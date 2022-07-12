@@ -1,12 +1,11 @@
 from fastapi import APIRouter
 
 router = APIRouter(
-    prefix="/whalechart",
-    tags="chart",
-    dependencies=[],
-    responses={404: {"description": "Not found"}}
+	prefix="/whalechart",
+	tags=["chart"],
+	responses={404: {"description": "Not found"}}
 )
 
 @router.get("/")
-async def whale_chart():
-    pass
+async def get_whalechart():
+	return {"message" : "This will be whalechart route"}
