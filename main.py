@@ -1,12 +1,7 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import select
 
-from routers import whalechart
-
-import database, dependencies
-database.Base.metadata.create_all(bind=database.engine)
+from routers import whalechart, param
 
 """
 =============================
@@ -33,11 +28,15 @@ description = """
 	* Behaviour: supply & demand, momentum, trend, time
 """
 
+# INITIATE DATABASE
+# db.Base.metadata.create_all(bind=db.engine)
+
 # INITIATE APP
 app = FastAPI(
+	debug=True,
 	title="quantist_api",
 	description=description,
-	version="0.0.1",
+	version="0.0.0",
 	contact={
 		"name": "Kevin Daffa Arrahman",
 		"email": "kevindaffaarr@quantist.io"
@@ -54,29 +53,10 @@ app.add_middleware(
 	allow_headers=["*"]
 )
 
-# DB Dependency
-def get_db():
-	db=database.SessionLocal()
-	try:
-		yield db
-	finally:
-		db.close()
-
-# Function
-def get_list_stock(db: Session, only_code: bool = True):
-	if only_code:
-		return db.execute(select(database.ListStock.index,database.ListStock.code)).scalars().all()
-	else:
-		return db.execute(select(database.ListStock)).scalars().all()
-
 # INCLUDE ROUTER
 app.include_router(whalechart.router)
+app.include_router(param.router)
 
 @app.get("/")
 async def home():
 	return {"message": "Welcome to Quantist.io"}
-
-@app.get("/list/{list_category}", response_model=list[dependencies.ListStockExtended])
-def get_list(list_category: dependencies.ListCategory, db: Session = Depends(get_db)):
-	db_list_stock = get_list_stock(db=db, only_code=False)
-	return db_list_stock

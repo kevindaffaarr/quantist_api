@@ -147,3 +147,5 @@ class StockTransaction(Base):
 	svol = Column(Numeric)
 	index = Column(Integer, primary_key=True, autoincrement=True, index=True, nullable=False)
 
+# INITIATE DATABASE
+# db.Base.metadata.create_all(bind=db.engine)
