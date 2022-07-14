@@ -28,9 +28,6 @@ description = """
 	* Behaviour: supply & demand, momentum, trend, time
 """
 
-# INITIATE DATABASE
-# db.Base.metadata.create_all(bind=db.engine)
-
 # INITIATE APP
 app = FastAPI(
 	debug=True,
