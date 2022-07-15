@@ -1,3 +1,4 @@
+import os
 # ==========
 # DATABASE CONNECTION
 # ==========
@@ -12,10 +13,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import select
 
 # PostgreSQL
-DB_USER = "postgres"
-DB_PASSWORD = "admin"
-DB_HOST = "localhost"
-DB_NAME = "quantist_marketdata"
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_NAME = os.getenv("DB_NAME")
 DB_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
 
 # Create Engine
