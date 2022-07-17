@@ -1,8 +1,7 @@
 # ==========
 # Pydantics Database Schema
 # ==========
-from unicodedata import numeric
-from pydantic import BaseModel, typing
+from pydantic import BaseModel
 from decimal import Decimal
 
 class DataParam(BaseModel):

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, Depends
-import dp
-import db
+import dependencies as dp
+import database as db
 
 # ==========
 # Router Initiation
