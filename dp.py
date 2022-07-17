@@ -1,24 +1,22 @@
 # ==========
 # Pydantics Database Schema
 # ==========
+from unicodedata import numeric
 from pydantic import BaseModel
 from decimal import Decimal
 
-class ListStockBase(BaseModel):
-	code: str
-
-class ListStockExtended(ListStockBase):
+class ListCodeBase(BaseModel):
 	index: int
-	volume: Decimal | None = None
-	frequency: Decimal | None = None
-	foreignsell: Decimal | None = None
-	foreignbuy: Decimal | None = None
+	code: str
 
 	class Config:
 		orm_mode = True
 
-class ListStock(ListStockBase):
-	index: int
+class ListCode(ListCodeBase):
+	volume: Decimal | None = None
+	frequency: Decimal | None = None
+	foreignsell: Decimal | None = None
+	foreignbuy: Decimal | None = None
 
 	class Config:
 		orm_mode = True

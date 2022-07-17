@@ -2,11 +2,11 @@
 .
 └── quantist_api
 	├── __init__.py
-	├── db.py
+	├── db.py # Database SQLAlchemy
 	│	├── SQLAlchemy Database Connection
 	│	├── get_dbs: dbs=SessionLocal()
 	│	└── Database Model
-	├── dependencies.py
+	├── dp.py # Dependencies and Pydantics Schema
 	│	├── Pydantics Database Schema
 	│	└── Parameter Enum Class
 	├── main.py

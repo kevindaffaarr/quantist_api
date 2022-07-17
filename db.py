@@ -90,7 +90,7 @@ class IndexTransactionCompositeBroker(Base):
 	sval = Column(Numeric)
 	svol = Column(Numeric)
 
-class IndexTransactionCompositeBroker(Base):
+class IndexTransactionCompositeForeign(Base):
 	__tablename__ = "indextransaction_composite_foreign"
 	index = Column(Integer, primary_key=True, autoincrement=True, index=True, nullable=False)
 	date = Column(Date, index=True, nullable=False)
@@ -149,4 +149,4 @@ class StockTransaction(Base):
 	index = Column(Integer, primary_key=True, autoincrement=True, index=True, nullable=False)
 
 # INITIATE DATABASE
-# db.Base.metadata.create_all(bind=db.engine)
+# Base.metadata.create_all(bind=engine)
