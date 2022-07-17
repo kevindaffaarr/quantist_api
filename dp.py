@@ -2,8 +2,16 @@
 # Pydantics Database Schema
 # ==========
 from unicodedata import numeric
-from pydantic import BaseModel
+from pydantic import BaseModel, typing
 from decimal import Decimal
+
+class DataParam(BaseModel):
+	index: int
+	param: str
+	value: str
+
+	class Config:
+		orm_mode = True
 
 class ListCodeBase(BaseModel):
 	index: int
