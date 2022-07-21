@@ -60,22 +60,29 @@ class StockFFFull(WhaleBase):
 		fpow_medium_fprop = default_ff['default_ff_fpow_medium_fprop'] if fpow_medium_fprop is None else fpow_medium_fprop
 		fpow_medium_fpricecorrel = default_ff['default_ff_fpow_medium_fpricecorrel'] if fpow_medium_fpricecorrel is None else fpow_medium_fpricecorrel
 		fpow_medium_fmapricecorrel = default_ff['default_ff_fpow_medium_fmapricecorrel'] if fpow_medium_fmapricecorrel is None else fpow_medium_fmapricecorrel
+		preoffset_period_param = max(period_fmf,period_fprop,period_fpricecorrel,(period_fmapricecorrel+period_fvwap))-1
 
 		# Raw Data: Assign variable self.raw_data
 		# TODO: Set limit bar range dilebihin (offset) sesuai dengan kebutuhan indicators period
 		# 		berdasarkan max of period variables
-		self.__get_raw_data(dbs,self.stockcode,self.startdate,self.enddate,default_bar_range)
+		self.__get_raw_data(dbs,self.stockcode,\
+			self.startdate,self.enddate,\
+			default_bar_range,preoffset_period_param)
 
 		# Foreign Flow Indicators
 		self.ff_indicators = self.calc_ff_indicators(self.raw_data,\
-			period_fmf,period_fprop,period_fpricecorrel,period_fmapricecorrel,period_fvwap
+			period_fmf,period_fprop,period_fpricecorrel,period_fmapricecorrel,period_fvwap,\
+			fpow_high_fprop,fpow_high_fpricecorrel,fpow_high_fmapricecorrel,fpow_medium_fprop,\
+			fpow_medium_fpricecorrel,fpow_medium_fmapricecorrel,\
+			preoffset_period_param
 			)
 
 	def __get_raw_data(self, dbs:db.Session = next(db.get_dbs()),
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
-		default_bar_range:int | None = None
+		default_bar_range:int | None = None,
+		preoffset_period_param: int | None = 50
 		):
 		# Query Definition
 		qry = dbs.query(
@@ -89,16 +96,31 @@ class StockFFFull(WhaleBase):
 			db.StockData.foreignbuy,
 			db.StockData.foreignsell
 		).filter(db.StockData.code == stockcode)
+		
+		# Main Query
 		if startdate is None:
-			qry = qry.filter(db.StockData.date <= enddate)\
+			qry_main = qry.filter(db.StockData.date <= enddate)\
 				.order_by(db.StockData.date.desc())\
 				.limit(default_bar_range)
 		else:
-			qry = qry.filter(db.StockData.date.between(startdate, enddate))
+			qry_main = qry.filter(db.StockData.date.between(startdate, enddate))
 		
-		# Query Fetching
-		raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])\
+		# Main Query Fetching
+		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
 			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
+		
+		# Pre-Data Query
+		self.startdate = raw_data_main.index[0].date() # Assign self.startdate
+		qry_pre = qry.filter(db.StockData.date < self.startdate)\
+			.order_by(db.StockData.date.desc())\
+			.limit(preoffset_period_param)
+
+		# Pre Query Fetching
+		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"])\
+			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
+
+		# Concatenate Pre and Main Query
+		raw_data = pd.concat([raw_data_pre,raw_data_main])
 
 		# Data Cleansing: zero openprice replace with previous
 		raw_data['openprice'] = raw_data['openprice'].mask(raw_data['openprice'].eq(0),raw_data['previous'])
@@ -119,7 +141,8 @@ class StockFFFull(WhaleBase):
 		fpow_high_fmapricecorrel: int | None = 50,
 		fpow_medium_fprop: int | None = 20,
 		fpow_medium_fpricecorrel: int | None = 50,
-		fpow_medium_fmapricecorrel: int | None = 50
+		fpow_medium_fmapricecorrel: int | None = 50,
+		preoffset_period_param: int | None = 0
 		):
 		# Define fbval, fsval, netvol, netval
 		raw_data['fbval'] = raw_data['close']*raw_data['foreignbuy']
@@ -141,7 +164,6 @@ class StockFFFull(WhaleBase):
 		raw_data['fnetprop'] = abs(raw_data['fbval']-raw_data['fsval']).rolling(window=period_fprop).sum()\
 			/(raw_data['value'].rolling(window=period_fprop).sum()*2)
 
-		pass
 		# FPriceCorrel
 		raw_data['fpricecorrel'] = raw_data['close'].rolling(window=period_fpricecorrel)\
 			.corr(raw_data['netvol'])
@@ -169,5 +191,5 @@ class StockFFFull(WhaleBase):
 		)
 
 		# End of Method: Return Processed Raw Data to FF Indicators
-		ff_indicators = raw_data
-		return ff_indicators
+		return raw_data.drop(raw_data.index[:preoffset_period_param])
+
