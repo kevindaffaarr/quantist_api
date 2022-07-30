@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import database as db
+from quantist_library import genchart
 
 class WhaleBase():
 	def __init__(self) -> None:
@@ -44,7 +45,7 @@ class StockFFFull(WhaleBase):
 		):
 
 		# Data Parameter
-		self.stockcode = super()._get_default_stockcode(dbs) if stockcode is None else stockcode # Default stock is parameterized, may become a branding or endorsement option
+		self.stockcode = (super()._get_default_stockcode(dbs) if stockcode is None else stockcode).lower() # Default stock is parameterized, may become a branding or endorsement option
 		self.startdate = startdate # If the startdate is None, will be overridden by default_bar_range
 		self.enddate = enddate # If the enddate is None, the default is already today date
 		default_bar_range = super()._get_default_bar_range(dbs) if self.startdate is None else None # If the startdate is None, then the query goes to end date to the limit of default_bar_range
@@ -63,8 +64,6 @@ class StockFFFull(WhaleBase):
 		preoffset_period_param = max(period_fmf,period_fprop,period_fpricecorrel,(period_fmapricecorrel+period_fvwap))-1
 
 		# Raw Data: Assign variable self.raw_data
-		# TODO: Set limit bar range dilebihin (offset) sesuai dengan kebutuhan indicators period
-		# 		berdasarkan max of period variables
 		self.__get_raw_data(dbs,self.stockcode,\
 			self.startdate,self.enddate,\
 			default_bar_range,preoffset_period_param)
@@ -76,6 +75,9 @@ class StockFFFull(WhaleBase):
 			fpow_medium_fpricecorrel,fpow_medium_fmapricecorrel,\
 			preoffset_period_param
 			)
+
+		# Not to be ran inside init, but just as a method that return plotly fig
+		# self.chart()
 
 	def __get_raw_data(self, dbs:db.Session = next(db.get_dbs()),
 		stockcode: str = ...,
@@ -115,7 +117,7 @@ class StockFFFull(WhaleBase):
 			.order_by(db.StockData.date.desc())\
 			.limit(preoffset_period_param)
 
-		# Pre Query Fetching
+		# Pre-Data Query Fetching
 		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"])\
 			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
 
@@ -133,7 +135,7 @@ class StockFFFull(WhaleBase):
 		raw_data: pd.DataFrame,
 		period_fmf: int | None = 1,
 		period_fprop: int | None = 1,
-		period_fpricecorrel: int | None = 10,
+		period_fpricecorrel: int | None = 20,
 		period_fmapricecorrel: int | None = 50,
 		period_fvwap:int | None = 10,
 		fpow_high_fprop: int | None = 40,
@@ -151,7 +153,7 @@ class StockFFFull(WhaleBase):
 		raw_data['netval'] = raw_data['fbval']-raw_data['fsval']
 		
 		# FF
-		raw_data['ffvol'] = raw_data['netvol'].cumsum()
+		raw_data['fvolflow'] = raw_data['netvol'].cumsum()
 
 		# FMF
 		raw_data['fmf'] = raw_data['netval'].rolling(window=period_fmf).sum()
@@ -172,8 +174,8 @@ class StockFFFull(WhaleBase):
 		raw_data['fmapricecorrel'] = raw_data['fpricecorrel'].rolling(window=period_fmapricecorrel).mean()
 		
 		# FVWAP
-		raw_data['fvwap'] = raw_data['netval'].rolling(window=period_fvwap).sum()\
-			/raw_data['netvol'].rolling(window=period_fvwap).sum()
+		raw_data['fvwap'] = (raw_data['netval'].rolling(window=period_fvwap).apply(lambda x: x[x>0].sum()))\
+			/(raw_data['netvol'].rolling(window=period_fvwap).apply(lambda x: x[x>0].sum()))
 		
 		raw_data['fvwap'] = raw_data['fvwap'].mask(raw_data['fvwap'].le(0)).ffill()
 		
@@ -181,15 +183,18 @@ class StockFFFull(WhaleBase):
 		raw_data['fpow'] = np.where(
 				(raw_data["fprop"]>(fpow_high_fprop/100)) & \
 				(raw_data['fpricecorrel']>(fpow_high_fpricecorrel/100)) & \
-				(raw_data['fmapricecorrel']>(fpow_high_fmapricecorrel/100)),"High",
+				(raw_data['fmapricecorrel']>(fpow_high_fmapricecorrel/100)),3,
 			np.where(
 				(raw_data["fprop"]>(fpow_medium_fprop/100)) & \
 				(raw_data['fpricecorrel']>(fpow_medium_fpricecorrel/100)) & \
-				(raw_data['fmapricecorrel']>(fpow_medium_fmapricecorrel/100)),"Medium",
-				"Low"
+				(raw_data['fmapricecorrel']>(fpow_medium_fmapricecorrel/100)),2,
+				2
 			)
 		)
 
 		# End of Method: Return Processed Raw Data to FF Indicators
 		return raw_data.drop(raw_data.index[:preoffset_period_param])
-
+	
+	def chart(self):
+		fig = genchart.foreign_chart(self.stockcode,self.ff_indicators)
+		return fig
