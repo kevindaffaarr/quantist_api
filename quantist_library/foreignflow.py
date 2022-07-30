@@ -44,41 +44,48 @@ class StockFFFull(WhaleBase):
 		dbs: db.Session = next(db.get_dbs())
 		):
 
-		# Data Parameter
+		# Check Does Stock Code Exists
 		self.stockcode = (super()._get_default_stockcode(dbs) if stockcode is None else stockcode).lower() # Default stock is parameterized, may become a branding or endorsement option
-		self.startdate = startdate # If the startdate is None, will be overridden by default_bar_range
-		self.enddate = enddate # If the enddate is None, the default is already today date
-		default_bar_range = super()._get_default_bar_range(dbs) if self.startdate is None else None # If the startdate is None, then the query goes to end date to the limit of default_bar_range
-		default_ff = super()._get_default_ff(dbs)
-		period_fmf = default_ff['default_ff_period_fmf'] if period_fmf is None else period_fmf
-		period_fprop = default_ff['default_ff_period_fprop'] if period_fprop is None else period_fprop
-		period_fpricecorrel = default_ff['default_ff_period_fpricecorrel'] if period_fpricecorrel is None else period_fpricecorrel
-		period_fmapricecorrel = default_ff['default_ff_period_fmapricecorrel'] if period_fmapricecorrel is None else period_fmapricecorrel
-		period_fvwap = default_ff['default_ff_period_fvwap'] if period_fvwap is None else period_fvwap
-		fpow_high_fprop = default_ff['default_ff_fpow_high_fprop'] if fpow_high_fprop is None else fpow_high_fprop
-		fpow_high_fpricecorrel = default_ff['default_ff_fpow_high_fpricecorrel'] if fpow_high_fpricecorrel is None else fpow_high_fpricecorrel
-		fpow_high_fmapricecorrel = default_ff['default_ff_fpow_high_fmapricecorrel'] if fpow_high_fmapricecorrel is None else fpow_high_fmapricecorrel
-		fpow_medium_fprop = default_ff['default_ff_fpow_medium_fprop'] if fpow_medium_fprop is None else fpow_medium_fprop
-		fpow_medium_fpricecorrel = default_ff['default_ff_fpow_medium_fpricecorrel'] if fpow_medium_fpricecorrel is None else fpow_medium_fpricecorrel
-		fpow_medium_fmapricecorrel = default_ff['default_ff_fpow_medium_fmapricecorrel'] if fpow_medium_fmapricecorrel is None else fpow_medium_fmapricecorrel
-		preoffset_period_param = max(period_fmf,period_fprop,period_fpricecorrel,(period_fmapricecorrel+period_fvwap))-1
+		qry = dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
+		row = pd.read_sql(sql=qry.statement, con=dbs.bind)
+		
+		if len(row) == 0:
+			raise KeyError("There is no such stock code in the database.")
+		else:
+			# Data Parameter
+			self.startdate = startdate # If the startdate is None, will be overridden by default_bar_range
+			self.enddate = enddate # If the enddate is None, the default is already today date
+			default_bar_range = super()._get_default_bar_range(dbs) if self.startdate is None else None # If the startdate is None, then the query goes to end date to the limit of default_bar_range
+			default_ff = super()._get_default_ff(dbs)
+			period_fmf = default_ff['default_ff_period_fmf'] if period_fmf is None else period_fmf
+			period_fprop = default_ff['default_ff_period_fprop'] if period_fprop is None else period_fprop
+			period_fpricecorrel = default_ff['default_ff_period_fpricecorrel'] if period_fpricecorrel is None else period_fpricecorrel
+			period_fmapricecorrel = default_ff['default_ff_period_fmapricecorrel'] if period_fmapricecorrel is None else period_fmapricecorrel
+			period_fvwap = default_ff['default_ff_period_fvwap'] if period_fvwap is None else period_fvwap
+			fpow_high_fprop = default_ff['default_ff_fpow_high_fprop'] if fpow_high_fprop is None else fpow_high_fprop
+			fpow_high_fpricecorrel = default_ff['default_ff_fpow_high_fpricecorrel'] if fpow_high_fpricecorrel is None else fpow_high_fpricecorrel
+			fpow_high_fmapricecorrel = default_ff['default_ff_fpow_high_fmapricecorrel'] if fpow_high_fmapricecorrel is None else fpow_high_fmapricecorrel
+			fpow_medium_fprop = default_ff['default_ff_fpow_medium_fprop'] if fpow_medium_fprop is None else fpow_medium_fprop
+			fpow_medium_fpricecorrel = default_ff['default_ff_fpow_medium_fpricecorrel'] if fpow_medium_fpricecorrel is None else fpow_medium_fpricecorrel
+			fpow_medium_fmapricecorrel = default_ff['default_ff_fpow_medium_fmapricecorrel'] if fpow_medium_fmapricecorrel is None else fpow_medium_fmapricecorrel
+			preoffset_period_param = max(period_fmf,period_fprop,period_fpricecorrel,(period_fmapricecorrel+period_fvwap))-1
 
-		# Raw Data: Assign variable self.raw_data
-		self.__get_raw_data(dbs,self.stockcode,\
-			self.startdate,self.enddate,\
-			default_bar_range,preoffset_period_param)
+			# Raw Data: Assign variable self.raw_data
+			self.__get_raw_data(dbs,self.stockcode,\
+				self.startdate,self.enddate,\
+				default_bar_range,preoffset_period_param)
 
-		# Foreign Flow Indicators
-		self.ff_indicators = self.calc_ff_indicators(self.raw_data,\
-			period_fmf,period_fprop,period_fpricecorrel,period_fmapricecorrel,period_fvwap,\
-			fpow_high_fprop,fpow_high_fpricecorrel,fpow_high_fmapricecorrel,fpow_medium_fprop,\
-			fpow_medium_fpricecorrel,fpow_medium_fmapricecorrel,\
-			preoffset_period_param
-			)
+			# Foreign Flow Indicators
+			self.ff_indicators = self.calc_ff_indicators(self.raw_data,\
+				period_fmf,period_fprop,period_fpricecorrel,period_fmapricecorrel,period_fvwap,\
+				fpow_high_fprop,fpow_high_fpricecorrel,fpow_high_fmapricecorrel,fpow_medium_fprop,\
+				fpow_medium_fpricecorrel,fpow_medium_fmapricecorrel,\
+				preoffset_period_param
+				)
 
-		# Not to be ran inside init, but just as a method that return plotly fig
-		# self.chart()
-
+			# Not to be ran inside init, but just as a method that return plotly fig
+			# self.chart()
+		
 	def __get_raw_data(self, dbs:db.Session = next(db.get_dbs()),
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
