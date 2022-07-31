@@ -1,6 +1,8 @@
 import datetime
 import pandas as pd
 import numpy as np
+import json
+from plotly.utils import PlotlyJSONEncoder
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -128,3 +130,12 @@ def foreign_chart(stockcode:str | None=None,ff_indicators:pd.DataFrame = ...):
 	fig.update_layout(margin=dict(l=0,r=0,b=0,t=50,pad=0))
 
 	return fig
+
+def fig_to_json(fig:go.Figure):
+	return json.dumps(fig, cls=PlotlyJSONEncoder)
+
+def fig_to_image(fig:go.Figure,format:str | None = "jpeg"):
+	# File Export:
+	# fig.write_image("img.jpeg", engine="kaleido", width=1920, height=1080)
+	# Bytes Export:
+	return fig.to_image(format=format, engine="kaleido", width=1920, height=1080, scale=2)

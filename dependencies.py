@@ -36,3 +36,11 @@ class ListCategory(str,Enum):
 	broker = "broker"
 	index = "index"
 	stock = "stock"
+
+class ListMediaType(str,Enum):
+	png = "png"
+	jpeg = "jpeg"
+	jpg = "jpg"
+	webp = "webp"
+	svg = "svg"
+	json = "json"

@@ -1,7 +1,10 @@
 from fastapi import APIRouter, status, Depends
+from fastapi.responses import Response
 import datetime
-import dependencies as dp
+
 import database as db
+import dependencies as dp
+from quantist_library import foreignflow as ff
 
 # ==========
 # Router Initiation
@@ -22,9 +25,52 @@ router = APIRouter(
 # ==========
 @router.get("/")
 def get_whalechart(
-	stockcode: str | None = None, startdate: datetime.date | None = None, enddate: datetime.date | None = None,
+	media_type:dp.ListMediaType | None = "json",
+	stockcode: str | None = None,
+	startdate: datetime.date | None = None,
+	enddate: datetime.date | None = datetime.date.today(),
+	period_fmf: int | None = None,
+	period_fprop: int | None = None,
+	period_fpricecorrel: int | None = None,
+	period_fmapricecorrel: int | None = None,
+	period_fvwap:int | None = None,
+	fpow_high_fprop: int | None = None,
+	fpow_high_fpricecorrel: int | None = None,
+	fpow_high_fmapricecorrel: int | None = None,
+	fpow_medium_fprop: int | None = None,
+	fpow_medium_fpricecorrel: int | None = None,
+	fpow_medium_fmapricecorrel: int | None = None,
 	dbs: db.Session = Depends(db.get_dbs)
 ):
-	# TODO: (on-going) Quantist Library
-	# TODO: stockcode validation based on enum of ListStock + Composite
-	pass
+	if media_type not in ["png","jpeg","jpg","webp","svg","json"]:
+		media_type = "json"
+	
+	try:
+		chart = ff.StockFFFull(
+			stockcode=stockcode,
+			startdate=startdate,
+			enddate=enddate,
+			period_fmf=period_fmf,
+			period_fprop=period_fprop,
+			period_fpricecorrel=period_fpricecorrel,
+			period_fmapricecorrel=period_fmapricecorrel,
+			period_fvwap=period_fvwap,
+			fpow_high_fprop=fpow_high_fprop,
+			fpow_high_fpricecorrel=fpow_high_fpricecorrel,
+			fpow_high_fmapricecorrel=fpow_high_fmapricecorrel,
+			fpow_medium_fprop=fpow_medium_fprop,
+			fpow_medium_fpricecorrel=fpow_medium_fpricecorrel,
+			fpow_medium_fmapricecorrel=fpow_medium_fmapricecorrel,
+			dbs=dbs
+		).chart(media_type=media_type)
+
+	except KeyError as err:
+		return err.args[0]
+	else:
+		if media_type in ["png","jpeg","jpg","webp"]:
+			media_type = f"image/{media_type}"
+		elif media_type == "svg":
+			media_type = "image/svg+xml"
+		else:
+			media_type = f"application/json"
+		return Response(content=chart, media_type=media_type)

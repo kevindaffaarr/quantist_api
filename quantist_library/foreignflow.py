@@ -94,7 +94,7 @@ class StockFFFull(WhaleBase):
 			)
 
 		# Not to be ran inside init, but just as a method that return plotly fig
-		# self.chart()
+		# self.chart(media_type="json")
 		
 	def __get_stock_raw_data(self, dbs:db.Session = next(db.get_dbs()),
 		stockcode: str = ...,
@@ -266,7 +266,11 @@ class StockFFFull(WhaleBase):
 		# End of Method: Return Processed Raw Data to FF Indicators
 		return raw_data.drop(raw_data.index[:preoffset_period_param])
 	
-	def chart(self):
+	def chart(self,media_type:str | None = None):
 		fig = genchart.foreign_chart(self.stockcode,self.ff_indicators)
-		return fig
-
+		if media_type in ["png","jpeg","jpg","webp","svg"]:
+			return genchart.fig_to_image(fig,media_type)
+		elif media_type == "json":
+			return genchart.fig_to_json(fig)
+		else:
+			return fig
