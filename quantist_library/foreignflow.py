@@ -24,7 +24,7 @@ class WhaleBase():
 		return pd.Series(\
 			pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value']\
 			).astype(int)
-
+	
 class StockFFFull(WhaleBase):
 	def __init__(self,
 		stockcode: str | None = None,
@@ -44,49 +44,59 @@ class StockFFFull(WhaleBase):
 		dbs: db.Session = next(db.get_dbs())
 		):
 
-		# Check Does Stock Code Exists
+		# Check Does Stock Code is composite
 		self.stockcode = (super()._get_default_stockcode(dbs) if stockcode is None else stockcode).lower() # Default stock is parameterized, may become a branding or endorsement option
-		qry = dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
-		row = pd.read_sql(sql=qry.statement, con=dbs.bind)
 		
-		if len(row) == 0:
-			raise KeyError("There is no such stock code in the database.")
+		if self.stockcode == 'composite':
+			self.type = 'composite'
 		else:
-			# Data Parameter
-			self.startdate = startdate # If the startdate is None, will be overridden by default_bar_range
-			self.enddate = enddate # If the enddate is None, the default is already today date
-			default_bar_range = super()._get_default_bar_range(dbs) if self.startdate is None else None # If the startdate is None, then the query goes to end date to the limit of default_bar_range
-			default_ff = super()._get_default_ff(dbs)
-			period_fmf = default_ff['default_ff_period_fmf'] if period_fmf is None else period_fmf
-			period_fprop = default_ff['default_ff_period_fprop'] if period_fprop is None else period_fprop
-			period_fpricecorrel = default_ff['default_ff_period_fpricecorrel'] if period_fpricecorrel is None else period_fpricecorrel
-			period_fmapricecorrel = default_ff['default_ff_period_fmapricecorrel'] if period_fmapricecorrel is None else period_fmapricecorrel
-			period_fvwap = default_ff['default_ff_period_fvwap'] if period_fvwap is None else period_fvwap
-			fpow_high_fprop = default_ff['default_ff_fpow_high_fprop'] if fpow_high_fprop is None else fpow_high_fprop
-			fpow_high_fpricecorrel = default_ff['default_ff_fpow_high_fpricecorrel'] if fpow_high_fpricecorrel is None else fpow_high_fpricecorrel
-			fpow_high_fmapricecorrel = default_ff['default_ff_fpow_high_fmapricecorrel'] if fpow_high_fmapricecorrel is None else fpow_high_fmapricecorrel
-			fpow_medium_fprop = default_ff['default_ff_fpow_medium_fprop'] if fpow_medium_fprop is None else fpow_medium_fprop
-			fpow_medium_fpricecorrel = default_ff['default_ff_fpow_medium_fpricecorrel'] if fpow_medium_fpricecorrel is None else fpow_medium_fpricecorrel
-			fpow_medium_fmapricecorrel = default_ff['default_ff_fpow_medium_fmapricecorrel'] if fpow_medium_fmapricecorrel is None else fpow_medium_fmapricecorrel
-			preoffset_period_param = max(period_fmf,period_fprop,period_fpricecorrel,(period_fmapricecorrel+period_fvwap))-1
+			qry = dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
+			row = pd.read_sql(sql=qry.statement, con=dbs.bind)
+			if len(row) != 0:
+				self.type = 'stock'
+			else:
+				raise KeyError("There is no such stock code in the database.")
+		
+		# Data Parameter
+		self.startdate = startdate # If the startdate is None, will be overridden by default_bar_range
+		self.enddate = enddate # If the enddate is None, the default is already today date
+		default_bar_range = super()._get_default_bar_range(dbs) if self.startdate is None else None # If the startdate is None, then the query goes to end date to the limit of default_bar_range
+		default_ff = super()._get_default_ff(dbs)
+		period_fmf = default_ff['default_ff_period_fmf'] if period_fmf is None else period_fmf
+		period_fprop = default_ff['default_ff_period_fprop'] if period_fprop is None else period_fprop
+		period_fpricecorrel = default_ff['default_ff_period_fpricecorrel'] if period_fpricecorrel is None else period_fpricecorrel
+		period_fmapricecorrel = default_ff['default_ff_period_fmapricecorrel'] if period_fmapricecorrel is None else period_fmapricecorrel
+		period_fvwap = default_ff['default_ff_period_fvwap'] if period_fvwap is None else period_fvwap
+		fpow_high_fprop = default_ff['default_ff_fpow_high_fprop'] if fpow_high_fprop is None else fpow_high_fprop
+		fpow_high_fpricecorrel = default_ff['default_ff_fpow_high_fpricecorrel'] if fpow_high_fpricecorrel is None else fpow_high_fpricecorrel
+		fpow_high_fmapricecorrel = default_ff['default_ff_fpow_high_fmapricecorrel'] if fpow_high_fmapricecorrel is None else fpow_high_fmapricecorrel
+		fpow_medium_fprop = default_ff['default_ff_fpow_medium_fprop'] if fpow_medium_fprop is None else fpow_medium_fprop
+		fpow_medium_fpricecorrel = default_ff['default_ff_fpow_medium_fpricecorrel'] if fpow_medium_fpricecorrel is None else fpow_medium_fpricecorrel
+		fpow_medium_fmapricecorrel = default_ff['default_ff_fpow_medium_fmapricecorrel'] if fpow_medium_fmapricecorrel is None else fpow_medium_fmapricecorrel
+		preoffset_period_param = max(period_fmf,period_fprop,period_fpricecorrel,(period_fmapricecorrel+period_fvwap))-1
 
-			# Raw Data: Assign variable self.raw_data
-			self.__get_raw_data(dbs,self.stockcode,\
+		# Raw Data
+		if self.type == 'stock':
+			self.raw_data = self.__get_stock_raw_data(dbs,self.stockcode,\
 				self.startdate,self.enddate,\
 				default_bar_range,preoffset_period_param)
+		elif self.type == 'composite':
+			self.raw_data = self.__get_composite_raw_data(dbs,\
+				self.startdate,self.enddate,\
+				default_bar_range,preoffset_period_param)
+			
+		# Foreign Flow Indicators
+		self.ff_indicators = self.calc_ff_indicators(self.raw_data,\
+			period_fmf,period_fprop,period_fpricecorrel,period_fmapricecorrel,period_fvwap,\
+			fpow_high_fprop,fpow_high_fpricecorrel,fpow_high_fmapricecorrel,fpow_medium_fprop,\
+			fpow_medium_fpricecorrel,fpow_medium_fmapricecorrel,\
+			preoffset_period_param
+			)
 
-			# Foreign Flow Indicators
-			self.ff_indicators = self.calc_ff_indicators(self.raw_data,\
-				period_fmf,period_fprop,period_fpricecorrel,period_fmapricecorrel,period_fvwap,\
-				fpow_high_fprop,fpow_high_fpricecorrel,fpow_high_fmapricecorrel,fpow_medium_fprop,\
-				fpow_medium_fpricecorrel,fpow_medium_fmapricecorrel,\
-				preoffset_period_param
-				)
-
-			# Not to be ran inside init, but just as a method that return plotly fig
-			# self.chart()
+		# Not to be ran inside init, but just as a method that return plotly fig
+		# self.chart()
 		
-	def __get_raw_data(self, dbs:db.Session = next(db.get_dbs()),
+	def __get_stock_raw_data(self, dbs:db.Session = next(db.get_dbs()),
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
@@ -135,7 +145,61 @@ class StockFFFull(WhaleBase):
 		raw_data['openprice'] = raw_data['openprice'].mask(raw_data['openprice'].eq(0),raw_data['previous'])
 
 		# End of Method: Return or Assign Attribute
-		self.raw_data = raw_data
+		return raw_data
+
+	def __get_composite_raw_data(self, dbs:db.Session = next(db.get_dbs()),
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = ...,
+		default_bar_range:int | None = None,
+		preoffset_period_param: int | None = 50
+		):
+
+		# Query Definition
+		qry = dbs.query(
+			db.IndexData.date,
+			db.IndexData.previous.label('openprice'),
+			db.IndexData.highest.label('high'),
+			db.IndexData.lowest.label('low'),
+			db.IndexData.close,
+			db.IndexData.value,
+			db.IndexTransactionCompositeForeign.foreignbuyval.label('foreignbuy'),
+			db.IndexTransactionCompositeForeign.foreignsellval.label('foreignsell')
+		).filter(db.IndexData.code == 'composite')\
+		.join(db.IndexTransactionCompositeForeign,
+			db.IndexTransactionCompositeForeign.date == db.IndexData.date
+		)
+		
+		# Main Query
+		if startdate is None:
+			qry_main = qry.filter(db.IndexData.date <= enddate)\
+				.order_by(db.IndexData.date.desc())\
+				.limit(default_bar_range)
+		else:
+			qry_main = qry.filter(db.IndexData.date.between(startdate, enddate))
+		
+		# Main Query Fetching
+		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
+			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
+		
+		# Pre-Data Query
+		self.startdate = raw_data_main.index[0].date() # Assign self.startdate
+		qry_pre = qry.filter(db.IndexData.date < self.startdate)\
+			.order_by(db.IndexData.date.desc())\
+			.limit(preoffset_period_param)
+
+		# Pre-Data Query Fetching
+		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"])\
+			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
+
+		# Concatenate Pre and Main Query
+		raw_data = pd.concat([raw_data_pre,raw_data_main])
+
+		# Convert Foreign Transaction Value to Volume
+		raw_data["foreignbuy"] = raw_data["foreignbuy"]/raw_data["close"]
+		raw_data["foreignsell"] = raw_data["foreignsell"]/raw_data["close"]
+
+		# End of Method: Return or Assign Attribute
+		return raw_data
 
 	def calc_ff_indicators(
 		self,
@@ -205,3 +269,4 @@ class StockFFFull(WhaleBase):
 	def chart(self):
 		fig = genchart.foreign_chart(self.stockcode,self.ff_indicators)
 		return fig
+

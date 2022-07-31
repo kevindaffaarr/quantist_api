@@ -81,24 +81,19 @@ class IndexTransactionCompositeBroker(Base):
 	index = Column(Integer, primary_key=True, autoincrement=True, index=True, nullable=False)
 	date = Column(Date, index=True, nullable=False)
 	broker = Column(String(2), index=True, nullable=False)
-	bavg = Column(Numeric)
 	bfreq = Column(Numeric)
 	bval = Column(Numeric)
-	bvol = Column(Numeric)
-	savg = Column(Numeric)
 	sfreq = Column(Numeric)
 	sval = Column(Numeric)
-	svol = Column(Numeric)
 
 class IndexTransactionCompositeForeign(Base):
 	__tablename__ = "indextransaction_composite_foreign"
 	index = Column(Integer, primary_key=True, autoincrement=True, index=True, nullable=False)
 	date = Column(Date, index=True, nullable=False)
-	foreignbuy = Column(Numeric)
-	foreignsell = Column(Numeric)
+	foreignbuyval = Column(Numeric)
+	foreignsellval = Column(Numeric)
 	nonregularfrequency = Column(Numeric)
 	nonregularvalue = Column(Numeric)
-	nonregularvolume = Column(Numeric)
 
 class StockData(Base):
 	__tablename__ = "stockdata"

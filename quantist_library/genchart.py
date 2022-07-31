@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from sqlalchemy import false
 
 def foreign_chart(stockcode:str | None=None,ff_indicators:pd.DataFrame = ...):
 	# Make Subplots
