@@ -24,7 +24,8 @@ router = APIRouter(
 # Router
 # ==========
 @router.get("/")
-def get_whalechart(
+@router.get("/foreign")
+def get_whalechart_foreign(
 	media_type:dp.ListMediaType | None = "json",
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
@@ -62,10 +63,11 @@ def get_whalechart(
 			fpow_medium_fpricecorrel=fpow_medium_fpricecorrel,
 			fpow_medium_fmapricecorrel=fpow_medium_fmapricecorrel,
 			dbs=dbs
-		).chart(media_type=media_type)
+			).chart(media_type=media_type)
 
 	except KeyError as err:
 		return err.args[0]
+
 	else:
 		if media_type in ["png","jpeg","jpg","webp"]:
 			media_type = f"image/{media_type}"
