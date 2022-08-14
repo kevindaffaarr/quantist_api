@@ -12,7 +12,8 @@ def foreign_chart(stockcode:str | None=None,ff_indicators:pd.DataFrame = ...):
 		specs=[[{"secondary_y":True}],[{"secondary_y":True}]],
 		vertical_spacing=0,
 		row_heights=[0.7,0.3])
-	
+	fig.update_layout(xaxis3= {'anchor': 'y', 'overlaying': 'x','showgrid':False,"visible":False})
+
 	# Add Trace
 	# OHLC Candlestick
 	fig.add_trace(go.Candlestick(
@@ -37,6 +38,15 @@ def foreign_chart(stockcode:str | None=None,ff_indicators:pd.DataFrame = ...):
 		),
 		row=1,col=1,secondary_y=False
 	)
+	# Foreign Volume Profile
+	fig.add_trace(go.Histogram(x=ff_indicators['netval'],y=ff_indicators['close'],histfunc="sum",
+		name="Net Volume Profile",orientation="h",opacity=0.1),
+		row=1,col=1,secondary_y=True)
+	bins=np.arange(fig.full_figure_for_development(warn=False).data[3].ybins.start,\
+		fig.full_figure_for_development(warn=False).data[3].ybins.end,\
+		fig.full_figure_for_development(warn=False).data[3].ybins.size)
+	hist_bar = ff_indicators.groupby(pd.cut(ff_indicators['close'],bins=bins))['netval'].sum()
+	fig.data[3].update(marker=dict(color=np.where(hist_bar<0,"Tomato","cyan")),xaxis='x3')
 	# Foreign Proportion
 	fig.add_trace(go.Scatter(x=ff_indicators.index,y=ff_indicators['fprop']*100,
 		name="F Proportion %",marker_color="blue"
@@ -61,7 +71,7 @@ def foreign_chart(stockcode:str | None=None,ff_indicators:pd.DataFrame = ...):
 	fig.update_yaxes(title_text="Price", row=1, col=1, secondary_y=True, showgrid=True)
 	fig.update_yaxes(row=1, col=1,secondary_y=False,showgrid=False, zeroline=False)
 	# Row 2
-	fig.update_yaxes(title_text="F Proportion %", row=2, col=1, secondary_y=True, showgrid=True)
+	fig.update_yaxes(title_text="F Proportion %", row=2, col=1, secondary_y=True, showgrid=True, range=[0,101])
 	fig.update_yaxes(title_text="F Net Value", row=2, col=1,secondary_y=False, showgrid=False, zeroline=False)
 
 	dt_all = pd.date_range(start=ff_indicators.index[0],end=ff_indicators.index[-1])
@@ -72,7 +82,7 @@ def foreign_chart(stockcode:str | None=None,ff_indicators:pd.DataFrame = ...):
 	fig.update_xaxes(rangeslider={"autorange":True, "visible":False})
 	fig.update_xaxes(rangebreaks=[dict(values=dt_breaks)])
 	fig.update_layout(xaxis_range=[ff_indicators.index[0],ff_indicators.index[-1]+datetime.timedelta(days=round(len(ff_indicators)*0.1))])
-	
+
 	# ANNOTATION
 	fpricecorrel = ff_indicators.loc[ff_indicators.index[-1],'fpricecorrel']
 	if fpricecorrel >= 0.7:
@@ -106,7 +116,7 @@ def foreign_chart(stockcode:str | None=None,ff_indicators:pd.DataFrame = ...):
 		showarrow=False
 	)
 
-	fig.add_annotation(xref="paper",yref="paper",xanchor="left",yanchor="bottom",x=0.025,y=0.75,
+	fig.add_annotation(xref="paper",yref="paper",xanchor="left",yanchor="bottom",x=0.025,y=0.70,
 		align="left",bordercolor="Ivory",borderwidth=0,
 		showarrow=False,
 		text=f"\

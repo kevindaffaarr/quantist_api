@@ -10,7 +10,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import Column, Integer, String, Date, Numeric
 
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import select
 
 # PostgreSQL
 DB_USER = os.getenv("DB_USER")
