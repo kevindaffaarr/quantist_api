@@ -54,10 +54,10 @@ class ListStock(Base):
 	__tablename__ = "list_stock"
 	index = Column(Integer, primary_key=True, autoincrement=True, index=True, nullable=False)
 	code = Column(String, index=True, nullable=False)
-	volume = Column(Numeric)
+	value = Column(Numeric)
 	frequency = Column(Numeric)
-	foreignsell = Column(Numeric)
-	foreignbuy = Column(Numeric)
+	foreignsellval = Column(Numeric)
+	foreignbuyval = Column(Numeric)
 
 class IndexData(Base):
 	__tablename__ = "indexdata"
