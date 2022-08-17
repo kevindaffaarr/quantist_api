@@ -41,7 +41,6 @@ def get_whalechart_foreign(
 	fpow_medium_fprop: int | None = None,
 	fpow_medium_fpricecorrel: int | None = None,
 	fpow_medium_fmapricecorrel: int | None = None,
-	dbs: db.Session = Depends(db.get_dbs)
 ):
 	if media_type not in ["png","jpeg","jpg","webp","svg","json"]:
 		media_type = "json"
@@ -62,7 +61,6 @@ def get_whalechart_foreign(
 			fpow_medium_fprop=fpow_medium_fprop,
 			fpow_medium_fpricecorrel=fpow_medium_fpricecorrel,
 			fpow_medium_fmapricecorrel=fpow_medium_fmapricecorrel,
-			dbs=dbs
 			).chart(media_type=media_type)
 
 	except KeyError as err:
