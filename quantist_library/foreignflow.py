@@ -1,4 +1,3 @@
-from tracemalloc import start
 import pandas as pd
 import numpy as np
 import datetime
@@ -311,6 +310,18 @@ class WhaleRadar():
 		self.radar_indicators = self.calc_radar_indicators(\
 			stocks_raw_data=stocks_raw_data,radar_type=self.radar_type)
 
+		if include_composite == True:
+			composite_raw_data = self.__get_composite_raw_data(
+				startdate=self.startdate,
+				enddate=enddate,
+				bar_range=max(period_fmf,period_fpricecorrel) if self.startdate is None else None,
+				dbs=dbs
+			)
+			composite_radar_indicators = self.calc_radar_indicators(\
+				stocks_raw_data=composite_raw_data,radar_type=self.radar_type)
+			
+			self.radar_indicators = pd.concat([self.radar_indicators,composite_radar_indicators])
+
 		# Not to be ran inside init, but just as a method that return plotly fig
 		# self.chart(media_type="json")
 		
@@ -354,7 +365,6 @@ class WhaleRadar():
 		) -> pd.DataFrame:
 		# Jika belum ada startdate, maka perlu ditentukan batas mulainya
 		if startdate is None:
-			# CARA 1 (0.028s)
 			# Ambil tanggal-tanggal pada BBCA yang meliputi enddate dan limit hingga bar_range
 			sub_qry = dbs.query(db.StockData.date)\
 				.filter(db.StockData.code == 'bbca')\
@@ -385,6 +395,48 @@ class WhaleRadar():
 			.sort_values(by=["code","date"],ascending=[True,True]).reset_index(drop=True)
 		return stocks_raw_data
 	
+	def __get_composite_raw_data(self,
+		startdate:datetime.date|None=None,
+		enddate:datetime.date|None=None,
+		bar_range:int|None=5,
+		dbs:db.Session=next(db.get_dbs())
+		) ->  pd.DataFrame:
+		# Jika belum ada startdate, maka perlu ditentukan batas mulainya
+		if startdate is None:
+			# Ambil tanggal-tanggal pada composite yang meliputi enddate dan limit hingga bar_range
+			sub_qry = dbs.query(db.IndexData.date)\
+				.filter(db.IndexData.code == 'composite')\
+				.filter(db.IndexData.date <= enddate)\
+				.order_by(db.IndexData.date.desc())\
+				.limit(bar_range)\
+				.subquery()
+			# Ambil tanggal minimum yang pada akhirnya akan dijadikan sebagai startdate
+			sub_qry = dbs.query(func.min(sub_qry.c.date)).scalar_subquery()
+			
+			startdate = sub_qry
+
+		# else:
+			# startdate = startdate
+		
+		# Main Query
+		qry = dbs.query(
+			db.IndexData.code,
+			db.IndexData.date,
+			db.IndexData.close,
+			(db.IndexTransactionCompositeForeign.foreignbuyval/db.IndexData.close).label('foreignbuy'),
+			(db.IndexTransactionCompositeForeign.foreignsellval/db.IndexData.close).label('foreignsell')
+			).\
+			filter(db.IndexData.code=="composite")\
+			.filter(db.IndexData.date.between(startdate,enddate))\
+			.join(db.IndexTransactionCompositeForeign,
+				db.IndexTransactionCompositeForeign.date == db.IndexData.date
+			)
+
+		# Query Fetching: composite raw data
+		composite_raw_data = pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"])\
+			.sort_values(by=["date"],ascending=[True]).reset_index(drop=True)
+		return composite_raw_data
+
 	def calc_radar_indicators(self,
 		stocks_raw_data:pd.DataFrame,
 		radar_type:dp.ListRadarType | None = "correlation"
