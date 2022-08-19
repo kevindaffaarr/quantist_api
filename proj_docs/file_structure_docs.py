@@ -16,7 +16,7 @@
 	├── routers
 	│	├── __init__.py
 	│	├── param.py
-	│	└── whalechart.py
+	│	└── whaleanalysis.py
 	└── proj_docs
 		├── fastapi_docs.py
 		└── file_structure_docs.py # This File

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import whalechart, param
+from routers import whaleanalysis, param
 
 """
 =============================
@@ -51,7 +51,7 @@ app.add_middleware(
 )
 
 # INCLUDE ROUTER
-app.include_router(whalechart.router)
+app.include_router(whaleanalysis.router)
 app.include_router(param.router)
 
 @app.get("/")
