@@ -1,8 +1,7 @@
-from fastapi import APIRouter, status, Depends
+from fastapi import APIRouter, status, Query
 from fastapi.responses import Response
 import datetime
 
-import database as db
 import dependencies as dp
 from quantist_library import foreignflow as ff
 
@@ -121,6 +120,40 @@ def get_foreign_data(
 		return full_data.to_dict(orient="index")
 
 @router.get("/foreign/radar")
-def get_foreign_radar():
+def get_foreign_radar(
+	media_type:dp.ListMediaType | None = "json",
+	startdate: datetime.date | None = None,
+	enddate: datetime.date | None = datetime.date.today(),
+	radar_type: dp.ListRadarType | None = "correlation",
+	stockcode_excludes: set[str] | None = Query(default=set()),
+	include_composite: bool | None = False,
+	screener_min_value: int | None = None,
+	screener_min_frequency: int | None = None,
+	screener_min_fprop:int | None = None,
+):
+	if media_type not in ["png","jpeg","jpg","webp","svg","json"]:
+		media_type = "json"
+	
+	try:
+		chart = ff.WhaleRadar(
+			startdate=startdate,
+			enddate=enddate,
+			radar_type=radar_type,
+			stockcode_excludes=stockcode_excludes,
+			include_composite=include_composite,
+			screener_min_value=screener_min_value,
+			screener_min_frequency=screener_min_frequency,
+			screener_min_fprop=screener_min_fprop
+		).chart(media_type=media_type)
 
-	return 0
+	except KeyError as err:
+		return err.args[0]
+
+	else:
+		if media_type in ["png","jpeg","jpg","webp"]:
+			media_type = f"image/{media_type}"
+		elif media_type == "svg":
+			media_type = "image/svg+xml"
+		else:
+			media_type = f"application/json"
+		return Response(content=chart, media_type=media_type)

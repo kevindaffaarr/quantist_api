@@ -1,8 +1,10 @@
+from tracemalloc import start
 import pandas as pd
 import numpy as np
 import datetime
 from sqlalchemy.sql import func
 import database as db
+import dependencies as dp
 from quantist_library import genchart
 
 class StockFFFull():
@@ -267,11 +269,12 @@ class WhaleRadar():
 	def __init__(self,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date | None = datetime.date.today(),
+		radar_type: dp.ListRadarType | None = "correlation",
+		stockcode_excludes: set[str] | None = set(),
+		include_composite: bool | None = False,
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
 		screener_min_fprop:int | None = None,
-		stockcode_excludes: set[str] | None = set(),
-		include_composite: bool | None = False,
 		dbs: db.Session = next(db.get_dbs())
 		):
 
@@ -299,11 +302,18 @@ class WhaleRadar():
 			bar_range=max(period_fmf,period_fpricecorrel) if startdate is None else None,
 			dbs=dbs)
 
-		# Calc Radar Indicators: last FMF
-		# Calc Radar Indicators: last fpricecorrel OR last change_percentage
+		# Set startdate and enddate based on data availability
+		self.startdate = stocks_raw_data['date'].min().date()
+		self.enddate = stocks_raw_data['date'].max().date()
+		self.radar_type = radar_type
 
-		pass
-	
+		# Calc Radar Indicators: last fpricecorrel OR last changepercentage
+		self.radar_indicators = self.calc_radar_indicators(\
+			stocks_raw_data=stocks_raw_data,radar_type=self.radar_type)
+
+		# Not to be ran inside init, but just as a method that return plotly fig
+		# self.chart(media_type="json")
+		
 	def __get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")))
@@ -323,13 +333,14 @@ class WhaleRadar():
 					stockcode_excludes
 		"""
 		# Query Definition
+		stockcode_excludes_lower = set(x.lower() for x in stockcode_excludes)
 		qry = dbs.query(db.ListStock.code)\
 			.filter((db.ListStock.value > screener_min_value) &
 					(db.ListStock.frequency > screener_min_frequency) &
 					(db.ListStock.foreignbuyval > 0) &
 					(db.ListStock.foreignsellval > 0) &
 					(((db.ListStock.foreignsellval+db.ListStock.foreignbuyval)/(db.ListStock.value*2)) > (screener_min_fprop/100)) &
-					(db.ListStock.code.not_in(stockcode_excludes)))
+					(db.ListStock.code.not_in(stockcode_excludes_lower)))
 		
 		# Query Fetching: filtered_stockcodes
 		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code'])
@@ -356,23 +367,8 @@ class WhaleRadar():
 			
 			startdate = sub_qry
 			
-			# CARA 2 (0.5s)
-			# qry = dbs.query(db.StockData.code,
-			# 	db.StockData.date,
-			# 	db.StockData.close,
-			# 	db.StockData.foreignbuy,
-			# 	db.StockData.foreignsell,
-			# 	func.row_number().over(
-			# 		partition_by=db.StockData.code,
-			# 		order_by=db.StockData.date.desc()
-			# 	).label('no')
-			# 	)\
-			# 	.filter(db.StockData.code.in_(filtered_stockcodes.to_list()))\
-			# 	.subquery()
-			# qry = dbs.query(qry).filter(qry.c.no <= bar_range)
-		
 		# else:
-		# 	startdate = startdate
+			# startdate = startdate
 
 		# Main Query
 		qry = dbs.query(db.StockData.code,
@@ -388,3 +384,42 @@ class WhaleRadar():
 		stocks_raw_data = pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"])\
 			.sort_values(by=["code","date"],ascending=[True,True]).reset_index(drop=True)
 		return stocks_raw_data
+	
+	def calc_radar_indicators(self,
+		stocks_raw_data:pd.DataFrame,
+		radar_type:dp.ListRadarType | None = "correlation"
+		) -> pd.DataFrame:
+		stocks_raw_data['netval'] = stocks_raw_data['close']*\
+			(stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell'])
+		
+		radar_indicators = pd.DataFrame()
+
+		# Y axis: fmf
+		radar_indicators['fmf'] = stocks_raw_data.groupby(by='code')['netval'].sum()
+
+		# X axis:
+		if radar_type == "correlation":
+			radar_indicators[radar_type] = stocks_raw_data.groupby(by='code')['netval']\
+				.corr(stocks_raw_data['close'])
+		elif radar_type == "changepercentage":
+			radar_indicators[radar_type] = \
+				(stocks_raw_data.groupby(by='code')['close'].nth([-1])- \
+				stocks_raw_data.groupby(by='code')['close'].nth([0]))/ \
+				stocks_raw_data.groupby(by='code')['close'].nth([0])
+		else:
+			raise Exception("Not a valid radar type")
+		
+		return radar_indicators
+	
+	def chart(self,media_type:str | None = None):
+		fig = genchart.radar_chart(
+			startdate=self.startdate,enddate=self.enddate,
+			radar_type=self.radar_type,
+			radar_indicators=self.radar_indicators
+		)
+		if media_type in ["png","jpeg","jpg","webp","svg"]:
+			return genchart.fig_to_image(fig,media_type)
+		elif media_type == "json":
+			return genchart.fig_to_json(fig)
+		else:
+			return fig

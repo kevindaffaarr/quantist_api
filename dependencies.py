@@ -44,3 +44,7 @@ class ListMediaType(str,Enum):
 	webp = "webp"
 	svg = "svg"
 	json = "json"
+
+class ListRadarType(str,Enum):
+	correlation = "correlation"
+	changepercentage = "changepercentage"

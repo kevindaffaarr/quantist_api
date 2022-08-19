@@ -6,7 +6,7 @@ from plotly.utils import PlotlyJSONEncoder
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-def foreign_chart(stockcode:str | None=None,ff_indicators:pd.DataFrame = ...):
+def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...) -> go.Figure:
 	# Make Subplots
 	fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
 		specs=[[{"secondary_y":True}],[{"secondary_y":True}]],
@@ -132,13 +132,70 @@ def foreign_chart(stockcode:str | None=None,ff_indicators:pd.DataFrame = ...):
 	# TITLE
 	STOCKCODE = stockcode.upper()
 	fig.update_layout(title={"text":f"<b>{STOCKCODE}</b>", "x":0.5})
-	fig.update_layout(legend={"orientation":"h","y":-0.1})
 
 	# UPDATE_LAYOUT GLOBAL DEFAULT TEMPLATE
-	fig.update_layout(template="plotly_dark")
+	fig.update_layout(legend={"orientation":"h","y":-0.1})
+	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
 	fig.update_layout(dragmode="pan")
 	fig.update_layout(margin=dict(l=0,r=0,b=0,t=50,pad=0))
 
+	return fig
+
+def radar_chart(startdate:datetime.date,enddate:datetime.date,
+	radar_type:str|None="correlation",
+	radar_indicators:pd.DataFrame=...
+	) -> go.Figure:
+	
+	# INIT
+	fig = go.Figure()
+
+	# ADD TRACE
+	fig.add_trace(go.Scatter(
+		x=radar_indicators["fmf"],
+		y=radar_indicators[radar_type]*100,
+		text=radar_indicators.index.str.upper(),
+		textposition="bottom center",
+		mode="markers+text",
+		name="Whale Radar",
+		marker_color="#BB86FC"
+		))
+	
+	# UPDATE AXES
+	fig.update_yaxes(title_text=radar_type.capitalize(), showgrid=True, zerolinewidth=3)
+	fig.update_xaxes(title_text="Foreign Money Flow",showgrid=True,zerolinewidth=3)
+	fig.update_xaxes(rangeslider={"autorange":True,"visible":False})
+	
+	# ANNOTATION
+	fig.add_annotation(xref="paper",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
+		text=f"<b>🔦 Chart by Quantist.io</b> | <b>Method: <span style='color:#BB86FC'>Foreign Flow</span></b> | Data date: {datetime.datetime.strftime(startdate,'%Y-%m-%d')} - {datetime.datetime.strftime(enddate,'%Y-%m-%d')}",
+		textangle=0,
+		showarrow=False
+	)
+	if radar_type == "correlation":
+		fig.update_yaxes(range=[-101,101])
+		q1 = "accumulation"
+		q2 = "distribution"
+		q3 = "markup"
+		q4 = "markdown"
+	elif radar_type == "changepercentage":
+		q1 = "accumulation"
+		q2 = "markup"
+		q3 = "distribution"
+		q4 = "markdown"
+	fig.add_annotation(xref="x domain",yref="y domain",x=1,y=1,text=q1,showarrow=False,font=dict(color="#BB86FC"))
+	fig.add_annotation(xref="x domain",yref="y domain",x=0,y=1,text=q2,showarrow=False,font=dict(color="#BB86FC"))
+	fig.add_annotation(xref="x domain",yref="y domain",x=0,y=0,text=q3,showarrow=False,font=dict(color="#BB86FC"))
+	fig.add_annotation(xref="x domain",yref="y domain",x=1,y=0,text=q4,showarrow=False,font=dict(color="#BB86FC"))
+
+	# TITLE
+	fig.update_layout(title={"text":f"<b>Whale Radar</b>", "x":0.5})
+	
+	# UPDATE_LAYOUT GLOBAL DEFAULT TEMPLATE
+	fig.update_layout(legend={"orientation":"h","y":-0.1})
+	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
+	fig.update_layout(dragmode="pan")
+	fig.update_layout(margin=dict(l=0,r=0,b=0,t=50,pad=0))
+	
 	return fig
 
 def fig_to_json(fig:go.Figure):
@@ -148,4 +205,4 @@ def fig_to_image(fig:go.Figure,format:str | None = "jpeg"):
 	# File Export:
 	# fig.write_image("img.jpeg", engine="kaleido", width=1920, height=1080)
 	# Bytes Export:
-	return fig.to_image(format=format, engine="kaleido", width=1920, height=1080, scale=2)
+	return fig.to_image(format=format, engine="kaleido", scale=5)
