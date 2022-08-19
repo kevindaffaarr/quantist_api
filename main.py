@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import whaleanalysis, param
+from dependencies import Tags
 
 """
 =============================
@@ -37,7 +38,8 @@ app = FastAPI(
 	contact={
 		"name": "Kevin Daffa Arrahman",
 		"email": "kevindaffaarr@quantist.io"
-	}
+	},
+	openapi_tags=[dict(tag.value) for tag in Tags]
 )
 
 # CORS https://fastapi.tiangolo.com/tutorial/cors/

@@ -64,7 +64,7 @@
     q: str | None = Query(default=..., max_length=16)
 
     # List of properties:
-    metadata: title, alias, descripion, deprecated
+    metadata: title, alias, description, deprecated
     string validations: min_length, max_length, regex
     numeric validatons: ge, gt, le, lt
 """
@@ -125,6 +125,27 @@
     example
     @app.get("/items/{item_id}", response_model=Item, response_model_exclude_unset=True)
 
+    https://fastapi.tiangolo.com/tutorial/response-model/
+
+==========
+[5] Metadata and Documentation
+==========
+Project Metadata
+    https://fastapi.tiangolo.com/tutorial/metadata/
+    metadata:title, description, version, terms_of_service,contact, license_info, tags_metadata
+API Endpoints
+    https://fastapi.tiangolo.com/tutorial/path-operation-configuration/
+    metadata: tags, summary, description, response description, deprecated
+Path
+    https://fastapi.tiangolo.com/tutorial/path-params-numeric-validations/#declare-metadata
+    metadata: title, 
+Query
+    https://fastapi.tiangolo.com/tutorial/query-params-str-validations/#declare-more-metadata
+    metadata: title, description, alias, deprecated
+Request Example Data
+    https://fastapi.tiangolo.com/tutorial/schema-extra-example/
+    metadata for: Body, Path, Query, Header, Cookie, Form, File
+Response Model
     https://fastapi.tiangolo.com/tutorial/response-model/
 """
 

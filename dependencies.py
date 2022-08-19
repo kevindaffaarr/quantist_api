@@ -1,9 +1,10 @@
+from pydantic import BaseModel
+from enum import Enum
+from decimal import Decimal
+
 # ==========
 # Pydantics Database Schema
 # ==========
-from pydantic import BaseModel
-from decimal import Decimal
-
 class DataParam(BaseModel):
 	index: int
 	param: str
@@ -12,26 +13,50 @@ class DataParam(BaseModel):
 	class Config:
 		orm_mode = True
 
-class ListCodeBase(BaseModel):
+class ListCode(BaseModel):
 	index: int
 	code: str
-
-	class Config:
-		orm_mode = True
-
-class ListCode(ListCodeBase):
-	volume: Decimal | None = None
+	value: Decimal | None = None
 	frequency: Decimal | None = None
-	foreignsell: Decimal | None = None
-	foreignbuy: Decimal | None = None
+	foreignsellval: Decimal | None = None
+	foreignbuyval: Decimal | None = None
 
 	class Config:
 		orm_mode = True
+
+# ==========
+# Metadata Tags
+# ==========
+class ExternalDocs(BaseModel):
+	description:str|None
+	url:str
+
+class MetadataTag(BaseModel):
+	name:str
+	description:str|None
+	external_docs:ExternalDocs|None
+
+class Tags(Enum):
+	chart = MetadataTag(
+		name="chart",
+		description="Generate chart by plotly, return plotly fig in json format as default, or png, jpeg, jpg, webp, and svg"
+		)
+	radar = MetadataTag(
+		name="radar",
+		description="Generate radar by plotly, return plotly fig in json format as default, or png, jpeg, jpg, webp, and svg"
+		)
+	screener = MetadataTag(
+		name="screener",
+		description="Find the list of stocks based on modifiable screener rules templates"
+		)
+	full_data = MetadataTag(
+		name="full_data",
+		description="Return full data of processed indicator from analysis in json format transformed from pandas dataframe"
+		)
 
 # ==========
 # Parameter Class
 # ==========
-from enum import Enum
 class ListCategory(str,Enum):
 	broker = "broker"
 	index = "index"
