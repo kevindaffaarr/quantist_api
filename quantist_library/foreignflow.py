@@ -194,16 +194,16 @@ class StockFFFull():
 		self,
 		raw_data: pd.DataFrame,
 		period_fmf: int | None = 1,
-		period_fprop: int | None = 1,
-		period_fpricecorrel: int | None = 20,
-		period_fmapricecorrel: int | None = 50,
-		period_fvwap:int | None = 10,
+		period_fprop: int | None = 10,
+		period_fpricecorrel: int | None = 10,
+		period_fmapricecorrel: int | None = 100,
+		period_fvwap:int | None = 21,
 		fpow_high_fprop: int | None = 40,
 		fpow_high_fpricecorrel: int | None = 50,
-		fpow_high_fmapricecorrel: int | None = 50,
+		fpow_high_fmapricecorrel: int | None = 30,
 		fpow_medium_fprop: int | None = 20,
-		fpow_medium_fpricecorrel: int | None = 50,
-		fpow_medium_fmapricecorrel: int | None = 50,
+		fpow_medium_fpricecorrel: int | None = 30,
+		fpow_medium_fmapricecorrel: int | None = 30,
 		preoffset_period_param: int | None = 0
 		) -> pd.DataFrame:
 		# Define fbval, fsval, netvol, netval
