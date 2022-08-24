@@ -173,19 +173,19 @@ def radar_chart(startdate:datetime.date,enddate:datetime.date,
 	)
 	if radar_type == "correlation":
 		fig.update_yaxes(range=[-101,101])
-		q1 = "accumulation"
-		q2 = "distribution"
-		q3 = "markup"
-		q4 = "markdown"
+		q1 = "ACCUMULATION AREA"
+		q2 = "DISTRIBUTION AREA"
+		q3 = "MARKUP AREA"
+		q4 = "MARKDOWN AREA"
 	elif radar_type == "changepercentage":
-		q1 = "accumulation"
-		q2 = "markup"
-		q3 = "distribution"
-		q4 = "markdown"
-	fig.add_annotation(xref="x domain",yref="y domain",x=1,y=1,text=q1,showarrow=False,font=dict(color="#BB86FC"))
-	fig.add_annotation(xref="x domain",yref="y domain",x=0,y=1,text=q2,showarrow=False,font=dict(color="#BB86FC"))
-	fig.add_annotation(xref="x domain",yref="y domain",x=0,y=0,text=q3,showarrow=False,font=dict(color="#BB86FC"))
-	fig.add_annotation(xref="x domain",yref="y domain",x=1,y=0,text=q4,showarrow=False,font=dict(color="#BB86FC"))
+		q1 = "ACCUMULATION AREA"
+		q2 = "MARKUP AREA"
+		q3 = "DISTRIBUTION AREA"
+		q4 = "MARKDOWN AREA"
+	fig.add_annotation(xref="x domain",yref="y domain",x=1,y=1,text=f"<b>{q1}</b>",showarrow=False,font=dict(color="#BB86FC"))
+	fig.add_annotation(xref="x domain",yref="y domain",x=0,y=1,text=f"<b>{q2}</b>",showarrow=False,font=dict(color="#BB86FC"))
+	fig.add_annotation(xref="x domain",yref="y domain",x=0,y=0,text=f"<b>{q3}</b>",showarrow=False,font=dict(color="#BB86FC"))
+	fig.add_annotation(xref="x domain",yref="y domain",x=1,y=0,text=f"<b>{q4}</b>",showarrow=False,font=dict(color="#BB86FC"))
 
 	# TITLE
 	fig.update_layout(title={"text":f"<b>Whale Radar</b>", "x":0.5})
@@ -205,4 +205,4 @@ def fig_to_image(fig:go.Figure,format:str | None = "jpeg"):
 	# File Export:
 	# fig.write_image("img.jpeg", engine="kaleido", width=1920, height=1080)
 	# Bytes Export:
-	return fig.to_image(format=format, engine="kaleido", scale=5)
+	return fig.to_image(format=format, engine="kaleido", scale=5, width=1280, height=720)
