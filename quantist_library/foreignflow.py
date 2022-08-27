@@ -268,7 +268,7 @@ class WhaleRadar():
 	def __init__(self,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date | None = datetime.date.today(),
-		radar_type: dp.ListRadarType | None = "correlation",
+		y_axis_type: dp.ListRadarType | None = "correlation",
 		stockcode_excludes: set[str] | None = set(),
 		include_composite: bool | None = False,
 		screener_min_value: int | None = None,
@@ -302,13 +302,13 @@ class WhaleRadar():
 			dbs=dbs)
 
 		# Set startdate and enddate based on data availability
-		self.startdate = stocks_raw_data['date'].min().date()
-		self.enddate = stocks_raw_data['date'].max().date()
-		self.radar_type = radar_type
+		self.startdate:datetime.date = stocks_raw_data['date'].min().date()
+		self.enddate:datetime.date = stocks_raw_data['date'].max().date()
+		self.y_axis_type = y_axis_type
 
 		# Calc Radar Indicators: last fpricecorrel OR last changepercentage
 		self.radar_indicators = self.calc_radar_indicators(\
-			stocks_raw_data=stocks_raw_data,radar_type=self.radar_type)
+			stocks_raw_data=stocks_raw_data,y_axis_type=self.y_axis_type)
 
 		if include_composite == True:
 			composite_raw_data = self.__get_composite_raw_data(
@@ -318,7 +318,7 @@ class WhaleRadar():
 				dbs=dbs
 			)
 			composite_radar_indicators = self.calc_radar_indicators(\
-				stocks_raw_data=composite_raw_data,radar_type=self.radar_type)
+				stocks_raw_data=composite_raw_data,y_axis_type=self.y_axis_type)
 			
 			self.radar_indicators = pd.concat([self.radar_indicators,composite_radar_indicators])
 
@@ -439,7 +439,7 @@ class WhaleRadar():
 
 	def calc_radar_indicators(self,
 		stocks_raw_data:pd.DataFrame,
-		radar_type:dp.ListRadarType | None = "correlation"
+		y_axis_type:dp.ListRadarType | None = "correlation"
 		) -> pd.DataFrame:
 		stocks_raw_data['netval'] = stocks_raw_data['close']*\
 			(stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell'])
@@ -450,11 +450,11 @@ class WhaleRadar():
 		radar_indicators['fmf'] = stocks_raw_data.groupby(by='code')['netval'].sum()
 
 		# X axis:
-		if radar_type == "correlation":
-			radar_indicators[radar_type] = stocks_raw_data.groupby(by='code')['netval']\
+		if y_axis_type == "correlation":
+			radar_indicators[y_axis_type] = stocks_raw_data.groupby(by='code')['netval']\
 				.corr(stocks_raw_data['close'])
-		elif radar_type == "changepercentage":
-			radar_indicators[radar_type] = \
+		elif y_axis_type == "changepercentage":
+			radar_indicators[y_axis_type] = \
 				(stocks_raw_data.groupby(by='code')['close'].nth([-1])- \
 				stocks_raw_data.groupby(by='code')['close'].nth([0]))/ \
 				stocks_raw_data.groupby(by='code')['close'].nth([0])
@@ -466,7 +466,7 @@ class WhaleRadar():
 	def chart(self,media_type:str | None = None):
 		fig = genchart.radar_chart(
 			startdate=self.startdate,enddate=self.enddate,
-			radar_type=self.radar_type,
+			y_axis_type=self.y_axis_type,
 			radar_indicators=self.radar_indicators
 		)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:

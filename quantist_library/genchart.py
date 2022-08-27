@@ -142,7 +142,7 @@ def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...) -> go
 	return fig
 
 def radar_chart(startdate:datetime.date,enddate:datetime.date,
-	radar_type:str|None="correlation",
+	y_axis_type:str|None="correlation",
 	radar_indicators:pd.DataFrame=...
 	) -> go.Figure:
 	
@@ -152,7 +152,7 @@ def radar_chart(startdate:datetime.date,enddate:datetime.date,
 	# ADD TRACE
 	fig.add_trace(go.Scatter(
 		x=radar_indicators["fmf"],
-		y=radar_indicators[radar_type]*100,
+		y=radar_indicators[y_axis_type]*100,
 		text=radar_indicators.index.str.upper(),
 		textposition="bottom center",
 		mode="markers+text",
@@ -161,7 +161,7 @@ def radar_chart(startdate:datetime.date,enddate:datetime.date,
 		))
 	
 	# UPDATE AXES
-	fig.update_yaxes(title_text=radar_type.capitalize(), showgrid=True, zerolinewidth=3)
+	fig.update_yaxes(title_text=y_axis_type.capitalize(), showgrid=True, zerolinewidth=3)
 	fig.update_xaxes(title_text="Foreign Money Flow",showgrid=True,zerolinewidth=3)
 	fig.update_xaxes(rangeslider={"autorange":True,"visible":False})
 	
@@ -171,13 +171,13 @@ def radar_chart(startdate:datetime.date,enddate:datetime.date,
 		textangle=0,
 		showarrow=False
 	)
-	if radar_type == "correlation":
+	if y_axis_type == "correlation":
 		fig.update_yaxes(range=[-101,101])
 		q1 = "ACCUMULATION AREA"
 		q2 = "DISTRIBUTION AREA"
 		q3 = "MARKUP AREA"
 		q4 = "MARKDOWN AREA"
-	elif radar_type == "changepercentage":
+	elif y_axis_type == "changepercentage":
 		q1 = "ACCUMULATION AREA"
 		q2 = "MARKUP AREA"
 		q3 = "DISTRIBUTION AREA"
