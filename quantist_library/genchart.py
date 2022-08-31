@@ -110,24 +110,24 @@ def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...) -> go
 	else:
 		fpow_text = "<span style='color:Red'>Low</span>"
 	
-	fig.add_annotation(xref="paper",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
-		text=f"<b>🔦 Chart by Quantist.io</b> | <b>Method: <span style='color:Fuchsia'>Foreign Flow</span></b> | <b>F-Power</b>: {fpow_text}",
-		font=dict(),textangle=0,
+	fig.add_annotation(xref="x domain",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
+		text=f"<b>Date: {datetime.datetime.strftime(ff_indicators.index[-1],'%Y-%m-%d')}</b> \
+			<b>Close</b>: {'{:0.0f}'.format(ff_indicators.close[-1])}\
+			<b>F-VWAP</b>: {'{:0.0f}'.format(ff_indicators.fvwap[-1])}\
+			<b>F-Prop</b>: {'{:.2f}%'.format(ff_indicators.fprop[-1]*100)}\
+			<b>F-NetProp</b>: {'{:.2f}%'.format(ff_indicators.fnetprop[-1]*100)}\
+			<b>F-Corr</b>: <span style='color:{fpricecorrel_color}'>{fpricecorrel}</span>\
+			<b>MA F-Corr</b>: <span style='color:{fmapricecorrel_color}'>{fmapricecorrel}</span>\
+			<b>F-Power</b>: {fpow_text}",
+		font=dict(),align="left",
 		showarrow=False
 	)
 
-	fig.add_annotation(xref="paper",yref="paper",xanchor="left",yanchor="bottom",x=0.025,y=0.70,
-		align="left",bordercolor="Ivory",borderwidth=0,
-		showarrow=False,
-		text=f"\
-			<b>Date: {datetime.datetime.strftime(ff_indicators.index[-1],'%Y-%m-%d')}</b><br>\
-			Close: {'{:0.0f}'.format(ff_indicators.close[-1])}<br>\
-			F-VWAP: {'{:0.0f}'.format(ff_indicators.fvwap[-1])}<br>\
-			F-Prop: {'{:.2f}%'.format(ff_indicators.fprop[-1]*100)}<br>\
-			F-NetProp: {'{:.2f}%'.format(ff_indicators.fnetprop[-1]*100)}<br>\
-			F-Corr: <span style='color:{fpricecorrel_color}'>{fpricecorrel}</span><br>\
-			MA F-Corr: <span style='color:{fmapricecorrel_color}'>{fmapricecorrel}</span><br>", 
-        )
+	fig.add_annotation(xref="x domain",yref="paper",xanchor="right",yanchor="bottom",x=1,y=1,
+		text=f"<b>Method: <span style='color:Fuchsia'>Foreign Flow</span></b> | <b>🔦 Chart by Quantist.io</b>",
+		font=dict(),align="right",
+		showarrow=False
+	)
 
 	# TITLE
 	STOCKCODE = stockcode.upper()
@@ -168,7 +168,7 @@ def radar_chart(startdate:datetime.date,enddate:datetime.date,
 	# ANNOTATION
 	fig.add_annotation(xref="paper",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
 		text=f"<b>🔦 Chart by Quantist.io</b> | <b>Method: <span style='color:#BB86FC'>Foreign Flow</span></b> | Data date: {datetime.datetime.strftime(startdate,'%Y-%m-%d')} - {datetime.datetime.strftime(enddate,'%Y-%m-%d')}",
-		textangle=0,
+		textangle=0,align="left",
 		showarrow=False
 	)
 	if y_axis_type == "correlation":
