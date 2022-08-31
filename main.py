@@ -1,8 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import whaleanalysis, param
 from dependencies import Tags
+
+import os
+from auth import get_api_key
 
 """
 =============================
@@ -32,6 +35,7 @@ Consists of high-end analysis tools based on data with top-down analysis:
 # INITIATE APP
 app = FastAPI(
 	debug=True,
+	dependencies=[Depends(get_api_key)],
 	title="quantist_api",
 	description=description,
 	version="0.0.0",
@@ -43,12 +47,12 @@ app = FastAPI(
 )
 
 # CORS https://fastapi.tiangolo.com/tutorial/cors/
-origins = ["*"]
+ALLOW_ORIGINS:list = os.getenv("ALLOW_ORIGINS","*").split(",")
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=origins,
+	allow_origins=ALLOW_ORIGINS,
 	allow_credentials=True,
-	allow_methods=["GET","POST","PUT"],
+	allow_methods=["GET"],
 	allow_headers=["*"]
 )
 
