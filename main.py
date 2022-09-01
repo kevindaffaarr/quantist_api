@@ -34,7 +34,7 @@ Consists of high-end analysis tools based on data with top-down analysis:
 
 # INITIATE APP
 app = FastAPI(
-	debug=True,
+	debug=os.getenv("DEBUG_STATUS", False),
 	dependencies=[Depends(get_api_key)],
 	title="quantist_api",
 	description=description,
