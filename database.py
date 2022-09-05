@@ -6,24 +6,49 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-
 from sqlalchemy import Column, Integer, String, Date, Numeric
-
 from sqlalchemy.orm import Session
 
-# PostgreSQL
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST")
-DB_NAME = os.getenv("DB_NAME")
-DB_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+import os
+env = os.getenv("ENV_PROD_DEV", "DEV")
 
-# Create Engine
-engine = create_engine(DB_URL)
+# Create Database SQLAlchemy Engine
+if env == "DEV":
+	# PostgreSQL
+	POSTGRES_DB_USER = os.getenv("POSTGRES_DB_USER")
+	POSTGRES_DB_PASSWORD = os.getenv("POSTGRES_DB_PASSWORD")
+	POSTGRES_DB_HOST = os.getenv("POSTGRES_DB_HOST")
+	POSTGRES_DB_NAME = os.getenv("POSTGRES_DB_NAME")
+	DB_URL = f"postgresql://{POSTGRES_DB_USER}:{POSTGRES_DB_PASSWORD}@{POSTGRES_DB_HOST}/{POSTGRES_DB_NAME}"
+
+	# Create Engine
+	engine = create_engine(DB_URL)
+
+elif env == "PROD":
+	# Bigquery
+	BIGQUERY_PROJECT_ID = os.getenv("BIGQUERY_PROJECT_ID")
+	BIGQUERY_DATASET_ID = os.getenv("BIGQUERY_DATASET_ID")
+	BIGQUERY_LOCATION = os.getenv("BIGQUERY_LOCATION")
+	BIGQUERY_DB_URL = f"bigquery://{BIGQUERY_PROJECT_ID}/{BIGQUERY_DATASET_ID}"
+
+	BIGQUERY_CREDENTIALS_BASE64 = os.getenv("BIGQUERY_CREDENTIALS_BASE64")
+	# BIGQUERY_CREDENTIALS_JSON = json.loads(base64.b64decode(BIGQUERY_CREDENTIALS_BASE64))
+	# BIGQUERY_CREDENTIALS = service_account.Credentials.from_service_account_info(BIGQUERY_CREDENTIALS_JSON)
+
+	# Create SQLALCHEMY Engine
+	engine = create_engine(
+		url=BIGQUERY_DB_URL,
+		credentials_base64=BIGQUERY_CREDENTIALS_BASE64,
+		location=BIGQUERY_LOCATION,
+		)
+
+else:
+	raise ValueError("ENV_PROD_DEV must be DEV or PROD")
+	
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# DB Session Dependency
+# SQLAlchemy DB Session Dependency
 def get_dbs():
 	dbs=SessionLocal()
 	try:
