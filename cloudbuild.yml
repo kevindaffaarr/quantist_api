@@ -1,0 +1,5 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/quantist/quantist-api', '.']
+images:
+- 'gcr.io/quantist/quantist-api'

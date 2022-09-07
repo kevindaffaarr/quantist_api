@@ -1,0 +1,9 @@
+env
+__pycache__
+testing_*
+.git
+.gitignore
+proj_docs
+README.md
+requirements_*
+.vscode

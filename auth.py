@@ -16,4 +16,5 @@ api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 async def get_api_key(api_key: str|None = Security(api_key_header)):
     if api_key not in REGISTERED_API_KEYS.keys():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    print(f"{REGISTERED_API_KEYS[api_key]} is connected.")
     return REGISTERED_API_KEYS[api_key]

@@ -1,0 +1,10 @@
+env
+__pycache__
+testing_*
+.git
+.dockerignore
+.gitignore
+proj_docs
+README.md
+requirements_*
+.vscode
