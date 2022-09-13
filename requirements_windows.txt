@@ -41,7 +41,7 @@ requests==2.28.1
 rsa==4.9
 six==1.16.0
 sniffio==1.2.0
-SQLAlchemy==1.4.27
+SQLAlchemy==1.4.41
 sqlalchemy-bigquery==1.4.4
 starlette==0.19.1
 tenacity==8.0.1
