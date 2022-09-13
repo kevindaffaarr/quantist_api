@@ -47,6 +47,6 @@ starlette==0.19.1
 tenacity==8.0.1
 typing_extensions==4.3.0
 urllib3==1.26.12
-uvicorn==0.18.2
+uvicorn==0.18.3
 watchfiles==0.15.0
 websockets==10.3
