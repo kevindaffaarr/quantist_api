@@ -23,7 +23,7 @@ idna==3.3
 kaleido==0.1.0
 numpy==1.23.1
 packaging==21.3
-pandas==1.4.3
+pandas==1.4.4
 plotly==5.9.0
 proto-plus==1.22.1
 protobuf==4.21.5
