@@ -17,7 +17,7 @@ pytz==2022.1
 PyYAML==6.0
 six==1.16.0
 sniffio==1.2.0
-SQLAlchemy==1.4.39
+SQLAlchemy==1.4.41
 starlette==0.19.1
 tenacity==8.0.1
 typing_extensions==4.3.0
