@@ -7,7 +7,7 @@ h11==0.13.0
 httptools==0.4.0
 idna==3.3
 numpy==1.23.1
-pandas==1.4.3
+pandas==1.4.4
 plotly==5.9.0
 psycopg2==2.9.3
 pydantic==1.9.1
