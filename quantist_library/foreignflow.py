@@ -108,7 +108,7 @@ class StockFFFull():
 		dbs:db.Session | None = next(db.get_dbs()),
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
-		enddate: datetime.date = ...,
+		enddate: datetime.date = datetime.date.today(),
 		default_bar_range:int | None = None,
 		preoffset_period_param: int | None = 50
 		) -> pd.DataFrame:
@@ -160,7 +160,7 @@ class StockFFFull():
 	async def __get_composite_raw_data(self, 
 		dbs:db.Session | None = next(db.get_dbs()),
 		startdate: datetime.date | None = None,
-		enddate: datetime.date = ...,
+		enddate: datetime.date = datetime.date.today(),
 		default_bar_range:int | None = None,
 		preoffset_period_param: int | None = 50
 		) -> pd.DataFrame:
@@ -245,12 +245,12 @@ class StockFFFull():
 			/(raw_data['value'].rolling(window=period_fprop).sum()*2)
 
 		# FNetProp
-		raw_data['fnetprop'] = abs(raw_data['fbval']-raw_data['fsval']).rolling(window=period_fprop).sum()\
+		raw_data['fnetprop'] = abs(raw_data['netval']).rolling(window=period_fprop).sum()\
 			/(raw_data['value'].rolling(window=period_fprop).sum()*2)
 
 		# FPriceCorrel
 		raw_data['fpricecorrel'] = raw_data['close'].rolling(window=period_fpricecorrel)\
-			.corr(raw_data['netvol'])
+			.corr(raw_data['fvolflow'])
 		
 		# FMAPriceCorrel
 		raw_data['fmapricecorrel'] = raw_data['fpricecorrel'].rolling(window=period_fmapricecorrel).mean()
@@ -394,7 +394,7 @@ class WhaleRadar():
 
 	async def __get_stocks_raw_data(self,
 		startdate: datetime.date | None = None,
-		enddate: datetime.date = ...,
+		enddate: datetime.date = datetime.date.today(),
 		filtered_stockcodes:pd.Series = ...,
 		bar_range: int | None = 5,
 		dbs: db.Session | None = next(db.get_dbs())

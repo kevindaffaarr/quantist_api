@@ -138,7 +138,7 @@ async def get_foreign_radar(
 			screener_min_frequency=screener_min_frequency,
 			screener_min_fprop=screener_min_fprop
 		)
-		await whale_radar_object.fit()
+		whale_radar_object = await whale_radar_object.fit()
 		
 		chart = await whale_radar_object.chart(media_type=media_type)
 
