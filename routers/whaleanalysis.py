@@ -4,8 +4,9 @@ import datetime
 
 import dependencies as dp
 from dependencies import Tags
-from quantist_library import foreignflow as ff
+from lib import timeit
 
+from quantist_library import foreignflow as ff
 # ==========
 # Router Initiation
 # ==========
@@ -26,7 +27,8 @@ router = APIRouter(
 # DEFAULT ROUTER
 # ==========
 @router.get("/")
-def get_default_response():
+@timeit
+async def get_default_response():
 	return """🔦 Quantist.io - Whale Analysis: Also called Transaction Analysis. The truly captured market action, whether someone buys or sells. Measuring the pressure of the market by Foreign Transactions, Broker Summary, Done Trade, Majority Shares Holder Transaction, and Shares Holder Distribution."""
 
 # ==========
@@ -34,7 +36,8 @@ def get_default_response():
 # ==========
 @router.get("/chart", tags=[Tags.chart.name])
 @router.get("/chart/foreign", tags=[Tags.chart.name])
-def get_foreign_chart(
+@timeit
+async def get_foreign_chart(
 	media_type:dp.ListMediaType | None = "json",
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
@@ -71,8 +74,8 @@ def get_foreign_chart(
 			fpow_medium_fpricecorrel=fpow_medium_fpricecorrel,
 			fpow_medium_fmapricecorrel=fpow_medium_fmapricecorrel,
 			)
-		
-		chart = stock_ff_full.chart(media_type=media_type)
+		stock_ff_full = await stock_ff_full.fit()
+		chart = await stock_ff_full.chart(media_type=media_type)
 
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0])
@@ -109,7 +112,8 @@ def get_foreign_chart(
 # ==========
 @router.get("/radar", tags=[Tags.radar.name])
 @router.get("/radar/foreign", tags=[Tags.radar.name])
-def get_foreign_radar(
+@timeit
+async def get_foreign_radar(
 	media_type:dp.ListMediaType | None = "json",
 	startdate: datetime.date | None = None,
 	enddate: datetime.date | None = datetime.date.today(),
@@ -134,8 +138,9 @@ def get_foreign_radar(
 			screener_min_frequency=screener_min_frequency,
 			screener_min_fprop=screener_min_fprop
 		)
+		await whale_radar_object.fit()
 		
-		chart = whale_radar_object.chart(media_type=media_type)
+		chart = await whale_radar_object.chart(media_type=media_type)
 
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0])
@@ -166,7 +171,8 @@ def get_foreign_radar(
 # ==========
 @router.get("/full-data", tags=[Tags.full_data.name])
 @router.get("/full-data/foreign", tags=[Tags.full_data.name])
-def get_foreign_data(
+@timeit
+async def get_foreign_data(
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date | None = datetime.date.today(),
@@ -183,7 +189,7 @@ def get_foreign_data(
 	fpow_medium_fmapricecorrel: int | None = None,
 ):
 	try:
-		full_data = ff.StockFFFull(
+		stock_ff_full = ff.StockFFFull(
 			stockcode=stockcode,
 			startdate=startdate,
 			enddate=enddate,
@@ -198,7 +204,9 @@ def get_foreign_data(
 			fpow_medium_fprop=fpow_medium_fprop,
 			fpow_medium_fpricecorrel=fpow_medium_fpricecorrel,
 			fpow_medium_fmapricecorrel=fpow_medium_fmapricecorrel,
-			).ff_indicators
+			)
+		stock_ff_full = await stock_ff_full.fit()
+		full_data = stock_ff_full.ff_indicators
 	
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0])
@@ -211,5 +219,6 @@ def get_foreign_data(
 # ==========
 @router.get("/screener", tags=[Tags.screener.name])
 @router.get("/screener/foreign", tags=[Tags.screener.name])
-def get_screener_mostaccum():
+@timeit
+async def get_screener_mostaccum():
 	pass

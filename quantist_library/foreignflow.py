@@ -1,3 +1,4 @@
+from __future__ import annotations
 import pandas as pd
 import numpy as np
 import datetime
@@ -23,52 +24,68 @@ class StockFFFull():
 		fpow_medium_fpricecorrel: int | None = None,
 		fpow_medium_fmapricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())
-		):
+		) -> None:
+		self.stockcode = stockcode
+		self.startdate = startdate
+		self.enddate = enddate
+		self.period_fmf = period_fmf
+		self.period_fprop = period_fprop
+		self.period_fpricecorrel = period_fpricecorrel
+		self.period_fmapricecorrel = period_fmapricecorrel
+		self.period_fvwap = period_fvwap
+		self.fpow_high_fprop = fpow_high_fprop
+		self.fpow_high_fpricecorrel = fpow_high_fpricecorrel
+		self.fpow_high_fmapricecorrel = fpow_high_fmapricecorrel
+		self.fpow_medium_fprop = fpow_medium_fprop
+		self.fpow_medium_fpricecorrel = fpow_medium_fpricecorrel
+		self.fpow_medium_fmapricecorrel = fpow_medium_fmapricecorrel
+		self.dbs = dbs
 
+	async def fit(self) -> StockFFFull:
 		# Get defaults value
-		default_ff = self.__get_default_ff(dbs)
+		default_ff = await self.__get_default_ff(self.dbs)
 
 		# Check Does Stock Code is composite
-		self.stockcode = (str(default_ff['default_stockcode']) if stockcode is None else stockcode).lower() # Default stock is parameterized, may become a branding or endorsement option
+		self.stockcode = (str(default_ff['default_stockcode']) if self.stockcode is None else self.stockcode).lower() # Default stock is parameterized, may become a branding or endorsement option
 		if self.stockcode == 'composite':
 			self.type = 'composite'
 		else:
-			qry = dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
-			row = pd.read_sql(sql=qry.statement, con=dbs.bind)
+			qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
+			row = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
 			if len(row) != 0:
 				self.type = 'stock'
 			else:
 				raise KeyError("There is no such stock code in the database.")
 		
 		# Data Parameter
-		self.startdate = startdate # If the startdate is None, will be overridden by default_bar_range
-		self.enddate = enddate # If the enddate is None, the default is already today date
+		self.startdate = self.startdate # If the startdate is None, will be overridden by default_bar_range
+		self.enddate = self.enddate # If the enddate is None, the default is already today date
 		default_bar_range = int(default_ff['default_bar_range']) if self.startdate is None else None # If the startdate is None, then the query goes to end date to the limit of default_bar_range
-		period_fmf = int(default_ff['default_ff_period_fmf']) if period_fmf is None else period_fmf
-		period_fprop = int(default_ff['default_ff_period_fprop']) if period_fprop is None else period_fprop
-		period_fpricecorrel = int(default_ff['default_ff_period_fpricecorrel']) if period_fpricecorrel is None else period_fpricecorrel
-		period_fmapricecorrel = int(default_ff['default_ff_period_fmapricecorrel']) if period_fmapricecorrel is None else period_fmapricecorrel
-		period_fvwap = int(default_ff['default_ff_period_fvwap']) if period_fvwap is None else period_fvwap
-		fpow_high_fprop = int(default_ff['default_ff_fpow_high_fprop']) if fpow_high_fprop is None else fpow_high_fprop
-		fpow_high_fpricecorrel = int(default_ff['default_ff_fpow_high_fpricecorrel']) if fpow_high_fpricecorrel is None else fpow_high_fpricecorrel
-		fpow_high_fmapricecorrel = int(default_ff['default_ff_fpow_high_fmapricecorrel']) if fpow_high_fmapricecorrel is None else fpow_high_fmapricecorrel
-		fpow_medium_fprop = int(default_ff['default_ff_fpow_medium_fprop']) if fpow_medium_fprop is None else fpow_medium_fprop
-		fpow_medium_fpricecorrel = int(default_ff['default_ff_fpow_medium_fpricecorrel']) if fpow_medium_fpricecorrel is None else fpow_medium_fpricecorrel
-		fpow_medium_fmapricecorrel = int(default_ff['default_ff_fpow_medium_fmapricecorrel']) if fpow_medium_fmapricecorrel is None else fpow_medium_fmapricecorrel
+		period_fmf = int(default_ff['default_ff_period_fmf']) if self.period_fmf is None else self.period_fmf
+		period_fprop = int(default_ff['default_ff_period_fprop']) if self.period_fprop is None else self.period_fprop
+		period_fpricecorrel = int(default_ff['default_ff_period_fpricecorrel']) if self.period_fpricecorrel is None else self.period_fpricecorrel
+		period_fmapricecorrel = int(default_ff['default_ff_period_fmapricecorrel']) if self.period_fmapricecorrel is None else self.period_fmapricecorrel
+		period_fvwap = int(default_ff['default_ff_period_fvwap']) if self.period_fvwap is None else self.period_fvwap
+		fpow_high_fprop = int(default_ff['default_ff_fpow_high_fprop']) if self.fpow_high_fprop is None else self.fpow_high_fprop
+		fpow_high_fpricecorrel = int(default_ff['default_ff_fpow_high_fpricecorrel']) if self.fpow_high_fpricecorrel is None else self.fpow_high_fpricecorrel
+		fpow_high_fmapricecorrel = int(default_ff['default_ff_fpow_high_fmapricecorrel']) if self.fpow_high_fmapricecorrel is None else self.fpow_high_fmapricecorrel
+		fpow_medium_fprop = int(default_ff['default_ff_fpow_medium_fprop']) if self.fpow_medium_fprop is None else self.fpow_medium_fprop
+		fpow_medium_fpricecorrel = int(default_ff['default_ff_fpow_medium_fpricecorrel']) if self.fpow_medium_fpricecorrel is None else self.fpow_medium_fpricecorrel
+		fpow_medium_fmapricecorrel = int(default_ff['default_ff_fpow_medium_fmapricecorrel']) if self.fpow_medium_fmapricecorrel is None else self.fpow_medium_fmapricecorrel
 		preoffset_period_param = max(period_fmf,period_fprop,period_fpricecorrel,(period_fmapricecorrel+period_fvwap))-1
 
 		# Raw Data
 		if self.type == 'stock':
-			self.raw_data = self.__get_stock_raw_data(dbs,self.stockcode,\
+			self.raw_data = await self.__get_stock_raw_data(self.dbs,self.stockcode,\
 				self.startdate,self.enddate,\
 				default_bar_range,preoffset_period_param)
 		elif self.type == 'composite':
-			self.raw_data = self.__get_composite_raw_data(dbs,\
+			self.raw_data = await self.__get_composite_raw_data(self.dbs,\
 				self.startdate,self.enddate,\
 				default_bar_range,preoffset_period_param)
 			
 		# Foreign Flow Indicators
-		self.ff_indicators = self.calc_ff_indicators(self.raw_data,\
+		self.ff_indicators = await self.calc_ff_indicators(self.raw_data,\
 			period_fmf,period_fprop,period_fpricecorrel,period_fmapricecorrel,period_fvwap,\
 			fpow_high_fprop,fpow_high_fpricecorrel,fpow_high_fmapricecorrel,fpow_medium_fprop,\
 			fpow_medium_fpricecorrel,fpow_medium_fmapricecorrel,\
@@ -77,15 +94,18 @@ class StockFFFull():
 
 		# Not to be ran inside init, but just as a method that return plotly fig
 		# self.chart(media_type="json")
+
+		return self
 		
-	def __get_default_ff(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
+	async def __get_default_ff(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_ff_%")) | \
 				(db.DataParam.param.like("default_stockcode")) | \
 				(db.DataParam.param.like("default_bar_range")))
 		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
-	def __get_stock_raw_data(self, dbs:db.Session = next(db.get_dbs()),
+	async def __get_stock_raw_data(self,
+		dbs:db.Session = next(db.get_dbs()),
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
@@ -136,7 +156,8 @@ class StockFFFull():
 		# End of Method: Return or Assign Attribute
 		return raw_data
 
-	def __get_composite_raw_data(self, dbs:db.Session = next(db.get_dbs()),
+	async def __get_composite_raw_data(self, 
+		dbs:db.Session = next(db.get_dbs()),
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
 		default_bar_range:int | None = None,
@@ -190,8 +211,7 @@ class StockFFFull():
 		# End of Method: Return or Assign Attribute
 		return raw_data
 
-	def calc_ff_indicators(
-		self,
+	async def calc_ff_indicators(self,
 		raw_data: pd.DataFrame,
 		period_fmf: int | None = 1,
 		period_fprop: int | None = 10,
@@ -255,12 +275,12 @@ class StockFFFull():
 		# End of Method: Return Processed Raw Data to FF Indicators
 		return raw_data.drop(raw_data.index[:preoffset_period_param])
 	
-	def chart(self,media_type:str | None = None):
-		fig = genchart.foreign_chart(self.stockcode,self.ff_indicators)
+	async def chart(self,media_type:str | None = None):
+		fig = await genchart.foreign_chart(self.stockcode,self.ff_indicators)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
-			return genchart.fig_to_image(fig,media_type)
+			return await genchart.fig_to_image(fig,media_type)
 		elif media_type == "json":
-			return genchart.fig_to_json(fig)
+			return await genchart.fig_to_json(fig)
 		else:
 			return fig
 	
@@ -275,62 +295,74 @@ class WhaleRadar():
 		screener_min_frequency: int | None = None,
 		screener_min_fprop:int | None = None,
 		dbs: db.Session = next(db.get_dbs())
-		):
+		) -> None:
+		self.startdate = startdate
+		self.enddate = enddate
+		self.y_axis_type = y_axis_type
+		self.stockcode_excludes = stockcode_excludes
+		self.include_composite = include_composite
+		self.screener_min_value = screener_min_value
+		self.screener_min_frequency = screener_min_frequency
+		self.screener_min_fprop = screener_min_fprop
+		self.dbs = dbs
 
+	async def fit(self) -> WhaleRadar:
 		# Get default value of parameter
-		default_radar = self.__get_default_radar()
-		period_fmf = int(default_radar['default_radar_period_fmf']) if startdate is None else None
-		period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel']) if startdate is None else None
-		screener_min_value = int(default_radar['default_screener_min_value']) if screener_min_value is None else screener_min_value
-		screener_min_frequency = int(default_radar['default_screener_min_frequency']) if screener_min_frequency is None else screener_min_frequency
-		screener_min_fprop = int(default_radar['default_screener_min_fprop']) if screener_min_fprop is None else screener_min_fprop
+		default_radar = await self.__get_default_radar()
+		period_fmf = int(default_radar['default_radar_period_fmf']) if self.startdate is None else None
+		period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel']) if self.startdate is None else None
+		screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
+		screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
+		screener_min_fprop = int(default_radar['default_screener_min_fprop']) if self.screener_min_fprop is None else self.screener_min_fprop
 		
 		# Get filtered stockcodes
-		filtered_stockcodes = self.__get_stockcodes(
+		filtered_stockcodes = await self.__get_stockcodes(
 			screener_min_value=screener_min_value,
 			screener_min_frequency=screener_min_frequency,
 			screener_min_fprop=screener_min_fprop,
-			stockcode_excludes=stockcode_excludes,
-			dbs=dbs)
+			stockcode_excludes=self.stockcode_excludes,
+			dbs=self.dbs)
 
 		# Get raw data
-		stocks_raw_data = self.__get_stocks_raw_data(
-			startdate=startdate,
-			enddate=enddate,
+		stocks_raw_data = await self.__get_stocks_raw_data(
+			startdate=self.startdate,
+			enddate=self.enddate,
 			filtered_stockcodes=filtered_stockcodes,
-			bar_range=max(period_fmf,period_fpricecorrel) if startdate is None else None,
-			dbs=dbs)
+			bar_range=max(period_fmf,period_fpricecorrel) if self.startdate is None else None,
+			dbs=self.dbs)
 
 		# Set startdate and enddate based on data availability
 		self.startdate:datetime.date = stocks_raw_data['date'].min().date()
 		self.enddate:datetime.date = stocks_raw_data['date'].max().date()
-		self.y_axis_type = y_axis_type
+		self.y_axis_type = self.y_axis_type
 
 		# Calc Radar Indicators: last fpricecorrel OR last changepercentage
-		self.radar_indicators = self.calc_radar_indicators(\
+		self.radar_indicators = await self.calc_radar_indicators(\
 			stocks_raw_data=stocks_raw_data,y_axis_type=self.y_axis_type)
 
-		if include_composite == True:
-			composite_raw_data = self.__get_composite_raw_data(
+		if self.include_composite == True:
+			composite_raw_data = await self.__get_composite_raw_data(
 				startdate=self.startdate,
-				enddate=enddate,
+				enddate=self.enddate,
 				bar_range=max(period_fmf,period_fpricecorrel) if self.startdate is None else None,
-				dbs=dbs
+				dbs=self.dbs
 			)
-			composite_radar_indicators = self.calc_radar_indicators(\
+			composite_radar_indicators = await self.calc_radar_indicators(\
 				stocks_raw_data=composite_raw_data,y_axis_type=self.y_axis_type)
 			
 			self.radar_indicators = pd.concat([self.radar_indicators,composite_radar_indicators])
 
 		# Not to be ran inside init, but just as a method that return plotly fig
 		# self.chart(media_type="json")
+
+		return self
 		
-	def __get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
+	async def __get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")))
 		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 	
-	def __get_stockcodes(self,
+	async def __get_stockcodes(self,
 		screener_min_value: int | None = 5000000000,
 		screener_min_frequency: int | None = 1000,
 		screener_min_fprop:int | None = 0,
@@ -356,7 +388,7 @@ class WhaleRadar():
 		# Query Fetching: filtered_stockcodes
 		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code'])
 
-	def __get_stocks_raw_data(self,
+	async def __get_stocks_raw_data(self,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
 		filtered_stockcodes:pd.Series = ...,
@@ -395,7 +427,7 @@ class WhaleRadar():
 			.sort_values(by=["code","date"],ascending=[True,True]).reset_index(drop=True)
 		return stocks_raw_data
 	
-	def __get_composite_raw_data(self,
+	async def __get_composite_raw_data(self,
 		startdate:datetime.date|None=None,
 		enddate:datetime.date|None=None,
 		bar_range:int|None=5,
@@ -437,7 +469,7 @@ class WhaleRadar():
 			.sort_values(by=["date"],ascending=[True]).reset_index(drop=True)
 		return composite_raw_data
 
-	def calc_radar_indicators(self,
+	async def calc_radar_indicators(self,
 		stocks_raw_data:pd.DataFrame,
 		y_axis_type:dp.ListRadarType | None = "correlation"
 		) -> pd.DataFrame:
@@ -463,15 +495,15 @@ class WhaleRadar():
 		
 		return radar_indicators
 	
-	def chart(self,media_type:str | None = None):
-		fig = genchart.radar_chart(
+	async def chart(self,media_type:str | None = None):
+		fig = await genchart.radar_chart(
 			startdate=self.startdate,enddate=self.enddate,
 			y_axis_type=self.y_axis_type,
 			radar_indicators=self.radar_indicators
 		)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
-			return genchart.fig_to_image(fig,media_type)
+			return await genchart.fig_to_image(fig,media_type)
 		elif media_type == "json":
-			return genchart.fig_to_json(fig)
+			return await genchart.fig_to_json(fig)
 		else:
 			return fig

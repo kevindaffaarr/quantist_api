@@ -1,6 +1,7 @@
 from fastapi import APIRouter, status, Depends
 import dependencies as dp
 import database as db
+from lib import timeit
 
 # ==========
 # Router Initiation
@@ -14,7 +15,7 @@ router = APIRouter(
 # ==========
 # Function
 # ==========
-def get_list_code(dbs: db.Session, list_category: dp.ListCategory = "stock", extended:bool = False):
+async def get_list_code(dbs: db.Session, list_category: dp.ListCategory = "stock", extended:bool = False):
 	if list_category == "stock" and extended == True:
 		return dbs.query(db.ListStock).all()
 	elif list_category == "stock":
@@ -30,9 +31,11 @@ def get_list_code(dbs: db.Session, list_category: dp.ListCategory = "stock", ext
 # Router
 # ==========
 @router.get("/dataparam", response_model=list[dp.DataParam])
-def get_dataparam(dbs: db.Session = Depends(db.get_dbs)):
+@timeit
+async def get_dataparam(dbs: db.Session = Depends(db.get_dbs)):
 	return dbs.query(db.DataParam).all()
 
 @router.get("/list/{list_category}", response_model=list[dp.ListCode], response_model_exclude_unset=True)
-def get_list(list_category: dp.ListCategory, extended: bool = False, dbs: db.Session = Depends(db.get_dbs)):
-	return get_list_code(dbs=dbs, list_category=list_category, extended=extended)
+@timeit
+async def get_list(list_category: dp.ListCategory, extended: bool = False, dbs: db.Session = Depends(db.get_dbs)):
+	return await get_list_code(dbs=dbs, list_category=list_category, extended=extended)

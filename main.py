@@ -6,6 +6,7 @@ from dependencies import Tags
 
 import os
 from auth import get_api_key
+from lib import timeit
 
 """
 =============================
@@ -61,5 +62,6 @@ app.include_router(whaleanalysis.router)
 app.include_router(param.router)
 
 @app.get("/")
+@timeit
 async def home():
 	return {"message": "Welcome to Quantist.io"}

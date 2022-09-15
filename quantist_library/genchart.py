@@ -6,7 +6,7 @@ from plotly.utils import PlotlyJSONEncoder
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...) -> go.Figure:
+async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...) -> go.Figure:
 	# Make Subplots
 	fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
 		specs=[[{"secondary_y":True}],[{"secondary_y":True}]],
@@ -141,7 +141,7 @@ def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...) -> go
 
 	return fig
 
-def radar_chart(startdate:datetime.date,enddate:datetime.date,
+async def radar_chart(startdate:datetime.date,enddate:datetime.date,
 	y_axis_type:str|None="correlation",
 	radar_indicators:pd.DataFrame=...
 	) -> go.Figure:
@@ -198,10 +198,10 @@ def radar_chart(startdate:datetime.date,enddate:datetime.date,
 	
 	return fig
 
-def fig_to_json(fig:go.Figure):
+async def fig_to_json(fig:go.Figure):
 	return json.dumps(fig, cls=PlotlyJSONEncoder)
 
-def fig_to_image(fig:go.Figure,format:str | None = "jpeg"):
+async def fig_to_image(fig:go.Figure,format:str | None = "jpeg"):
 	# File Export:
 	# fig.write_image("img.jpeg", engine="kaleido", width=1920, height=1080)
 	# Bytes Export:
