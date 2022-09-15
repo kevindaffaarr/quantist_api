@@ -21,7 +21,6 @@ class StockBFFull():
 	"""
 	Init, Calculate Indicators, and Get Chart for Broker Flow Methods
 	"""
-	#TODO : Add more indicators
 	def __init__(self,
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
@@ -57,12 +56,13 @@ class StockBFFull():
 		self.wpow_medium_wmapricecorrel = wpow_medium_wmapricecorrel
 		self.dbs = dbs
 
+		self.preoffset_startdate = None
+
 		self.selected_broker = None
 		self.optimum_n_selected_cluster = None
 		self.optimum_corr = None
 		self.bf_indicators = None
 
-	#TODO fit def: fit()
 	async def fit(self) -> StockBFFull:
 		# Get default bf params
 		default_bf = await self.__get_default_bf(dbs=self.dbs)

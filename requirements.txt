@@ -20,7 +20,9 @@ grpcio-status==1.48.1
 h11==0.13.0
 httptools==0.4.0
 idna==3.3
+joblib==1.1.0
 kaleido==0.1.0
+nest-asyncio==1.5.5
 numpy==1.23.1
 packaging==21.3
 pandas==1.4.4
@@ -38,12 +40,16 @@ pytz==2022.2.1
 PyYAML==6.0
 requests==2.28.1
 rsa==4.9
+scikit-learn==1.1.2
+scipy==1.9.1
 six==1.16.0
+sklearn==0.0
 sniffio==1.2.0
 SQLAlchemy
 sqlalchemy-bigquery==1.4.4
 starlette==0.19.1
 tenacity==8.0.1
+threadpoolctl==3.1.0
 typing_extensions==4.3.0
 urllib3==1.26.12
 uvicorn==0.18.3
