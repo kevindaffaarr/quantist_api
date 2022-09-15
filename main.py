@@ -1,10 +1,11 @@
+import os
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import whaleanalysis, param
 from dependencies import Tags
 
-import os
 from auth import get_api_key
 from lib import timeit
 
@@ -21,7 +22,7 @@ uvicorn main:app --reload
 META DATA:
 =============================
 """
-description = """
+DESCRIPTION = """
 ## Backend of Quantist.io: Capturing The Silhouette of Data
 _Democratize the information of Indonesia Stocks and more to investors from retail to institution._
 
@@ -35,10 +36,10 @@ Consists of high-end analysis tools based on data with top-down analysis:
 
 # INITIATE APP
 app = FastAPI(
-	debug=os.getenv("DEBUG_STATUS", False),
+	debug=os.getenv("DEBUG_STATUS", 0),
 	dependencies=[Depends(get_api_key)],
 	title="quantist_api",
-	description=description,
+	description=DESCRIPTION,
 	version="0.0.0",
 	contact={
 		"name": "Kevin Daffa Arrahman",

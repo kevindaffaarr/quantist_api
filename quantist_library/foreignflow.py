@@ -1,7 +1,7 @@
 from __future__ import annotations
+import datetime
 import pandas as pd
 import numpy as np
-import datetime
 from sqlalchemy.sql import func
 import database as db
 import dependencies as dp
@@ -40,6 +40,9 @@ class StockFFFull():
 		self.fpow_medium_fpricecorrel = fpow_medium_fpricecorrel
 		self.fpow_medium_fmapricecorrel = fpow_medium_fmapricecorrel
 		self.dbs = dbs
+
+		self.type = None
+		self.ff_indicators = None
 
 	async def fit(self) -> StockFFFull:
 		# Get defaults value
@@ -299,6 +302,8 @@ class WhaleRadar():
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
 		screener_min_fprop:int | None = None,
+		period_fmf: int | None = None,
+		period_fpricecorrel: int | None = None,
 		dbs: db.Session | None = next(db.get_dbs())
 		) -> None:
 		self.startdate = startdate
@@ -309,7 +314,11 @@ class WhaleRadar():
 		self.screener_min_value = screener_min_value
 		self.screener_min_frequency = screener_min_frequency
 		self.screener_min_fprop = screener_min_fprop
+		self.period_fmf = period_fmf
+		self.period_fpricecorrel = period_fpricecorrel
 		self.dbs = dbs
+
+		self.radar_indicators =  None
 
 	async def fit(self) -> WhaleRadar:
 		# Get default value of parameter
@@ -344,7 +353,7 @@ class WhaleRadar():
 		self.radar_indicators = await self.calc_radar_indicators(\
 			stocks_raw_data=stocks_raw_data,y_axis_type=self.y_axis_type)
 
-		if self.include_composite == True:
+		if self.include_composite is True:
 			composite_raw_data = await self.__get_composite_raw_data(
 				startdate=self.startdate,
 				enddate=self.enddate,

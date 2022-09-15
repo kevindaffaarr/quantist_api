@@ -1,6 +1,6 @@
+import datetime
 from fastapi import APIRouter, status, HTTPException, Query
 from fastapi.responses import Response
-import datetime
 
 import dependencies as dp
 from dependencies import Tags
@@ -78,7 +78,7 @@ async def get_foreign_chart(
 		chart = await stock_ff_full.chart(media_type=media_type)
 
 	except KeyError as err:
-		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0])
+		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
 
 	else:
 		# Define the responses from Quantist: headers, content, and media_type
@@ -103,7 +103,7 @@ async def get_foreign_chart(
 		elif media_type == "svg":
 			media_type = "image/svg+xml"
 		else:
-			media_type = f"application/json"
+			media_type = "application/json"
 
 		return Response(content=chart, media_type=media_type, headers=headers)
 
@@ -143,7 +143,7 @@ async def get_foreign_radar(
 		chart = await whale_radar_object.chart(media_type=media_type)
 
 	except KeyError as err:
-		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0])
+		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
 
 	else:
 		# Define the responses from Quantist: headers, content, and media_type
@@ -162,7 +162,7 @@ async def get_foreign_radar(
 		elif media_type == "svg":
 			media_type = "image/svg+xml"
 		else:
-			media_type = f"application/json"
+			media_type = "application/json"
 		
 		return Response(content=chart, media_type=media_type, headers=headers)
 
@@ -209,7 +209,7 @@ async def get_foreign_data(
 		full_data = stock_ff_full.ff_indicators
 	
 	except KeyError as err:
-		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0])
+		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
 	
 	else:
 		return full_data.to_dict(orient="index")
