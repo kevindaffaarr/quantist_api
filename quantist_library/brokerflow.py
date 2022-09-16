@@ -461,6 +461,9 @@ class StockBFFull():
 		selected_data_broker_nval = raw_data_broker_nval[selected_broker].sum(axis=1)
 		selected_data_broker_sumval = raw_data_broker_sumval[selected_broker].sum(axis=1)
 
+		# Net Value for Volume Profile
+		raw_data_full["netvol"] = selected_data_broker_nvol
+		
 		# Whale Volume Flow
 		raw_data_full["wvolflow"] = selected_data_broker_nvol.cumsum()
 
@@ -505,4 +508,11 @@ class StockBFFull():
 		# End of Method: Return Processed Raw Data to BF Indicators
 		return raw_data_full.drop(raw_data_full.index[:preoffset_period_param])
 
-	#TODO generate chart def: chart()
+	async def chart(self,media_type: str | None = None):
+		fig = await genchart.broker_chart(self.stockcode,self.bf_indicators)
+		if media_type in ["png","jpeg","jpg","webp","svg"]:
+			return await genchart.fig_to_image(fig,media_type)
+		elif media_type == "json":
+			return await genchart.fig_to_json(fig)
+		else:
+			return fig
