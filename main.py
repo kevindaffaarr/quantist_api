@@ -9,6 +9,9 @@ from dependencies import Tags
 from auth import get_api_key
 from lib import timeit
 
+ENV_OR_PROD = os.getenv("ENV_OR_PROD", "DEV")
+DEBUG_STATUS = True if ENV_OR_PROD == "DEV" else False
+
 """
 =============================
 FAST API APP
@@ -36,7 +39,7 @@ Consists of high-end analysis tools based on data with top-down analysis:
 
 # INITIATE APP
 app = FastAPI(
-	debug=os.getenv("DEBUG_STATUS", 0),
+	debug=DEBUG_STATUS,
 	dependencies=[Depends(get_api_key)],
 	title="quantist_api",
 	description=DESCRIPTION,

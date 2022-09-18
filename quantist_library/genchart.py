@@ -2,9 +2,16 @@ import datetime
 import pandas as pd
 import numpy as np
 import json
+import textwrap
 from plotly.utils import PlotlyJSONEncoder
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+def html_wrap(text:str, width:int | None = 16, n_lines:int | None = 2):
+	text_arr = textwrap.wrap(text=text, width=width)
+	text_arr = text_arr[0:n_lines]
+	text_arr[n_lines-1] = str(text_arr[n_lines-1]) + "..."
+	return "<br>".join(text_arr)
 
 async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...) -> go.Figure:
 	# Make Subplots
@@ -120,7 +127,7 @@ async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...)
 			<b>F-VWAP</b>: {'{:0.0f}'.format(ff_indicators.fvwap[-1])}\
 			<b>F-Prop</b>: {'{:.2f}%'.format(ff_indicators.fprop[-1]*100)}\
 			<b>F-NetProp</b>: {'{:.2f}%'.format(ff_indicators.fnetprop[-1]*100)}\
-			<b>F-Corr</b>: <span style='color:{fpricecorrel_color}'>{fpricecorrel}</span>\
+			<br><b>F-Corr</b>: <span style='color:{fpricecorrel_color}'>{fpricecorrel}</span>\
 			<b>MA F-Corr</b>: <span style='color:{fmapricecorrel_color}'>{fmapricecorrel}</span>\
 			<b>F-Power</b>: {fpow_text}",
 		font=dict(),align="left",
@@ -141,11 +148,21 @@ async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...)
 	fig.update_layout(legend={"orientation":"h","y":-0.1})
 	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
 	fig.update_layout(dragmode="pan")
-	fig.update_layout(margin=dict(l=0,r=0,b=0,t=50,pad=0))
+	fig.update_layout(margin=dict(l=0,r=0,b=50,t=75,pad=0))
 
 	return fig
 
-async def broker_chart(stockcode:str|None=None, bf_indicators:pd.DataFrame=...) -> go.Figure:
+async def broker_chart(
+	stockcode:str = ..., 
+	bf_indicators:pd.DataFrame = ...,
+	selected_broker: list[str] | None = None,
+	optimum_n_selected_cluster: int | None = None,
+	optimum_corr: float | None = None,
+	period_wprop: int | None = None,
+	period_wpricecorrel: int | None = None,
+	period_wmapricecorrel: int | None = None,
+	period_wvwap:int | None = None,
+	) -> go.Figure:
 	# Make Subplots
 	fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
 		specs=[[{"secondary_y":True}],[{"secondary_y":True}]],
@@ -257,18 +274,24 @@ async def broker_chart(stockcode:str|None=None, bf_indicators:pd.DataFrame=...) 
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
 		text=f"<b>Date: {datetime.datetime.strftime(bf_indicators.index[-1],'%Y-%m-%d')}</b> \
 			<b>Close</b>: {'{:0.0f}'.format(bf_indicators.close[-1])}\
-			<b>W-VWAP</b>: {'{:0.0f}'.format(bf_indicators.wvwap[-1])}\
-			<b>W-Prop</b>: {'{:.2f}%'.format(bf_indicators.wprop[-1]*100)}\
-			<b>W-NetProp</b>: {'{:.2f}%'.format(bf_indicators.wnetprop[-1]*100)}\
-			<b>W-Corr</b>: <span style='color:{wpricecorrel_color}'>{wpricecorrel}</span>\
-			<b>MA W-Corr</b>: <span style='color:{wmapricecorrel_color}'>{wmapricecorrel}</span>\
+			<b>W-VWAP({period_wvwap if period_wvwap is not None else ''})</b>: {'{:0.0f}'.format(bf_indicators.wvwap[-1])}\
+			<b>W-Prop({period_wprop if period_wprop is not None else ''})</b>: {'{:.2f}%'.format(bf_indicators.wprop[-1]*100)}\
+			<b>W-NetProp({period_wprop if period_wprop is not None else ''})</b>: {'{:.2f}%'.format(bf_indicators.wnetprop[-1]*100)}\
+			<br><b>W-Corr({period_wpricecorrel if period_wpricecorrel is not None else ''})</b>: <span style='color:{wpricecorrel_color}'>{wpricecorrel}</span>\
+			<b>MA W-Corr({period_wmapricecorrel if period_wmapricecorrel is not None else ''})</b>: <span style='color:{wmapricecorrel_color}'>{wmapricecorrel}</span>\
 			<b>W-Power</b>: {wpow_text}",
 		font=dict(),align="left",
 		showarrow=False
 	)
-
+	
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="right",yanchor="bottom",x=1,y=1,
 		text=f"<b>Method: <span style='color:Fuchsia'>Whale Flow</span></b> | <b>🔦 Chart by Quantist.io</b>",
+		font=dict(),align="right",
+		showarrow=False
+	)
+
+	fig.add_annotation(xref="x domain",yref="paper",xanchor="right",yanchor="bottom",x=1,y=-0.15,
+		text=f"Clustering Info<br>N: {optimum_n_selected_cluster} | Corr: {'{:.2f}%'.format(optimum_corr*100)}<br>Selected Broker: {html_wrap(str(selected_broker),32,2)}",
 		font=dict(),align="right",
 		showarrow=False
 	)
@@ -281,7 +304,7 @@ async def broker_chart(stockcode:str|None=None, bf_indicators:pd.DataFrame=...) 
 	fig.update_layout(legend={"orientation":"h","y":-0.1})
 	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
 	fig.update_layout(dragmode="pan")
-	fig.update_layout(margin=dict(l=0,r=0,b=0,t=50,pad=0))
+	fig.update_layout(margin=dict(l=0,r=0,b=50,t=75,pad=0))
 
 	return fig
 

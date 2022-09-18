@@ -280,7 +280,10 @@ class StockBFFull():
 		) -> list[str]:
 		# Get index of max value in column 0 in centroid
 		selected_cluster = centroids_cluster[0].nlargest(n_selected_cluster).index.tolist()
-		selected_broker = clustered_features.loc[clustered_features["cluster"].isin(selected_cluster), :].index.tolist()
+		# Get sorted selected broker
+		selected_broker = clustered_features.loc[clustered_features["cluster"].isin(selected_cluster), :]\
+			.sort_values(by="corr_ncum_close", ascending=False)\
+			.index.tolist()
 
 		return selected_broker
 
@@ -509,7 +512,16 @@ class StockBFFull():
 		return raw_data_full.drop(raw_data_full.index[:preoffset_period_param])
 
 	async def chart(self,media_type: str | None = None):
-		fig = await genchart.broker_chart(self.stockcode,self.bf_indicators)
+		fig = await genchart.broker_chart(
+			self.stockcode,self.bf_indicators,
+			self.selected_broker,
+			self.optimum_n_selected_cluster,
+			self.optimum_corr,
+			self.period_wprop,
+			self.period_wpricecorrel,
+			self.period_wmapricecorrel,
+			self.period_wvwap,
+			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)
 		elif media_type == "json":

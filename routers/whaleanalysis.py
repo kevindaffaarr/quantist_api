@@ -7,6 +7,8 @@ from dependencies import Tags
 from lib import timeit
 
 from quantist_library import foreignflow as ff
+from quantist_library import brokerflow as bf
+
 # ==========
 # Router Initiation
 # ==========
@@ -107,6 +109,80 @@ async def get_foreign_chart(
 
 		return Response(content=chart, media_type=media_type, headers=headers)
 
+@router.get("/chart/broker", tags=[Tags.chart.name])
+@timeit
+async def get_broker_chart(
+	media_type:dp.ListMediaType | None = "json",
+	stockcode: str | None = None,
+	startdate: datetime.date | None = None,
+	enddate: datetime.date | None = datetime.date.today(),
+	n_selected_cluster:int | None = None,
+	period_wmf: int | None = None,
+	period_wprop: int | None = None,
+	period_wpricecorrel: int | None = None,
+	period_wmapricecorrel: int | None = None,
+	period_wvwap:int | None = None,
+	wpow_high_wprop: int | None = None,
+	wpow_high_wpricecorrel: int | None = None,
+	wpow_high_wmapricecorrel: int | None = None,
+	wpow_medium_wprop: int | None = None,
+	wpow_medium_wpricecorrel: int | None = None,
+	wpow_medium_wmapricecorrel: int | None = None,
+):
+	if media_type not in ["png","jpeg","jpg","webp","svg","json"]:
+		media_type = "json"
+	
+	try:
+		stock_bf_full = bf.StockBFFull(
+			stockcode=stockcode,
+			startdate=startdate,
+			enddate=enddate,
+			n_selected_cluster=n_selected_cluster,
+			period_wmf=period_wmf,
+			period_wprop=period_wprop,
+			period_wpricecorrel=period_wpricecorrel,
+			period_wmapricecorrel=period_wmapricecorrel,
+			period_wvwap=period_wvwap,
+			wpow_high_wprop=wpow_high_wprop,
+			wpow_high_wpricecorrel=wpow_high_wpricecorrel,
+			wpow_high_wmapricecorrel=wpow_high_wmapricecorrel,
+			wpow_medium_wprop=wpow_medium_wprop,
+			wpow_medium_wpricecorrel=wpow_medium_wpricecorrel,
+			wpow_medium_wmapricecorrel=wpow_medium_wmapricecorrel,
+			)
+		stock_bf_full = await stock_bf_full.fit()
+		chart = await stock_bf_full.chart(media_type=media_type)
+
+	except KeyError as err:
+		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
+
+	else:
+		# Define the responses from Quantist: headers, content, and media_type
+		# Define Headers
+		headers = {
+			"stockcode": stock_bf_full.stockcode,
+			"last_date": stock_bf_full.bf_indicators.index[-1].strftime("%Y-%m-%d"),
+			"last_wmf": stock_bf_full.bf_indicators['wmf'][-1].astype(str),
+			"last_wprop": stock_bf_full.bf_indicators['wprop'][-1].astype(str),
+			"last_wpricecorrel": stock_bf_full.bf_indicators['wpricecorrel'][-1].astype(str),
+			"last_wmapricecorrel": stock_bf_full.bf_indicators['wmapricecorrel'][-1].astype(str),
+			"last_wvwap": stock_bf_full.bf_indicators['wvwap'][-1].astype(str),
+			"last_close": stock_bf_full.bf_indicators['close'][-1].astype(str),
+		}
+
+		# Define content
+		# content=chart
+
+		# Define media_type
+		if media_type in ["png","jpeg","jpg","webp"]:
+			media_type = f"image/{media_type}"
+		elif media_type == "svg":
+			media_type = "image/svg+xml"
+		else:
+			media_type = "application/json"
+
+		return Response(content=chart, media_type=media_type, headers=headers)
+		
 # ==========
 # RADAR ROUTER
 # ==========
