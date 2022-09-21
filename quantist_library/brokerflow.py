@@ -345,7 +345,7 @@ class StockBFFull():
 					break
 		# -- End of if
 
-		# If n_selected_cluster not defined
+		# If n_selected_cluster is defined
 		else:
 			optimum_n_selected_cluster: int = n_selected_cluster
 			optimum_corr = await self.__get_corr_selected_broker_ncum(clustered_features, raw_data_close, broker_ncum, centroids_cluster, n_selected_cluster)
@@ -414,15 +414,36 @@ class StockBFFull():
 		del raw_data_broker_nval, raw_data_broker_sumval, broker_ncum_corr, broker_sumval
 		gc.collect()
 
+		# # Obsolete Method: General Clustering
+		# # Replace by separated clustering for each negative and positive correlation
+		# # Standardize Features
+		# broker_features_std = await self.__xy_standardize(broker_features)
+		# # Clustering
+		# broker_features_cluster, broker_features_centroids = await self.__kmeans_clustering(broker_features_std, "corr_ncum_close", "broker_sumval")
+		
 		# Standardize Features
-		broker_features_std = await self.__xy_standardize(broker_features)
-		# Clustering
-		broker_features_cluster, broker_features_centroids = await self.__kmeans_clustering(broker_features_std, "corr_ncum_close", "broker_sumval")
+		# Using no standarization
+		broker_features_std_pos = broker_features[broker_features['corr_ncum_close']>0].copy()
+		broker_features_std_neg = broker_features[broker_features['corr_ncum_close']<=0].copy()
+
+		# Positive Clustering
+		broker_features_pos, centroids_pos = await self.__kmeans_clustering(broker_features_std_pos, "corr_ncum_close", "broker_sumval", MIN_N_CLUSTER=2, MAX_N_CLUSTER=5)
+		# Negative Clustering
+		broker_features_neg, centroids_neg = await self.__kmeans_clustering(broker_features_std_neg, "corr_ncum_close", "broker_sumval", MIN_N_CLUSTER=2, MAX_N_CLUSTER=5)
+		broker_features_neg["cluster"] = broker_features_neg['cluster'] + broker_features_pos['cluster'].max() + 1
+		centroids_neg.index = centroids_neg.index + centroids_pos.index.max() + 1
+
+		# Combine Positive and Negative Clustering
+		broker_features_cluster = pd.concat([broker_features_pos,broker_features_neg],axis=0)
+		broker_features_centroids = pd.concat([centroids_pos,centroids_neg],axis=0)
+
 		# Get cluster label
 		broker_features["cluster"] = broker_features_cluster["cluster"].astype("int")
 
 		# Delete variable for memory management
-		del broker_features_std, broker_features_cluster
+		del broker_features_std_pos, broker_features_std_neg, \
+			broker_features_pos, centroids_pos, \
+			broker_features_cluster
 		gc.collect()
 
 		# Define optimum selected cluster: net transaction clusters with highest correlation to close

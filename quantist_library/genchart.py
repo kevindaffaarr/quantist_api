@@ -11,7 +11,8 @@ from plotly.subplots import make_subplots
 def html_wrap(text:str, width:int | None = 16, n_lines:int | None = 2):
 	text_arr = textwrap.wrap(text=text, width=width)
 	text_arr = text_arr[0:n_lines]
-	text_arr[n_lines-1] = str(text_arr[n_lines-1]) + "..."
+	if len(text_arr) >= n_lines:
+		text_arr[n_lines-1] = str(text_arr[n_lines-1]) + "..."
 	return "<br>".join(text_arr)
 
 async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...) -> go.Figure:
