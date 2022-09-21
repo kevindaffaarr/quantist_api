@@ -182,7 +182,7 @@ async def get_broker_chart(
 			media_type = "application/json"
 
 		return Response(content=chart, media_type=media_type, headers=headers)
-		
+
 # ==========
 # RADAR ROUTER
 # ==========
@@ -204,7 +204,7 @@ async def get_foreign_radar(
 		media_type = "json"
 	
 	try:
-		whale_radar_object = ff.WhaleRadar(
+		whale_radar_object = ff.ForeignRadar(
 			startdate=startdate,
 			enddate=enddate,
 			y_axis_type=y_axis_type,

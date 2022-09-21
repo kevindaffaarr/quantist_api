@@ -104,7 +104,7 @@ class StockBFFull():
 				dbs=self.dbs
 				)
 		# Get broker flow parameters
-		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr = \
+		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
 			await self.__get_bf_parameters(
 				raw_data_close=raw_data_full["close"],
 				raw_data_broker_nval=raw_data_broker_nval,
@@ -435,7 +435,7 @@ class StockBFFull():
 				n_selected_cluster=n_selected_cluster
 			)
 
-		return selected_broker, optimum_n_selected_cluster, optimum_corr
+		return selected_broker, optimum_n_selected_cluster, optimum_corr, broker_features
 
 	async def calc_bf_indicators(self,
 		raw_data_full: pd.DataFrame,
@@ -528,3 +528,22 @@ class StockBFFull():
 			return await genchart.fig_to_json(fig)
 		else:
 			return fig
+	
+	async def broker_cluster_chart(self,media_type: str | None = None):
+		fig = await genchart.broker_cluster_chart(
+			broker_features=self.broker_features,
+			code=self.stockcode,
+		)
+		if media_type in ["png","jpeg","jpg","webp","svg"]:
+			return await genchart.fig_to_image(fig,media_type)
+		elif media_type == "json":
+			return await genchart.fig_to_json(fig)
+		else:
+			return fig
+
+class WhaleRadar():
+	def __init__(self) -> None:
+		pass
+	
+	async def fit (self) -> WhaleRadar:
+		return self

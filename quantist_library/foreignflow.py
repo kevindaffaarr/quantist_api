@@ -288,7 +288,7 @@ class StockFFFull():
 		else:
 			return fig
 	
-class WhaleRadar():
+class ForeignRadar():
 	def __init__(self,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date | None = datetime.date.today(),
@@ -316,7 +316,7 @@ class WhaleRadar():
 
 		self.radar_indicators =  None
 
-	async def fit(self) -> WhaleRadar:
+	async def fit(self) -> ForeignRadar:
 		# Get default value of parameter
 		default_radar = await self.__get_default_radar()
 		self.period_fmf = int(default_radar['default_radar_period_fmf']) if self.startdate is None else None

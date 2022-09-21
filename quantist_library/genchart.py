@@ -5,6 +5,7 @@ import json
 import textwrap
 from plotly.utils import PlotlyJSONEncoder
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
 
 def html_wrap(text:str, width:int | None = 16, n_lines:int | None = 2):
@@ -363,6 +364,24 @@ async def radar_chart(startdate:datetime.date,enddate:datetime.date,
 	fig.update_layout(dragmode="pan")
 	fig.update_layout(margin=dict(l=0,r=0,b=0,t=50,pad=0))
 	
+	return fig
+
+async def broker_cluster_chart(broker_features: pd.DataFrame, code:str):
+	fig = px.scatter(broker_features, 
+		x='corr_ncum_close', y='broker_sumval', 
+		labels={'x':'Price-Net Transaction Correlation', 'y':'Sum Transaction'},
+		color='cluster', symbol='cluster', text=broker_features.index,
+		title=f"{code.upper()} - Broker K Means Clustering",
+		color_continuous_scale=px.colors.qualitative.G10,
+		)
+	fig.update_traces(marker_size=20)
+	fig.update_layout(font_size=20)
+	fig.update_layout(coloraxis_showscale=False)
+
+	# UPDATE_LAYOUT GLOBAL DEFAULT TEMPLATE
+	fig.update_layout(legend={"orientation":"h","y":-0.1})
+	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
+
 	return fig
 
 async def fig_to_json(fig:go.Figure):
