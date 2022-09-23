@@ -62,9 +62,9 @@ class StockFFFull():
 				raise KeyError("There is no such stock code in the database.")
 		
 		# Data Parameter
-		default_year_range = int(default_ff['default_year_range']) if self.startdate is None else 0
+		default_months_range = int(default_ff['default_months_range']) if self.startdate is None else 0
 		self.enddate = datetime.date.today() if self.enddate is None else self.enddate
-		self.startdate = self.enddate - relativedelta(years=default_year_range) if self.startdate is None else self.startdate
+		self.startdate = self.enddate - relativedelta(months=default_months_range) if self.startdate is None else self.startdate
 		self.period_fmf = int(default_ff['default_ff_period_fmf']) if self.period_fmf is None else self.period_fmf
 		self.period_fprop = int(default_ff['default_ff_period_fprop']) if self.period_fprop is None else self.period_fprop
 		self.period_fpricecorrel = int(default_ff['default_ff_period_fpricecorrel']) if self.period_fpricecorrel is None else self.period_fpricecorrel
@@ -82,11 +82,11 @@ class StockFFFull():
 		if self.type == 'stock':
 			raw_data = await self.__get_stock_raw_data(self.dbs,self.stockcode,\
 				self.startdate,self.enddate,\
-				default_year_range,preoffset_period_param)
+				default_months_range,preoffset_period_param)
 		elif self.type == 'composite':
 			raw_data = await self.__get_composite_raw_data(self.dbs,\
 				self.startdate,self.enddate,\
-				default_year_range,preoffset_period_param)
+				default_months_range,preoffset_period_param)
 			
 		# Foreign Flow Indicators
 		self.ff_indicators = await self.calc_ff_indicators(raw_data,\
@@ -105,7 +105,7 @@ class StockFFFull():
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_ff_%")) | \
 				(db.DataParam.param.like("default_stockcode")) | \
-				(db.DataParam.param.like("default_year_range")))
+				(db.DataParam.param.like("default_months_range")))
 		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 	async def __get_stock_raw_data(self,
@@ -113,12 +113,12 @@ class StockFFFull():
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
-		default_year_range:int | None = None,
+		default_months_range:int | None = None,
 		preoffset_period_param: int | None = 50
 		) -> pd.DataFrame:
 		# Define startdate to 1 year before enddate if startdate is None
 		if startdate is None:
-			startdate = enddate - relativedelta(years=default_year_range)
+			startdate = enddate - relativedelta(months=default_months_range)
 		# Query Definition
 		qry = dbs.query(
 			db.StockData.date,
@@ -163,12 +163,12 @@ class StockFFFull():
 		dbs:db.Session | None = next(db.get_dbs()),
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
-		default_year_range:int | None = None,
+		default_months_range:int | None = None,
 		preoffset_period_param: int | None = 50
 		) -> pd.DataFrame:
 		# Define startdate to 1 year before enddate if startdate is None
 		if startdate is None:
-			startdate = enddate - relativedelta(years=default_year_range)
+			startdate = enddate - relativedelta(months=default_months_range)
 		# Query Definition
 		qry = dbs.query(
 			db.IndexData.date,

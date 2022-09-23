@@ -13,6 +13,8 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
+from sqlalchemy.sql import func
+
 import database as db
 import dependencies as dp
 from quantist_library import genchart
@@ -92,9 +94,9 @@ class StockBFFull():
 			if len(row) == 0:
 				raise KeyError("There is no such stock code in the database.")
 		# Data Parameter
-		default_year_range = int(default_bf['default_year_range']) if self.startdate is None else 0
+		default_months_range = int(default_bf['default_months_range']) if self.startdate is None else 0
 		self.enddate = datetime.date.today() if self.enddate is None else self.enddate
-		self.startdate = self.enddate - relativedelta(years=default_year_range) if self.startdate is None else self.startdate
+		self.startdate = self.enddate - relativedelta(months=default_months_range) if self.startdate is None else self.startdate
 		self.period_wmf = int(default_bf['default_bf_period_wmf']) if self.period_wmf is None else self.period_wmf
 		self.period_wprop = int(default_bf['default_bf_period_wprop']) if self.period_wprop is None else self.period_wprop
 		self.period_wpricecorrel = int(default_bf['default_bf_period_wpricecorrel']) if self.period_wpricecorrel is None else self.period_wpricecorrel
@@ -166,7 +168,7 @@ class StockBFFull():
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_bf_%")) | \
 				(db.DataParam.param.like("default_stockcode")) | \
-				(db.DataParam.param.like("default_year_range")))
+				(db.DataParam.param.like("default_months_range")))
 		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 	# Get Net Val Sum Val Broker Transaction
@@ -192,12 +194,12 @@ class StockBFFull():
 		stockcode: str,
 		preoffset_startdate: datetime.date | None = None,
 		enddate: datetime.date | None = datetime.date.today(),
-		default_year_range: int | None = 1,
+		default_months_range: int | None = 12,
 		dbs: db.Session | None = next(db.get_dbs()),
 		):
 		# if startdate is none, set to 1 year before enddate
 		if preoffset_startdate is None:
-			preoffset_startdate = enddate - relativedelta(years=default_year_range)
+			preoffset_startdate = enddate - relativedelta(months=default_months_range)
 
 		# Query Definition
 		qry = dbs.query(
@@ -222,17 +224,17 @@ class StockBFFull():
 
 		return raw_data_broker_full
 
-	async def __get_stock_full_data(self,
+	async def __get_stock_price_data(self,
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		preoffset_period_param: int | None = 50,
-		default_year_range: int | None = 1,
+		default_months_range: int | None = 12,
 		dbs: db.Session | None = next(db.get_dbs()),
 		) -> pd.Series:
 		# Define startdate if None equal to last year of enddate
 		if startdate is None:
-			startdate = enddate - relativedelta(years=default_year_range)
+			startdate = enddate - relativedelta(months=default_months_range)
 
 		# Query Definition
 		qry = dbs.query(
@@ -262,10 +264,14 @@ class StockBFFull():
 		# Pre-Data Query Fetching
 		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"])\
 			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
-		self.preoffset_startdate = raw_data_pre.index[0].date()
 
 		# Concatenate Pre and Main Query
 		raw_data_full = pd.concat([raw_data_pre,raw_data_main])
+		
+		if len(raw_data_pre) > 0:
+			self.preoffset_startdate = raw_data_pre.index[0].date()
+		else:
+			self.preoffset_startdate = startdate
 
 		# Data Cleansing: zero openprice replace with previous
 		raw_data_full['openprice'] = raw_data_full['openprice'].mask(raw_data_full['openprice'].eq(0),raw_data_full['previous'])
@@ -277,20 +283,20 @@ class StockBFFull():
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
-		default_year_range: int | None = 1,
+		default_months_range: int | None = 12,
 		preoffset_period_param: int | None = 50,
 		dbs: db.Session | None = next(db.get_dbs()),
 		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		# Get Stockdata Full
-		raw_data_full = await self.__get_stock_full_data(
+		raw_data_full = await self.__get_stock_price_data(
 			stockcode=stockcode,startdate=startdate,enddate=enddate,
 			preoffset_period_param=preoffset_period_param,
-			default_year_range=default_year_range,dbs=dbs)
+			default_months_range=default_months_range,dbs=dbs)
 
 		# Get Raw Data Broker Full
 		raw_data_broker_full = await self.__get_full_broker_transaction(
 			stockcode=stockcode,preoffset_startdate=self.preoffset_startdate,enddate=enddate,
-			default_year_range=default_year_range,dbs=dbs)
+			default_months_range=default_months_range,dbs=dbs)
 
 		# Transform Raw Data Broker
 		raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = await self.__get_nvsv_broker_transaction(raw_data_broker_full=raw_data_broker_full)
@@ -631,9 +637,3 @@ class StockBFFull():
 		else:
 			return fig
 
-class WhaleRadar():
-	def __init__(self) -> None:
-		pass
-	
-	async def fit (self) -> WhaleRadar:
-		return self
