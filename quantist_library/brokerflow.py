@@ -37,6 +37,13 @@ class StockBFFull():
 		wpow_medium_wprop: int | None = None,
 		wpow_medium_wpricecorrel: int | None = None,
 		wpow_medium_wmapricecorrel: int | None = None,
+		training_start_index: int | None = None,
+		training_end_index: int | None = None,
+		min_n_cluster: int | None = None,
+		max_n_cluster: int | None = None,
+		splitted_min_n_cluster: int | None = None,
+		splitted_max_n_cluster: int | None = None,
+		stepup_n_cluster_threshold: float | None = None,
 		dbs: db.Session | None = next(db.get_dbs()),
 		) -> None:
 		self.stockcode = stockcode
@@ -54,6 +61,13 @@ class StockBFFull():
 		self.wpow_medium_wprop = wpow_medium_wprop
 		self.wpow_medium_wpricecorrel = wpow_medium_wpricecorrel
 		self.wpow_medium_wmapricecorrel = wpow_medium_wmapricecorrel
+		self.training_start_index = training_start_index
+		self.training_end_index = training_end_index
+		self.min_n_cluster = min_n_cluster
+		self.max_n_cluster = max_n_cluster
+		self.splitted_min_n_cluster = splitted_min_n_cluster
+		self.splitted_max_n_cluster = splitted_max_n_cluster
+		self.stepup_n_cluster_threshold = stepup_n_cluster_threshold
 		self.dbs = dbs
 
 		self.preoffset_startdate = None
@@ -94,6 +108,14 @@ class StockBFFull():
 		self.wpow_medium_wmapricecorrel = int(default_bf['default_bf_wpow_medium_wmapricecorrel']) if self.wpow_medium_wmapricecorrel is None else self.wpow_medium_wmapricecorrel
 		preoffset_period_param = max(self.period_wmf,self.period_wprop,self.period_wpricecorrel,(self.period_wmapricecorrel+self.period_wvwap))-1
 
+		self.training_start_index = int(default_bf['default_bf_training_start_index'])/100 if self.training_start_index is None else self.training_start_index
+		self.training_end_index = int(default_bf['default_bf_training_end_index'])/100 if self.training_end_index is None else self.training_end_index
+		self.min_n_cluster = int(default_bf['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster
+		self.max_n_cluster = int(default_bf['default_bf_max_n_cluster']) if self.max_n_cluster is None else self.max_n_cluster
+		self.splitted_min_n_cluster = int(default_bf['default_bf_splitted_min_n_cluster']) if self.splitted_min_n_cluster is None else self.splitted_min_n_cluster
+		self.splitted_max_n_cluster = int(default_bf['default_bf_splitted_max_n_cluster']) if self.splitted_max_n_cluster is None else self.splitted_max_n_cluster
+		self.stepup_n_cluster_threshold = int(default_bf['default_bf_stepup_n_cluster_threshold'])/100 if self.stepup_n_cluster_threshold is None else self.stepup_n_cluster_threshold
+
 		# Get full stockdatatransaction
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self.__get_stock_raw_data(
@@ -109,7 +131,11 @@ class StockBFFull():
 				raw_data_close=raw_data_full["close"],
 				raw_data_broker_nval=raw_data_broker_nval,
 				raw_data_broker_sumval=raw_data_broker_sumval,
-				n_selected_cluster=self.n_selected_cluster
+				n_selected_cluster=self.n_selected_cluster,
+				training_start_index=self.training_start_index,
+				training_end_index=self.training_end_index,
+				splitted_min_n_cluster=self.splitted_min_n_cluster,
+				splitted_max_n_cluster=self.splitted_max_n_cluster,
 			)
 
 		# Calc broker flow indicators
@@ -279,7 +305,9 @@ class StockBFFull():
 		n_selected_cluster: int | None = 1,
 		) -> list[str]:
 		# Get index of max value in column 0 in centroid
-		selected_cluster = centroids_cluster[0].nlargest(n_selected_cluster).index.tolist()
+		selected_cluster = (centroids_cluster[0]).nlargest(n_selected_cluster).index.tolist()
+		# selected_cluster = (abs(centroids_cluster[0]*centroids_cluster[1])).nlargest(n_selected_cluster).index.tolist()
+		
 		# Get sorted selected broker
 		selected_broker = clustered_features.loc[clustered_features["cluster"].isin(selected_cluster), :]\
 			.sort_values(by="corr_ncum_close", ascending=False)\
@@ -304,7 +332,11 @@ class StockBFFull():
 		centroids_cluster: pd.DataFrame,
 		n_selected_cluster: int | None = None,
 		) -> pd.Series:
-		selected_broker = await self.__get_selected_broker(clustered_features=clustered_features,centroids_cluster=centroids_cluster,n_selected_cluster=n_selected_cluster)
+		selected_broker = await self.__get_selected_broker(
+			clustered_features=clustered_features,
+			centroids_cluster=centroids_cluster,
+			n_selected_cluster=n_selected_cluster
+			)
 
 		# Get selected broker transaction by columns of net_stockdatatransaction, then sum each column to aggregate to date
 		selected_broker_ncum = await self.__get_selected_broker_ncum(selected_broker, broker_ncum)
@@ -328,7 +360,13 @@ class StockBFFull():
 			# Iterate optimum n_cluster
 			for n_selected_cluster in range(1,len(centroids_cluster)+1):
 				# Get correlation between close and selected_broker_ncum
-				selected_broker_ncum_corr = await self.__get_corr_selected_broker_ncum(clustered_features, raw_data_close, broker_ncum, centroids_cluster, n_selected_cluster)
+				selected_broker_ncum_corr = await self.__get_corr_selected_broker_ncum(
+					clustered_features,
+					raw_data_close,
+					broker_ncum,
+					centroids_cluster,
+					n_selected_cluster
+					)
 				# Get correlation
 				corr_list.append(selected_broker_ncum_corr)
 
@@ -348,10 +386,20 @@ class StockBFFull():
 		# If n_selected_cluster is defined
 		else:
 			optimum_n_selected_cluster: int = n_selected_cluster
-			optimum_corr = await self.__get_corr_selected_broker_ncum(clustered_features, raw_data_close, broker_ncum, centroids_cluster, n_selected_cluster)
+			optimum_corr = await self.__get_corr_selected_broker_ncum(
+				clustered_features, 
+				raw_data_close, 
+				broker_ncum, 
+				centroids_cluster, 
+				n_selected_cluster
+				)
 
 		# Get Selected Broker from optimum n_selected_cluster
-		selected_broker = await self.__get_selected_broker(clustered_features=clustered_features,centroids_cluster=centroids_cluster,n_selected_cluster=optimum_n_selected_cluster)
+		selected_broker = await self.__get_selected_broker(
+			clustered_features=clustered_features,
+			centroids_cluster=centroids_cluster,
+			n_selected_cluster=optimum_n_selected_cluster
+			)
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr
 
@@ -359,8 +407,8 @@ class StockBFFull():
 		features: pd.DataFrame,
 		x: str,
 		y: str,
-		MIN_N_CLUSTER:int | None = 4,
-		MAX_N_CLUSTER:int | None = 10,
+		min_n_cluster:int | None = 4,
+		max_n_cluster:int | None = 10,
 		) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 		# Get X and Y
@@ -369,13 +417,13 @@ class StockBFFull():
 		silhouette_coefficient = []
 
 		# Iterate optimum n_cluster
-		for n_cluster in range(MIN_N_CLUSTER, MAX_N_CLUSTER+1):
+		for n_cluster in range(min_n_cluster, max_n_cluster+1):
 			# Clustering
 			kmeans = KMeans(init="k-means++", n_clusters=n_cluster, random_state=0).fit(X)
 			score = silhouette_score(X, kmeans.labels_)
 			silhouette_coefficient.append(score)
 		# Define optimum n_cluster
-		optimum_n_cluster = np.argmax(silhouette_coefficient) + MIN_N_CLUSTER
+		optimum_n_cluster = np.argmax(silhouette_coefficient) + min_n_cluster
 
 		# Clustering with optimum n cluster
 		kmeans = KMeans(init="k-means++", n_clusters=optimum_n_cluster, random_state=0).fit(X)
@@ -395,7 +443,20 @@ class StockBFFull():
 		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
 		n_selected_cluster: int | None = None,
+		training_start_index: float | None = 0.5,
+		training_end_index: float | None = 0.75,
+		splitted_min_n_cluster: int | None = 2,
+		splitted_max_n_cluster: int | None = 5,
+		stepup_n_cluster_threshold: float | None = 0.05,
 		) -> tuple[list[str], int, float]:
+
+		# Only get third quartile of raw_data so not over-fitting
+		length = len(raw_data_close)
+		start_index = int(length*training_start_index)
+		end_index = int(length*training_end_index)
+		raw_data_close = raw_data_close.iloc[start_index:end_index]
+		raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
+		raw_data_broker_sumval = raw_data_broker_sumval.iloc[start_index:end_index,:]
 
 		# Cumulate value for nval
 		broker_ncum = raw_data_broker_nval.cumsum(axis=0)
@@ -427,9 +488,13 @@ class StockBFFull():
 		broker_features_std_neg = broker_features[broker_features['corr_ncum_close']<=0].copy()
 
 		# Positive Clustering
-		broker_features_pos, centroids_pos = await self.__kmeans_clustering(broker_features_std_pos, "corr_ncum_close", "broker_sumval", MIN_N_CLUSTER=2, MAX_N_CLUSTER=5)
+		broker_features_pos, centroids_pos = await self.__kmeans_clustering(
+			broker_features_std_pos, "corr_ncum_close", "broker_sumval", 
+			min_n_cluster=splitted_min_n_cluster, max_n_cluster=splitted_max_n_cluster)
 		# Negative Clustering
-		broker_features_neg, centroids_neg = await self.__kmeans_clustering(broker_features_std_neg, "corr_ncum_close", "broker_sumval", MIN_N_CLUSTER=2, MAX_N_CLUSTER=5)
+		broker_features_neg, centroids_neg = await self.__kmeans_clustering(
+			broker_features_std_neg, "corr_ncum_close", "broker_sumval", 
+			min_n_cluster=splitted_min_n_cluster, max_n_cluster=splitted_max_n_cluster)
 		broker_features_neg["cluster"] = broker_features_neg['cluster'] + broker_features_pos['cluster'].max() + 1
 		centroids_neg.index = centroids_neg.index + centroids_pos.index.max() + 1
 
@@ -453,7 +518,8 @@ class StockBFFull():
 				raw_data_close=raw_data_close,
 				broker_ncum=broker_ncum,
 				centroids_cluster=broker_features_centroids,
-				n_selected_cluster=n_selected_cluster
+				n_selected_cluster=n_selected_cluster,
+				stepup_n_cluster_threshold=stepup_n_cluster_threshold
 			)
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr, broker_features
