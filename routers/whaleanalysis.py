@@ -128,6 +128,13 @@ async def get_broker_chart(
 	wpow_medium_wprop: int | None = None,
 	wpow_medium_wpricecorrel: int | None = None,
 	wpow_medium_wmapricecorrel: int | None = None,
+	training_start_index: int | None = None,
+	training_end_index: int | None = None,
+	min_n_cluster: int | None = None,
+	max_n_cluster: int | None = None,
+	splitted_min_n_cluster: int | None = None,
+	splitted_max_n_cluster: int | None = None,
+	stepup_n_cluster_threshold: int | None = None,
 ):
 	if media_type not in ["png","jpeg","jpg","webp","svg","json"]:
 		media_type = "json"
@@ -149,6 +156,13 @@ async def get_broker_chart(
 			wpow_medium_wprop=wpow_medium_wprop,
 			wpow_medium_wpricecorrel=wpow_medium_wpricecorrel,
 			wpow_medium_wmapricecorrel=wpow_medium_wmapricecorrel,
+			training_start_index=training_start_index,
+			training_end_index=training_end_index,
+			min_n_cluster=min_n_cluster,
+			max_n_cluster=max_n_cluster,
+			splitted_min_n_cluster=splitted_min_n_cluster,
+			splitted_max_n_cluster=splitted_max_n_cluster,
+			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
 			)
 		stock_bf_full = await stock_bf_full.fit()
 		chart = await stock_bf_full.chart(media_type=media_type)

@@ -43,7 +43,7 @@ class StockBFFull():
 		max_n_cluster: int | None = None,
 		splitted_min_n_cluster: int | None = None,
 		splitted_max_n_cluster: int | None = None,
-		stepup_n_cluster_threshold: float | None = None,
+		stepup_n_cluster_threshold: int | None = None,
 		dbs: db.Session | None = next(db.get_dbs()),
 		) -> None:
 		self.stockcode = stockcode
@@ -108,13 +108,13 @@ class StockBFFull():
 		self.wpow_medium_wmapricecorrel = int(default_bf['default_bf_wpow_medium_wmapricecorrel']) if self.wpow_medium_wmapricecorrel is None else self.wpow_medium_wmapricecorrel
 		preoffset_period_param = max(self.period_wmf,self.period_wprop,self.period_wpricecorrel,(self.period_wmapricecorrel+self.period_wvwap))-1
 
-		self.training_start_index = int(default_bf['default_bf_training_start_index'])/100 if self.training_start_index is None else self.training_start_index
-		self.training_end_index = int(default_bf['default_bf_training_end_index'])/100 if self.training_end_index is None else self.training_end_index
+		self.training_start_index = int(default_bf['default_bf_training_start_index'])/100 if self.training_start_index is None else self.training_start_index/100
+		self.training_end_index = int(default_bf['default_bf_training_end_index'])/100 if self.training_end_index is None else self.training_end_index/100
 		self.min_n_cluster = int(default_bf['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster
 		self.max_n_cluster = int(default_bf['default_bf_max_n_cluster']) if self.max_n_cluster is None else self.max_n_cluster
 		self.splitted_min_n_cluster = int(default_bf['default_bf_splitted_min_n_cluster']) if self.splitted_min_n_cluster is None else self.splitted_min_n_cluster
 		self.splitted_max_n_cluster = int(default_bf['default_bf_splitted_max_n_cluster']) if self.splitted_max_n_cluster is None else self.splitted_max_n_cluster
-		self.stepup_n_cluster_threshold = int(default_bf['default_bf_stepup_n_cluster_threshold'])/100 if self.stepup_n_cluster_threshold is None else self.stepup_n_cluster_threshold
+		self.stepup_n_cluster_threshold = int(default_bf['default_bf_stepup_n_cluster_threshold'])/100 if self.stepup_n_cluster_threshold is None else self.stepup_n_cluster_threshold/100
 
 		# Get full stockdatatransaction
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
