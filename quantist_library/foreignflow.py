@@ -43,7 +43,7 @@ class StockFFFull():
 		self.dbs = dbs
 
 		self.type = None
-		self.ff_indicators = None
+		self.ff_indicators = pd.DataFrame()
 
 	async def fit(self) -> StockFFFull:
 		# Get defaults value
@@ -314,7 +314,7 @@ class ForeignRadar():
 		self.period_fpricecorrel = period_fpricecorrel
 		self.dbs = dbs
 
-		self.radar_indicators =  None
+		self.radar_indicators =  pd.DataFrame()
 
 	async def fit(self) -> ForeignRadar:
 		# Get default value of parameter

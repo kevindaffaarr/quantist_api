@@ -39,19 +39,23 @@ class MetadataTag(BaseModel):
 class Tags(Enum):
 	chart = MetadataTag(
 		name="chart",
-		description="Generate chart by plotly, return plotly fig in json format as default, or png, jpeg, jpg, webp, and svg"
+		description="Generate chart by plotly, return plotly fig in json format as default, or png, jpeg, jpg, webp, and svg",
+		external_docs=None
 		)
 	radar = MetadataTag(
 		name="radar",
-		description="Generate radar by plotly, return plotly fig in json format as default, or png, jpeg, jpg, webp, and svg"
+		description="Generate radar by plotly, return plotly fig in json format as default, or png, jpeg, jpg, webp, and svg",
+		external_docs=None
 		)
 	screener = MetadataTag(
 		name="screener",
-		description="Find the list of stocks based on modifiable screener rules templates"
+		description="Find the list of stocks based on modifiable screener rules templates",
+		external_docs=None
 		)
 	full_data = MetadataTag(
 		name="full_data",
-		description="Return full data of processed indicator from analysis in json format transformed from pandas dataframe"
+		description="Return full data of processed indicator from analysis in json format transformed from pandas dataframe",
+		external_docs=None
 		)
 
 # ==========
@@ -59,7 +63,7 @@ class Tags(Enum):
 # ==========
 class ListCategory(str,Enum):
 	broker = "broker"
-	index = "index"
+	index = "index"  # type: ignore
 	stock = "stock"
 
 class ListMediaType(str,Enum):

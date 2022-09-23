@@ -42,7 +42,7 @@ async def get_default_response():
 @router.get("/chart/foreign", tags=[Tags.chart.name])
 @timeit
 async def get_foreign_chart(
-	media_type:dp.ListMediaType | None = "json",
+	media_type:dp.ListMediaType | None = dp.ListMediaType.json,
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date | None = datetime.date.today(),
@@ -58,8 +58,14 @@ async def get_foreign_chart(
 	fpow_medium_fpricecorrel: int | None = None,
 	fpow_medium_fmapricecorrel: int | None = None,
 ):
-	if media_type not in ["png","jpeg","jpg","webp","svg","json"]:
-		media_type = "json"
+	if media_type not in [dp.ListMediaType.png,
+		dp.ListMediaType.jpeg,
+		dp.ListMediaType.jpg,
+		dp.ListMediaType.webp,
+		dp.ListMediaType.svg,
+		dp.ListMediaType.json
+		]:
+		media_type = dp.ListMediaType.json
 	
 	try:
 		stock_ff_full = ff.StockFFFull(
@@ -102,9 +108,13 @@ async def get_foreign_chart(
 		# content=chart
 
 		# Define media_type
-		if media_type in ["png","jpeg","jpg","webp"]:
+		if media_type in [dp.ListMediaType.png,
+			dp.ListMediaType.jpeg,
+			dp.ListMediaType.jpg,
+			dp.ListMediaType.webp
+			]:
 			media_type = f"image/{media_type}"
-		elif media_type == "svg":
+		elif media_type == dp.ListMediaType.svg:
 			media_type = "image/svg+xml"
 		else:
 			media_type = "application/json"
@@ -114,7 +124,7 @@ async def get_foreign_chart(
 @router.get("/chart/broker", tags=[Tags.chart.name])
 @timeit
 async def get_broker_chart(
-	media_type:dp.ListMediaType | None = "json",
+	media_type:dp.ListMediaType | None = dp.ListMediaType.json,
 	api_type: dp.ListBrokerApiType | None = dp.ListBrokerApiType.brokerflow,
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
@@ -139,8 +149,14 @@ async def get_broker_chart(
 	splitted_max_n_cluster: int | None = None,
 	stepup_n_cluster_threshold: int | None = None,
 ):
-	if media_type not in ["png","jpeg","jpg","webp","svg","json"]:
-		media_type = "json"
+	if media_type not in [dp.ListMediaType.png,
+		dp.ListMediaType.jpeg,
+		dp.ListMediaType.jpg,
+		dp.ListMediaType.webp,
+		dp.ListMediaType.svg,
+		dp.ListMediaType.json
+		]:
+		media_type = dp.ListMediaType.json
 	
 	try:
 		stock_bf_full = bf.StockBFFull(
@@ -216,9 +232,13 @@ async def get_broker_chart(
 			return StreamingResponse(chart, media_type=media_type, headers=headers)
 
 		else:
-			if media_type in ["png","jpeg","jpg","webp"]:
+			if media_type in [dp.ListMediaType.png,
+				dp.ListMediaType.jpeg,
+				dp.ListMediaType.jpg,
+				dp.ListMediaType.webp
+				]:
 				media_type = f"image/{media_type}"
-			elif media_type == "svg":
+			elif media_type == dp.ListMediaType.svg:
 				media_type = "image/svg+xml"
 			else:
 				media_type = "application/json"
@@ -232,7 +252,7 @@ async def get_broker_chart(
 @router.get("/radar/foreign", tags=[Tags.radar.name])
 @timeit
 async def get_foreign_radar(
-	media_type:dp.ListMediaType | None = "json",
+	media_type:dp.ListMediaType | None = dp.ListMediaType.json,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date | None = datetime.date.today(),
 	y_axis_type: dp.ListRadarType | None = "correlation",
@@ -242,8 +262,14 @@ async def get_foreign_radar(
 	screener_min_frequency: int | None = None,
 	screener_min_fprop:int | None = None,
 ):
-	if media_type not in ["png","jpeg","jpg","webp","svg","json"]:
-		media_type = "json"
+	if media_type not in [dp.ListMediaType.png,
+		dp.ListMediaType.jpeg,
+		dp.ListMediaType.jpg,
+		dp.ListMediaType.webp,
+		dp.ListMediaType.svg,
+		dp.ListMediaType.json
+		]:
+		media_type = dp.ListMediaType.json
 	
 	try:
 		whale_radar_object = ff.ForeignRadar(
@@ -275,9 +301,13 @@ async def get_foreign_radar(
 		# content=chart
 
 		# Define media_type
-		if media_type in ["png","jpeg","jpg","webp"]:
+		if media_type in [dp.ListMediaType.png,
+			dp.ListMediaType.jpeg,
+			dp.ListMediaType.jpg,
+			dp.ListMediaType.webp
+			]:
 			media_type = f"image/{media_type}"
-		elif media_type == "svg":
+		elif media_type == dp.ListMediaType.svg:
 			media_type = "image/svg+xml"
 		else:
 			media_type = "application/json"
