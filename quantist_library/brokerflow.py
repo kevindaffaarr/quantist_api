@@ -637,3 +637,222 @@ class StockBFFull():
 		else:
 			return fig
 
+class WhaleRadar():
+	def __init__(self,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date | None = datetime.date.today(),
+		y_axis_type: dp.ListRadarType | None = dp.ListRadarType.correlation,
+		stockcode_excludes: set[str] | None = set(),
+		include_composite: bool | None = False,
+		screener_min_value: int | None = None,
+		screener_min_frequency: int | None = None,
+		n_selected_cluster:int | None = None,
+		period_wmf: int | None = None,
+		period_wpricecorrel: int | None = None,
+		default_months_range: int | None = None,
+		training_start_index: int | None = None,
+		training_end_index: int | None = None,
+		min_n_cluster: int | None = None,
+		max_n_cluster: int | None = None,
+		splitted_min_n_cluster: int | None = None,
+		splitted_max_n_cluster: int | None = None,
+		stepup_n_cluster_threshold: int | None = None,
+		dbs: db.Session | None = next(db.get_dbs()),
+		) -> None:
+		self.startdate = startdate
+		self.enddate = enddate
+		self.y_axis_type = y_axis_type
+		self.stockcode_excludes = stockcode_excludes
+		self.include_composite = include_composite
+		self.screener_min_value = screener_min_value
+		self.screener_min_frequency = screener_min_frequency
+		self.n_selected_cluster = n_selected_cluster
+		self.period_wmf = period_wmf
+		self.period_wpricecorrel = period_wpricecorrel
+		self.default_months_range = default_months_range
+		self.training_start_index = training_start_index
+		self.training_end_index = training_end_index
+		self.min_n_cluster = min_n_cluster
+		self.max_n_cluster = max_n_cluster
+		self.splitted_min_n_cluster = splitted_min_n_cluster
+		self.splitted_max_n_cluster = splitted_max_n_cluster
+		self.stepup_n_cluster_threshold = stepup_n_cluster_threshold
+		self.dbs = dbs
+
+		self.radar_indicators = None
+	
+	async def fit (self) -> WhaleRadar:
+		# Get default bf params
+		default_radar = await self.__get_default_radar(dbs=self.dbs)
+
+		# Data Parameter
+		self.period_wmf = int(default_radar['default_radar_period_wmf']) if self.startdate is None else None
+		self.period_wpricecorrel = int(default_radar['default_radar_period_wpricecorrel']) if self.startdate is None else None
+		self.bar_range = max(self.period_wmf,self.period_wpricecorrel) if self.startdate is None else None
+		self.enddate = datetime.date.today() if self.enddate is None else self.enddate
+		
+		self.default_months_range = int(default_radar['default_months_range']) if self.default_months_range is None else self.default_months_range
+		if self.startdate is None:
+			self.default_months_range = int((self.default_months_range/2) + (20/self.bar_range))
+		else:
+			self.default_months_range = int((self.default_months_range/2) + (20/(self.enddate-self.startdate).days))
+
+		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
+		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
+
+		self.training_start_index = int(default_radar['default_bf_training_start_index'])/100 if self.training_start_index is None else self.training_start_index/100
+		self.training_end_index = int(default_radar['default_bf_training_end_index'])/100 if self.training_end_index is None else self.training_end_index/100
+		self.min_n_cluster = int(default_radar['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster
+		self.max_n_cluster = int(default_radar['default_bf_max_n_cluster']) if self.max_n_cluster is None else self.max_n_cluster
+		self.splitted_min_n_cluster = int(default_radar['default_bf_splitted_min_n_cluster']) if self.splitted_min_n_cluster is None else self.splitted_min_n_cluster
+		self.splitted_max_n_cluster = int(default_radar['default_bf_splitted_max_n_cluster']) if self.splitted_max_n_cluster is None else self.splitted_max_n_cluster
+		self.stepup_n_cluster_threshold = int(default_radar['default_bf_stepup_n_cluster_threshold'])/100 if self.stepup_n_cluster_threshold is None else self.stepup_n_cluster_threshold/100
+
+		# Get Filtered StockCodes
+		self.filtered_stockcodes = await self.__get_stockcodes(
+			screener_min_value=self.screener_min_value,
+			screener_min_frequency=self.screener_min_frequency,
+			stockcode_excludes=self.stockcode_excludes,
+			dbs=self.dbs)
+
+		# Get raw data
+		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+			await self.__get_stock_raw_data(
+				filtered_stockcodes=self.filtered_stockcodes,
+				enddate=self.enddate,
+				default_months_range=self.default_months_range,
+				dbs=self.dbs
+				)
+		
+		return self
+	
+	async def __get_default_radar(self, dbs:db.Session | None = next(db.get_dbs())) -> pd.Series:
+		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
+			.filter((db.DataParam.param.like("default_radar_%")) | \
+				(db.DataParam.param.like("default_screener_%")) | \
+				(db.DataParam.param.like("default_bf_%")))
+		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+	
+	async def __get_stockcodes(self,
+		screener_min_value: int | None = 5000000000,
+		screener_min_frequency: int | None = 1000,
+		stockcode_excludes: set[str] | None = set(),
+		dbs: db.Session | None = next(db.get_dbs())
+		) -> pd.Series:
+		"""
+		Get filtered stockcodes
+		Filtered by:value>screener_min_value, 
+					frequency>screener_min_frequency 
+					stockcode_excludes
+		"""
+		# Query Definition
+		stockcode_excludes_lower = set(x.lower() for x in stockcode_excludes)
+		qry = dbs.query(db.ListStock.code)\
+			.filter((db.ListStock.value > screener_min_value) &
+					(db.ListStock.frequency > screener_min_frequency) &
+					(db.ListStock.code.not_in(stockcode_excludes_lower)))
+		
+		# Query Fetching: filtered_stockcodes
+		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code'])
+	
+	# Get Net Val Sum Val Broker Transaction
+	async def __get_nvsv_broker_transaction(self,
+		raw_data_broker_full: pd.DataFrame
+		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		# Calculate nval (bval-sval) and sumval (bval+sval)
+		raw_data_broker_full["nvol"] = raw_data_broker_full["bvol"] - raw_data_broker_full["svol"]
+		raw_data_broker_full["nval"] = raw_data_broker_full["bval"] - raw_data_broker_full["sval"]
+		raw_data_broker_full["sumval"] = raw_data_broker_full["bval"] + raw_data_broker_full["sval"]
+		# Aggretate by broker then broker to column for each net and sum
+		raw_data_broker_nvol = raw_data_broker_full.pivot(index=None,columns="broker",values="nvol")
+		raw_data_broker_nval = raw_data_broker_full.pivot(index=None,columns="broker",values="nval")
+		raw_data_broker_sumval = raw_data_broker_full.pivot(index=None,columns="broker",values="sumval")
+
+		# Fill na
+		raw_data_broker_nvol.fillna(value=0, inplace=True)
+		raw_data_broker_nval.fillna(value=0, inplace=True)
+		raw_data_broker_sumval.fillna(value=0, inplace=True)
+
+		# Return
+		return raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+
+	async def __get_full_broker_transaction(self,
+		filtered_stockcodes: pd.Series = ...,
+		enddate: datetime.date = datetime.date.today(),
+		default_months_range: int | None = 12,
+		dbs: db.Session | None = next(db.get_dbs()),
+		) -> pd.DataFrame:
+		start_qry = enddate - relativedelta(months=default_months_range)
+
+		# Query Definition
+		qry = dbs.query(
+			db.StockTransaction.date,
+			db.StockTransaction.broker,
+			db.StockTransaction.bvol,
+			db.StockTransaction.svol,
+			db.StockTransaction.bval,
+			db.StockTransaction.sval
+		).filter(db.StockTransaction.code.in_(filtered_stockcodes.to_list()))\
+		.filter(db.StockTransaction.date.between(start_qry, enddate))
+
+		# Main Query Fetching
+		raw_data_broker_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])\
+			.sort_values(by=["date","broker"], ascending=[True,True])\
+			.reset_index(drop=True).set_index("date")
+
+		# Data Cleansing: fillna
+		raw_data_broker_full.fillna(value=0, inplace=True)
+
+		return raw_data_broker_full
+	
+	async def __get_stock_price_data(self,
+		filtered_stockcodes: pd.Series = ...,
+		enddate: datetime.date = datetime.date.today(),
+		default_months_range: int | None = 12,
+		dbs: db.Session | None = next(db.get_dbs()),
+		) -> pd.DataFrame:
+		
+		start_qry = enddate - relativedelta(months=default_months_range)
+
+		# Query Definition
+		qry = dbs.query(
+			db.StockData.code,
+			db.StockData.date,
+			db.StockData.close,
+		).filter(db.StockData.code.in_(filtered_stockcodes.to_list()))\
+		.filter(db.StockData.date.between(start_qry, enddate))
+
+		# Main Query Fetching
+		raw_data_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])\
+			.sort_values(by=["code","date"],ascending=[True,True]).reset_index(drop=True)
+
+		# End of Method: Return or Assign Attribute
+		return raw_data_full
+
+	async def __get_stock_raw_data(self,
+		filtered_stockcodes: pd.Series = ...,
+		enddate: datetime.date = ...,
+		default_months_range: int | None = 6,
+		dbs: db.Session | None = next(db.get_dbs()),
+		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		# Get Stockdata Full
+		raw_data_full = await self.__get_stock_price_data(
+			filtered_stockcodes=filtered_stockcodes,
+			enddate=enddate,
+			default_months_range=default_months_range,
+			dbs=dbs
+			)
+
+		# Get Raw Data Broker Full
+		raw_data_broker_full = await self.__get_full_broker_transaction(
+			filtered_stockcodes=filtered_stockcodes,
+			enddate=enddate,
+			default_months_range=default_months_range,
+			dbs=dbs
+			)
+
+		# Transform Raw Data Broker
+		raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+			await self.__get_nvsv_broker_transaction(raw_data_broker_full=raw_data_broker_full)
+
+		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
