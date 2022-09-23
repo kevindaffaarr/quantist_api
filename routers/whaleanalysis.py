@@ -1,6 +1,8 @@
+from io import BytesIO
 import datetime
+import zipfile
 from fastapi import APIRouter, status, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 import dependencies as dp
 from dependencies import Tags
@@ -113,6 +115,7 @@ async def get_foreign_chart(
 @timeit
 async def get_broker_chart(
 	media_type:dp.ListMediaType | None = "json",
+	api_type: dp.ListBrokerApiType | None = dp.ListBrokerApiType.brokerflow,
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date | None = datetime.date.today(),
@@ -165,7 +168,25 @@ async def get_broker_chart(
 			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
 			)
 		stock_bf_full = await stock_bf_full.fit()
-		chart = await stock_bf_full.chart(media_type=media_type)
+		if api_type == dp.ListBrokerApiType.brokerflow:
+			chart = await stock_bf_full.chart(media_type=media_type)
+		elif api_type == dp.ListBrokerApiType.brokercluster:
+			chart = await stock_bf_full.broker_cluster_chart(media_type=media_type)
+		elif api_type == dp.ListBrokerApiType.all:
+			chart_flow = await stock_bf_full.chart(media_type=media_type)
+			chart_cluster = await stock_bf_full.broker_cluster_chart(media_type=media_type)
+			# Create zip file to be sent through API
+			chart_all = {
+				"flow": chart_flow,
+				"cluster": chart_cluster,
+			}
+			chart = BytesIO()
+			with zipfile.ZipFile(chart, "a", zipfile.ZIP_DEFLATED, False) as zf:
+				for key, value in chart_all.items():
+					zf.writestr(f"{key}.{media_type}", value)
+			chart.seek(0)
+		else:
+			raise ValueError("api_type is not valid")
 
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
@@ -188,14 +209,19 @@ async def get_broker_chart(
 		# content=chart
 
 		# Define media_type
-		if media_type in ["png","jpeg","jpg","webp"]:
-			media_type = f"image/{media_type}"
-		elif media_type == "svg":
-			media_type = "image/svg+xml"
-		else:
-			media_type = "application/json"
+		if api_type == dp.ListBrokerApiType.all:
+			media_type = "application/zip"
+			return StreamingResponse(chart, media_type=media_type, headers=headers)
 
-		return Response(content=chart, media_type=media_type, headers=headers)
+		else:
+			if media_type in ["png","jpeg","jpg","webp"]:
+				media_type = f"image/{media_type}"
+			elif media_type == "svg":
+				media_type = "image/svg+xml"
+			else:
+				media_type = "application/json"
+			return Response(content=chart, media_type=media_type, headers=headers)
+			
 
 # ==========
 # RADAR ROUTER

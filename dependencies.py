@@ -73,3 +73,8 @@ class ListMediaType(str,Enum):
 class ListRadarType(str,Enum):
 	correlation = "correlation"
 	changepercentage = "changepercentage"
+
+class ListBrokerApiType(str, Enum):
+	all = "all"
+	brokerflow = "brokerflow"
+	brokercluster = "brokercluster"
