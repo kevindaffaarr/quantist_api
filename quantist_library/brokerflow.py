@@ -458,6 +458,9 @@ class StockBFFull():
 		raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
 		raw_data_broker_sumval = raw_data_broker_sumval.iloc[start_index:end_index,:]
 
+		if (raw_data_broker_nval == 0).all().all() or (raw_data_broker_nval == 0).all().all():
+			raise ValueError("There is no transaction for the stockcode in the selected quantile")
+		
 		# Cumulate value for nval
 		broker_ncum = raw_data_broker_nval.cumsum(axis=0)
 		# Get correlation between raw_data_ncum and close

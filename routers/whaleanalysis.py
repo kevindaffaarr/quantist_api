@@ -190,6 +190,8 @@ async def get_broker_chart(
 
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
+	except ValueError as err:
+		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
 
 	else:
 		# Define the responses from Quantist: headers, content, and media_type
