@@ -421,6 +421,7 @@ class StockBFFull():
 		X = features[[x,y]].values
 		# Define silhouette param
 		silhouette_coefficient = []
+		max_n_cluster = min(max_n_cluster, len(X)-1)
 
 		# Iterate optimum n_cluster
 		for n_cluster in range(min_n_cluster, max_n_cluster+1):
@@ -454,7 +455,7 @@ class StockBFFull():
 		splitted_min_n_cluster: int | None = 2,
 		splitted_max_n_cluster: int | None = 5,
 		stepup_n_cluster_threshold: float | None = 0.05,
-		) -> tuple[list[str], int, float]:
+		) -> tuple[list[str], int, float, pd.DataFrame]:
 
 		# Only get third quartile of raw_data so not over-fitting
 		length = len(raw_data_close)
@@ -724,13 +725,34 @@ class WhaleRadar():
 				dbs=self.dbs
 				)
 		
+		# Get broker flow parameters for each stock in filtered_stockcodes
+		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
+			await self.__get_bf_parameters(
+				raw_data_close=raw_data_full["close"],
+				raw_data_broker_nval=raw_data_broker_nval,
+				raw_data_broker_sumval=raw_data_broker_sumval,
+				n_selected_cluster=self.n_selected_cluster,
+				training_start_index=self.training_start_index,
+				training_end_index=self.training_end_index,
+				splitted_min_n_cluster=self.splitted_min_n_cluster,
+				splitted_max_n_cluster=self.splitted_max_n_cluster,
+			)
+		
+		# Get Whale Radar Indicators
+		pass
+		self.radar_indicators = await self.calc_radar_indicators(
+			)
+		
 		return self
 	
 	async def __get_default_radar(self, dbs:db.Session | None = next(db.get_dbs())) -> pd.Series:
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-			.filter((db.DataParam.param.like("default_radar_%")) | \
+			.filter(
+				(db.DataParam.param.like("default_months_range")) | \
+				(db.DataParam.param.like("default_radar_%")) | \
 				(db.DataParam.param.like("default_screener_%")) | \
-				(db.DataParam.param.like("default_bf_%")))
+				(db.DataParam.param.like("default_bf_%"))
+				)
 		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 	
 	async def __get_stockcodes(self,
@@ -787,6 +809,7 @@ class WhaleRadar():
 		# Query Definition
 		qry = dbs.query(
 			db.StockTransaction.date,
+			db.StockTransaction.code,
 			db.StockTransaction.broker,
 			db.StockTransaction.bvol,
 			db.StockTransaction.svol,
@@ -797,8 +820,8 @@ class WhaleRadar():
 
 		# Main Query Fetching
 		raw_data_broker_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])\
-			.sort_values(by=["date","broker"], ascending=[True,True])\
-			.reset_index(drop=True).set_index("date")
+			.sort_values(by=["code","date","broker"], ascending=[True,True,True])\
+			.reset_index(drop=True).set_index(["code","date"])
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -824,7 +847,8 @@ class WhaleRadar():
 
 		# Main Query Fetching
 		raw_data_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])\
-			.sort_values(by=["code","date"],ascending=[True,True]).reset_index(drop=True)
+			.sort_values(by=["code","date"],ascending=[True,True])\
+			.reset_index(drop=True).set_index(["code","date"])
 
 		# End of Method: Return or Assign Attribute
 		return raw_data_full
@@ -850,9 +874,281 @@ class WhaleRadar():
 			default_months_range=default_months_range,
 			dbs=dbs
 			)
-
+		
 		# Transform Raw Data Broker
 		raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self.__get_nvsv_broker_transaction(raw_data_broker_full=raw_data_broker_full)
 
 		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+	
+	async def __get_selected_broker(self,
+		clustered_features: pd.DataFrame,
+		centroids_cluster: pd.DataFrame,
+		n_selected_cluster: int | None = 1,
+		) -> list[str]:
+		# Get index of max value in column 0 in centroid
+		selected_cluster = (centroids_cluster[0]).nlargest(n_selected_cluster).index.tolist()
+		# selected_cluster = (abs(centroids_cluster[0]*centroids_cluster[1])).nlargest(n_selected_cluster).index.tolist()
+		
+		# Get sorted selected broker
+		selected_broker = clustered_features.loc[clustered_features["cluster"].isin(selected_cluster), :]\
+			.sort_values(by="corr_ncum_close", ascending=False)\
+			.index.tolist()
+
+		return selected_broker
+
+	async def __get_selected_broker_ncum(self,
+		selected_broker: list[str],
+		broker_ncum: pd.DataFrame,
+		) -> pd.Series:
+		# Get selected broker transaction by columns of net_stockdatatransaction, then sum each column to aggregate to date
+		selected_broker_ncum = broker_ncum[selected_broker].sum(axis=1)
+		# Get cumulative
+		selected_broker_ncum = selected_broker_ncum.cumsum().rename("selected_broker_ncum")
+		return selected_broker_ncum
+
+	async def __get_corr_selected_broker_ncum(self,
+		clustered_features: pd.DataFrame,
+		raw_data_close: pd.Series,
+		broker_ncum: pd.Series,
+		centroids_cluster: pd.DataFrame,
+		n_selected_cluster: int | None = None,
+		) -> pd.Series:
+		selected_broker = await self.__get_selected_broker(
+			clustered_features=clustered_features,
+			centroids_cluster=centroids_cluster,
+			n_selected_cluster=n_selected_cluster
+			)
+
+		# Get selected broker transaction by columns of net_stockdatatransaction, then sum each column to aggregate to date
+		selected_broker_ncum = await self.__get_selected_broker_ncum(selected_broker, broker_ncum)
+
+		# Return correlation between close and selected_broker_ncum
+		return selected_broker_ncum.corr(raw_data_close)
+
+	async def __optimize_selected_cluster(self,
+		clustered_features: pd.DataFrame,
+		raw_data_close: pd.Series,
+		broker_ncum: pd.Series,
+		centroids_cluster: pd.DataFrame,
+		stepup_n_cluster_threshold: float | None = 0.05,
+		n_selected_cluster: int | None = None,
+		) -> tuple[list[str], int, float]:
+		# Check does n_selected_cluster already defined
+		if n_selected_cluster is None:
+			# Define correlation param
+			corr_list = []
+
+			# Iterate optimum n_cluster
+			for n_selected_cluster in range(1,len(centroids_cluster)+1):
+				# Get correlation between close and selected_broker_ncum
+				selected_broker_ncum_corr = await self.__get_corr_selected_broker_ncum(
+					clustered_features,
+					raw_data_close,
+					broker_ncum,
+					centroids_cluster,
+					n_selected_cluster
+					)
+				# Get correlation
+				corr_list.append(selected_broker_ncum_corr)
+
+			# Define optimum n_selected_cluster
+			max_corr: float = np.max(corr_list)
+			index_max_corr: int = np.argmax(corr_list)
+			optimum_corr: float = max_corr
+			optimum_n_selected_cluster: int = index_max_corr + 1
+
+			for i in range (index_max_corr):
+				if (max_corr-corr_list[i]) < stepup_n_cluster_threshold:
+					optimum_n_selected_cluster = i+1
+					optimum_corr = corr_list[i]
+					break
+		# -- End of if
+
+		# If n_selected_cluster is defined
+		else:
+			optimum_n_selected_cluster: int = n_selected_cluster
+			optimum_corr = await self.__get_corr_selected_broker_ncum(
+				clustered_features, 
+				raw_data_close, 
+				broker_ncum, 
+				centroids_cluster, 
+				n_selected_cluster
+				)
+
+		# Get Selected Broker from optimum n_selected_cluster
+		selected_broker = await self.__get_selected_broker(
+			clustered_features=clustered_features,
+			centroids_cluster=centroids_cluster,
+			n_selected_cluster=optimum_n_selected_cluster
+			)
+
+		return selected_broker, optimum_n_selected_cluster, optimum_corr
+
+	async def __kmeans_clustering(self,
+		features: pd.DataFrame,
+		x: str,
+		y: str,
+		min_n_cluster:int | None = 4,
+		max_n_cluster:int | None = 10,
+		) -> tuple[pd.DataFrame, pd.DataFrame]:
+
+		# Get X and Y
+		X = features[[x,y]].values
+		# Define silhouette param
+		silhouette_coefficient = []
+		max_n_cluster = min(max_n_cluster, len(X)-1)
+
+		# Iterate optimum n_cluster
+		for n_cluster in range(min_n_cluster, max_n_cluster+1):
+			# Clustering
+			kmeans = KMeans(init="k-means++", n_clusters=n_cluster, random_state=0).fit(X)
+			score = silhouette_score(X, kmeans.labels_)
+			silhouette_coefficient.append(score)
+		# Define optimum n_cluster
+		optimum_n_cluster = np.argmax(silhouette_coefficient) + min_n_cluster
+
+		# Clustering with optimum n cluster
+		kmeans = KMeans(init="k-means++", n_clusters=optimum_n_cluster, random_state=0).fit(X)
+		# Get cluster label
+		features["cluster"] = kmeans.labels_
+		# Get location of cluster center
+		centroids_cluster = pd.DataFrame(kmeans.cluster_centers_)
+
+		return features, centroids_cluster
+
+	async def __get_bf_parameters(self,
+		raw_data_close: pd.Series,
+		raw_data_broker_nval: pd.DataFrame,
+		raw_data_broker_sumval: pd.DataFrame,
+		n_selected_cluster: int | None = None,
+		training_start_index: float | None = 0.5,
+		training_end_index: float | None = 0.75,
+		splitted_min_n_cluster: int | None = 2,
+		splitted_max_n_cluster: int | None = 5,
+		stepup_n_cluster_threshold: float | None = 0.05,
+		) -> tuple[dict, dict, dict, pd.DataFrame]:
+		# Only get third quartile of raw_data so not over-fitting
+		length = raw_data_close.groupby(level=['code']).size()
+		start_index = (length*training_start_index).astype('int')
+		end_index = (length*training_end_index).astype('int')
+		raw_data_close = raw_data_close.groupby(level=['code'], group_keys=False)\
+			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
+		raw_data_broker_nval = raw_data_broker_nval.groupby(level=['code'], group_keys=False)\
+			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
+		raw_data_broker_sumval = raw_data_broker_sumval.groupby(level=['code'], group_keys=False)\
+			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
+		
+		# Only get raw_data_broker_nval groupby level code that doesn' all zero
+		nval_true = raw_data_broker_nval.groupby(level=['code'], group_keys=False)\
+			.apply(lambda x: (x!=0).any().any())
+		sumval_true = raw_data_broker_sumval.groupby(level=['code'], group_keys=False)\
+			.apply(lambda x: (x!=0).any().any())
+		transaction_true = nval_true & sumval_true
+		raw_data_close = raw_data_close.loc[transaction_true.index[transaction_true]]
+		raw_data_broker_nval = raw_data_broker_nval.loc[transaction_true.index[transaction_true]]
+		raw_data_broker_sumval = raw_data_broker_sumval.loc[transaction_true.index[transaction_true]]
+
+		# Cumulate value for nval
+		broker_ncum = raw_data_broker_nval.groupby(level=['code']).cumsum(axis=0)
+		# Get correlation between raw_data_ncum and close
+		corr_ncum_close = broker_ncum.groupby(level=['code']).corrwith(raw_data_close,axis=0)
+
+		# Get each broker's sum of transaction value
+		broker_sumval = raw_data_broker_sumval.groupby(level=['code']).sum()
+
+		# fillna
+		corr_ncum_close.fillna(value=0, inplace=True)
+		broker_sumval.fillna(value=0, inplace=True)
+		
+		# Create broker features from corr_ncum_close and broker_sumval
+		corr_ncum_close = corr_ncum_close.unstack().swaplevel(0,1).sort_index(level=0).rename('corr_ncum_close')
+		broker_sumval = broker_sumval.unstack().swaplevel(0,1).sort_index(level=0).rename('broker_sumval')
+		broker_features = pd.concat([corr_ncum_close, broker_sumval], axis=1)
+
+		# Delete variable for memory management
+		del raw_data_broker_nval, raw_data_broker_sumval, corr_ncum_close, broker_sumval
+		gc.collect()
+
+		# Standardize Features
+		# Using no standarization
+		# Get the column name from corr_ncum_close for each index that has correlation > 0
+		broker_features_std_pos = broker_features[broker_features['corr_ncum_close']>0]
+		broker_features_std_neg = broker_features[broker_features['corr_ncum_close']<=0]
+		
+		# Positive Clustering
+		broker_features_pos = pd.DataFrame()
+		centroids_pos = pd.DataFrame()
+		for code in broker_features_std_pos.index.get_level_values('code').unique():
+			features, centroids = \
+				await self.__kmeans_clustering(
+					features=broker_features_std_pos.loc[code],
+					x='corr_ncum_close',
+					y='broker_sumval',
+					min_n_cluster=splitted_min_n_cluster,
+					max_n_cluster=splitted_max_n_cluster,
+				)
+			features['code'] = code
+			features = features.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
+			broker_features_pos = pd.concat([broker_features_pos, features], axis=0)
+			centroids['code'] = code
+			centroids = centroids.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
+			centroids_pos = pd.concat([centroids_pos, centroids], axis=0)
+
+		# Negative Clustering
+		broker_features_neg = pd.DataFrame()
+		centroids_neg = pd.DataFrame()
+		for code in broker_features_std_neg.index.get_level_values('code').unique():
+			features, centroids = \
+				await self.__kmeans_clustering(
+					features=broker_features_std_neg.loc[code],
+					x='corr_ncum_close',
+					y='broker_sumval',
+					min_n_cluster=splitted_min_n_cluster,
+					max_n_cluster=splitted_max_n_cluster,
+				)
+			features['code'] = code
+			features = features.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
+			if code in broker_features_pos.index.get_level_values('code'):
+				features = features + (broker_features_pos.loc[(code),"cluster"].max()) + 1
+			broker_features_neg = pd.concat([broker_features_neg, features], axis=0)
+
+			centroids['code'] = code
+			if code in broker_features_pos.index.get_level_values('code'):
+				centroids.index = centroids.index + centroids_pos.loc[(code)].index.max() + 1
+			centroids = centroids.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
+			centroids_neg = pd.concat([centroids_neg, centroids], axis=0)
+			
+		# Combine Positive and Negative Clustering
+		broker_features_cluster = pd.concat([broker_features_pos,broker_features_neg],axis=0)
+		broker_features_centroids = pd.concat([centroids_pos,centroids_neg],axis=0)
+
+		# Get cluster label
+		broker_features["cluster"] = broker_features_cluster["cluster"].astype("int")
+
+		# Delete variable for memory management
+		del broker_features_std_pos, broker_features_std_neg, \
+			broker_features_pos, centroids_pos, \
+			broker_features_neg, centroids_neg, \
+			broker_features_cluster
+		gc.collect()
+
+		# Define optimum selected cluster: net transaction clusters with highest correlation to close
+		selected_broker = {}
+		optimum_n_selected_cluster = {}
+		optimum_corr = {}
+		for code in broker_features.index.get_level_values('code').unique():
+			selected_broker_code, optimum_n_selected_cluster_code, optimum_corr_code = \
+				await self.__optimize_selected_cluster(
+					clustered_features=broker_features.loc[(code)],
+					raw_data_close=raw_data_close.loc[(code)],
+					broker_ncum=broker_ncum.loc[(code)],
+					centroids_cluster=broker_features_centroids.loc[(code)],
+					n_selected_cluster=n_selected_cluster,
+					stepup_n_cluster_threshold=stepup_n_cluster_threshold
+				)
+			selected_broker[code] = selected_broker_code
+			optimum_n_selected_cluster[code] = optimum_n_selected_cluster_code
+			optimum_corr[code] = optimum_corr_code
+
+		return selected_broker, optimum_n_selected_cluster, optimum_corr, broker_features
