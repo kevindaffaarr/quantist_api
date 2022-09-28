@@ -658,6 +658,7 @@ class WhaleRadar():
 		splitted_min_n_cluster: int | None = None,
 		splitted_max_n_cluster: int | None = None,
 		stepup_n_cluster_threshold: int | None = None,
+		filter_opt_corr: int | None = None,
 		dbs: db.Session | None = next(db.get_dbs()),
 		) -> None:
 		self.startdate = startdate
@@ -678,6 +679,7 @@ class WhaleRadar():
 		self.splitted_min_n_cluster = splitted_min_n_cluster
 		self.splitted_max_n_cluster = splitted_max_n_cluster
 		self.stepup_n_cluster_threshold = stepup_n_cluster_threshold
+		self.filter_opt_corr = filter_opt_corr
 		self.dbs = dbs
 
 		self.radar_indicators = None
@@ -708,6 +710,7 @@ class WhaleRadar():
 		self.splitted_min_n_cluster = int(default_radar['default_bf_splitted_min_n_cluster']) if self.splitted_min_n_cluster is None else self.splitted_min_n_cluster
 		self.splitted_max_n_cluster = int(default_radar['default_bf_splitted_max_n_cluster']) if self.splitted_max_n_cluster is None else self.splitted_max_n_cluster
 		self.stepup_n_cluster_threshold = int(default_radar['default_bf_stepup_n_cluster_threshold'])/100 if self.stepup_n_cluster_threshold is None else self.stepup_n_cluster_threshold/100
+		self.filter_opt_corr = int(default_radar['default_radar_filter_opt_corr'])/100 if self.filter_opt_corr is None else self.filter_opt_corr/100
 
 		# Get Filtered StockCodes
 		self.filtered_stockcodes = await self.__get_stockcodes(
@@ -738,9 +741,35 @@ class WhaleRadar():
 				splitted_max_n_cluster=self.splitted_max_n_cluster,
 			)
 		
+		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
+		self.filtered_stockcodes = \
+			self.filtered_stockcodes[\
+				(abs(self.optimum_corr['optimum_corr']) > self.filter_opt_corr).reset_index(drop=True)\
+			].reset_index(drop=True)
+		raw_data_full = \
+			raw_data_full[raw_data_full.index.get_level_values(0).isin(self.filtered_stockcodes)]
+		raw_data_broker_nvol = \
+			raw_data_broker_nvol[raw_data_broker_nvol.index.get_level_values(0).isin(self.filtered_stockcodes)]
+		raw_data_broker_nval = \
+			raw_data_broker_nval[raw_data_broker_nval.index.get_level_values(0).isin(self.filtered_stockcodes)]
+
+		# Update Date Based on Data Queried
+		bar_range = max(self.period_wmf,self.period_wpricecorrel) if self.startdate is None else None
+		self.startdate = raw_data_full.groupby("code").tail(bar_range).index.get_level_values("date").date.min()
+		self.enddate = raw_data_full.index.get_level_values("date").date.max()
+
+		# Get only bar_range rows from last row for each group by code from raw_data_full
+		raw_data_full = raw_data_full.groupby("code").tail(bar_range)
+		raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(bar_range)
+		raw_data_broker_nval = raw_data_broker_nval.groupby("code").tail(bar_range)
+
 		# Get Whale Radar Indicators
-		pass
 		self.radar_indicators = await self.calc_radar_indicators(
+			raw_data_full = raw_data_full,
+			raw_data_broker_nvol = raw_data_broker_nvol,
+			raw_data_broker_nval = raw_data_broker_nval,
+			selected_broker = self.selected_broker,
+			y_axis_type=self.y_axis_type,
 			)
 		
 		return self
@@ -1027,7 +1056,7 @@ class WhaleRadar():
 		splitted_min_n_cluster: int | None = 2,
 		splitted_max_n_cluster: int | None = 5,
 		stepup_n_cluster_threshold: float | None = 0.05,
-		) -> tuple[dict, dict, dict, pd.DataFrame]:
+		) -> tuple[dict, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		# Only get third quartile of raw_data so not over-fitting
 		length = raw_data_close.groupby(level=['code']).size()
 		start_index = (length*training_start_index).astype('int')
@@ -1150,5 +1179,70 @@ class WhaleRadar():
 			selected_broker[code] = selected_broker_code
 			optimum_n_selected_cluster[code] = optimum_n_selected_cluster_code
 			optimum_corr[code] = optimum_corr_code
+		
+		optimum_n_selected_cluster = pd.DataFrame.from_dict(optimum_n_selected_cluster, orient='index').rename(columns={0:'optimum_n_selected_cluster'})
+		optimum_corr = pd.DataFrame.from_dict(optimum_corr, orient='index').rename(columns={0:'optimum_corr'})
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr, broker_features
+
+	async def sum_selected_broker_transaction(self,
+		raw_data_broker_nvol: pd.DataFrame,
+		raw_data_broker_nval: pd.DataFrame,
+		selected_broker: list[str],
+		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		
+		selected_broker_nvol = pd.DataFrame()
+		selected_broker_nval = pd.DataFrame()
+		for code in raw_data_broker_nvol.index.get_level_values('code').unique():
+			broker_nvol = raw_data_broker_nvol.loc[(code),selected_broker[code]].sum(axis=1)
+			broker_nval = raw_data_broker_nval.loc[(code),selected_broker[code]].sum(axis=1)
+			
+			# Concatenate
+			broker_nvol = pd.DataFrame(broker_nvol)
+			broker_nvol.columns = ['broker_nvol']
+			broker_nvol['code'] = code
+			broker_nvol = broker_nvol.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
+			selected_broker_nvol = pd.concat([selected_broker_nvol, broker_nvol], axis=0)
+
+			broker_nval = pd.DataFrame(broker_nval)
+			broker_nval.columns = ['broker_nval']
+			broker_nval['code'] = code
+			broker_nval = broker_nval.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
+			selected_broker_nval = pd.concat([selected_broker_nval, broker_nval], axis=0)
+
+		return selected_broker_nvol, selected_broker_nval
+			
+	async def calc_radar_indicators(self,
+		raw_data_full: pd.DataFrame,
+		raw_data_broker_nvol: pd.DataFrame,
+		raw_data_broker_nval: pd.DataFrame,
+		selected_broker: dict,
+		y_axis_type: dp.ListRadarType | None = dp.ListRadarType.correlation,
+		) -> pd.DataFrame:
+		# Data Preparation
+		selected_broker_nvol, selected_broker_nval = \
+			await self.sum_selected_broker_transaction(
+				raw_data_broker_nvol=raw_data_broker_nvol,
+				raw_data_broker_nval=raw_data_broker_nval,
+				selected_broker=selected_broker,
+			)
+
+		radar_indicators = pd.DataFrame()
+		
+		# Y Axis: WMF
+		radar_indicators["wmf"] = selected_broker_nval.groupby("code").sum()
+
+		# X Axis:
+		if y_axis_type.value == "correlation":
+			selected_broker_nvol_cumsum = selected_broker_nvol.groupby(level='code').cumsum()
+			radar_indicators[y_axis_type.value] = selected_broker_nvol_cumsum.groupby('code')\
+				.corrwith(raw_data_full['close'],axis=0)
+		elif y_axis_type.value == "changepercentage":
+			radar_indicators[y_axis_type.value] = \
+				(raw_data_full.groupby('code')['close'].nth([-1]) \
+				-raw_data_full.groupby('code')['close'].nth([0])) \
+				/raw_data_full.groupby('code')['close'].nth([0])
+		else:
+			raise Exception("Not a valid radar type")
+
+		return radar_indicators			
