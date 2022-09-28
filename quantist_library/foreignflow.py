@@ -482,18 +482,24 @@ class ForeignRadar():
 		stocks_raw_data:pd.DataFrame,
 		y_axis_type:dp.ListRadarType | None = "correlation"
 		) -> pd.DataFrame:
-		stocks_raw_data['netval'] = stocks_raw_data['close']*\
-			(stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell'])
 		
 		radar_indicators = pd.DataFrame()
 
 		# Y axis: fmf
+		stocks_raw_data['netval'] = stocks_raw_data['close']*\
+			(stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell'])
 		radar_indicators['fmf'] = stocks_raw_data.groupby(by='code')['netval'].sum()
 
 		# X axis:
 		if y_axis_type == "correlation":
-			radar_indicators[y_axis_type] = stocks_raw_data.groupby(by='code')['netval']\
+			# NetVol
+			stocks_raw_data['netvol'] = stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell']
+			# FF
+			stocks_raw_data['fvolflow'] = stocks_raw_data.groupby('code')['netvol'].cumsum()
+			# FPriceCorrel
+			radar_indicators[y_axis_type] = stocks_raw_data.groupby(by='code')['fvolflow']\
 				.corr(stocks_raw_data['close'])
+				
 		elif y_axis_type == "changepercentage":
 			radar_indicators[y_axis_type] = \
 				(stocks_raw_data.groupby(by='code')['close'].nth([-1])- \
