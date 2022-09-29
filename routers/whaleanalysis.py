@@ -1,6 +1,7 @@
 from io import BytesIO
 import datetime
 import zipfile
+import pandas as pd
 from fastapi import APIRouter, status, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 
@@ -453,6 +454,81 @@ async def get_foreign_data(
 	
 	else:
 		return full_data.to_dict(orient="index")
+
+@router.get("/full-data/broker", tags=[Tags.full_data.name])
+@timeit
+async def get_broker_data(
+	api_type: dp.ListBrokerApiType | None = dp.ListBrokerApiType.brokerflow,
+	stockcode: str | None = None,
+	startdate: datetime.date | None = None,
+	enddate: datetime.date | None = datetime.date.today(),
+	n_selected_cluster:int | None = None,
+	period_wmf: int | None = None,
+	period_wprop: int | None = None,
+	period_wpricecorrel: int | None = None,
+	period_wmapricecorrel: int | None = None,
+	period_wvwap:int | None = None,
+	wpow_high_wprop: int | None = None,
+	wpow_high_wpricecorrel: int | None = None,
+	wpow_high_wmapricecorrel: int | None = None,
+	wpow_medium_wprop: int | None = None,
+	wpow_medium_wpricecorrel: int | None = None,
+	wpow_medium_wmapricecorrel: int | None = None,
+	training_start_index: int | None = None,
+	training_end_index: int | None = None,
+	min_n_cluster: int | None = None,
+	max_n_cluster: int | None = None,
+	splitted_min_n_cluster: int | None = None,
+	splitted_max_n_cluster: int | None = None,
+	stepup_n_cluster_threshold: int | None = None,
+):
+	try:
+		stock_bf_full = bf.StockBFFull(
+			stockcode=stockcode,
+			startdate=startdate,
+			enddate=enddate,
+			n_selected_cluster=n_selected_cluster,
+			period_wmf=period_wmf,
+			period_wprop=period_wprop,
+			period_wpricecorrel=period_wpricecorrel,
+			period_wmapricecorrel=period_wmapricecorrel,
+			period_wvwap=period_wvwap,
+			wpow_high_wprop=wpow_high_wprop,
+			wpow_high_wpricecorrel=wpow_high_wpricecorrel,
+			wpow_high_wmapricecorrel=wpow_high_wmapricecorrel,
+			wpow_medium_wprop=wpow_medium_wprop,
+			wpow_medium_wpricecorrel=wpow_medium_wpricecorrel,
+			wpow_medium_wmapricecorrel=wpow_medium_wmapricecorrel,
+			training_start_index=training_start_index,
+			training_end_index=training_end_index,
+			min_n_cluster=min_n_cluster,
+			max_n_cluster=max_n_cluster,
+			splitted_min_n_cluster=splitted_min_n_cluster,
+			splitted_max_n_cluster=splitted_max_n_cluster,
+			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
+			)
+		stock_bf_full = await stock_bf_full.fit()
+
+		if api_type == dp.ListBrokerApiType.brokerflow:
+			data = stock_bf_full.bf_indicators.to_dict(orient="index"),
+		elif api_type == dp.ListBrokerApiType.brokercluster:
+			data = stock_bf_full.broker_features.to_dict(orient="index"),
+		elif api_type == dp.ListBrokerApiType.all:
+			flow = stock_bf_full.bf_indicators
+			cluster = stock_bf_full.broker_features
+			data = {
+				"flow": flow.to_dict(orient="index"),
+				"cluster": cluster.to_dict(orient="index"),
+			}
+		else:
+			raise ValueError("api_type is not valid")
+	
+	except KeyError as err:
+		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
+	
+	else:
+		return data
+
 
 # ==========
 # SCREENER ROUTER

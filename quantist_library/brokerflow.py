@@ -552,7 +552,7 @@ class StockBFFull():
 		wpow_medium_wpricecorrel: int | None = 30,
 		wpow_medium_wmapricecorrel: int | None = 30,
 		preoffset_period_param: int | None = 50,
-		) -> tuple[list[str], int, float]:
+		) -> pd.DataFrame:
 		# OHLC
 		# raw_data_full
 
