@@ -261,6 +261,8 @@ async def get_foreign_radar(
 	screener_min_value: int | None = None,
 	screener_min_frequency: int | None = None,
 	screener_min_fprop:int | None = None,
+	period_fmf: int | None = None,
+	period_fpricecorrel: int | None = None,
 ):
 	if media_type not in [dp.ListMediaType.png,
 		dp.ListMediaType.jpeg,
@@ -280,7 +282,9 @@ async def get_foreign_radar(
 			include_composite=include_composite,
 			screener_min_value=screener_min_value,
 			screener_min_frequency=screener_min_frequency,
-			screener_min_fprop=screener_min_fprop
+			screener_min_fprop=screener_min_fprop,
+			period_fmf=period_fmf,
+			period_fpricecorrel=period_fpricecorrel,
 		)
 		whale_radar_object = await whale_radar_object.fit()
 		
@@ -313,6 +317,94 @@ async def get_foreign_radar(
 			media_type = "application/json"
 		
 		return Response(content=chart, media_type=media_type, headers=headers)
+
+@router.get("/radar/broker", tags=[Tags.radar.name])
+@timeit
+async def get_broker_radar(
+	media_type:dp.ListMediaType | None = dp.ListMediaType.json,
+	startdate: datetime.date | None = None,
+	enddate: datetime.date | None = datetime.date.today(),
+	y_axis_type: dp.ListRadarType | None = dp.ListRadarType.correlation,
+	stockcode_excludes: set[str] | None = Query(default=set()),
+	include_composite: bool | None = False,
+	screener_min_value: int | None = None,
+	screener_min_frequency: int | None = None,
+	n_selected_cluster:int | None = None,
+	period_wmf: int | None = None,
+	period_wpricecorrel: int | None = None,
+	default_months_range: int | None = None,
+	training_start_index: int | None = None,
+	training_end_index: int | None = None,
+	min_n_cluster: int | None = None,
+	max_n_cluster: int | None = None,
+	splitted_min_n_cluster: int | None = None,
+	splitted_max_n_cluster: int | None = None,
+	stepup_n_cluster_threshold: int | None = None,
+	filter_opt_corr: int | None = None,
+):
+	if media_type not in [dp.ListMediaType.png,
+		dp.ListMediaType.jpeg,
+		dp.ListMediaType.jpg,
+		dp.ListMediaType.webp,
+		dp.ListMediaType.svg,
+		dp.ListMediaType.json
+		]:
+		media_type = dp.ListMediaType.json
+	
+	try:
+		whale_radar_object = bf.WhaleRadar(
+			startdate=startdate,
+			enddate=enddate,
+			y_axis_type=y_axis_type,
+			stockcode_excludes=stockcode_excludes,
+			include_composite=include_composite,
+			screener_min_value=screener_min_value,
+			screener_min_frequency=screener_min_frequency,
+			n_selected_cluster=n_selected_cluster,
+			period_wmf=period_wmf,
+			period_wpricecorrel=period_wpricecorrel,
+			default_months_range=default_months_range,
+			training_start_index=training_start_index,
+			training_end_index=training_end_index,
+			min_n_cluster=min_n_cluster,
+			max_n_cluster=max_n_cluster,
+			splitted_min_n_cluster=splitted_min_n_cluster,
+			splitted_max_n_cluster=splitted_max_n_cluster,
+			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
+			filter_opt_corr=filter_opt_corr,
+		)
+		whale_radar_object = await whale_radar_object.fit()
+		
+		chart = await whale_radar_object.chart(media_type=media_type)
+
+	except KeyError as err:
+		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
+
+	else:
+		# Define the responses from Quantist: headers, content, and media_type
+		# Define Headers
+		headers = {
+			"startdate": whale_radar_object.startdate.strftime("%Y-%m-%d"),
+			"enddate": whale_radar_object.enddate.strftime("%Y-%m-%d"),
+		}
+		
+		# Define content
+		# content=chart
+
+		# Define media_type
+		if media_type in [dp.ListMediaType.png,
+			dp.ListMediaType.jpeg,
+			dp.ListMediaType.jpg,
+			dp.ListMediaType.webp
+			]:
+			media_type = f"image/{media_type}"
+		elif media_type == dp.ListMediaType.svg:
+			media_type = "image/svg+xml"
+		else:
+			media_type = "application/json"
+		
+		return Response(content=chart, media_type=media_type, headers=headers)
+
 
 # ==========
 # FULL DATA ROUTER

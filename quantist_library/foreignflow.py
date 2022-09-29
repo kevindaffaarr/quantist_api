@@ -488,7 +488,7 @@ class ForeignRadar():
 		# Y axis: fmf
 		stocks_raw_data['netval'] = stocks_raw_data['close']*\
 			(stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell'])
-		radar_indicators['fmf'] = stocks_raw_data.groupby(by='code')['netval'].sum()
+		radar_indicators['mf'] = stocks_raw_data.groupby(by='code')['netval'].sum()
 
 		# X axis:
 		if y_axis_type == "correlation":

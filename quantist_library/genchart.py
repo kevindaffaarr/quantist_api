@@ -310,7 +310,8 @@ async def broker_chart(
 
 	return fig
 
-async def radar_chart(startdate:datetime.date,enddate:datetime.date,
+async def radar_chart(
+	startdate:datetime.date,enddate:datetime.date,
 	y_axis_type:str|None="correlation",
 	radar_indicators:pd.DataFrame=...
 	) -> go.Figure:
@@ -320,7 +321,7 @@ async def radar_chart(startdate:datetime.date,enddate:datetime.date,
 
 	# ADD TRACE
 	fig.add_trace(go.Scatter(
-		x=radar_indicators["fmf"],
+		x=radar_indicators["mf"],
 		y=radar_indicators[y_axis_type]*100,
 		text=radar_indicators.index.str.upper(),
 		textposition="bottom center",

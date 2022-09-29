@@ -1230,7 +1230,7 @@ class WhaleRadar():
 		radar_indicators = pd.DataFrame()
 		
 		# Y Axis: WMF
-		radar_indicators["wmf"] = selected_broker_nval.groupby("code").sum()
+		radar_indicators["mf"] = selected_broker_nval.groupby("code").sum()
 
 		# X Axis:
 		if y_axis_type.value == "correlation":
@@ -1245,4 +1245,25 @@ class WhaleRadar():
 		else:
 			raise Exception("Not a valid radar type")
 
-		return radar_indicators			
+		return radar_indicators
+
+	async def chart(self, media_type: dp.ListMediaType | None = None):
+		fig = await genchart.radar_chart(
+			startdate=self.startdate,
+			enddate=self.enddate,
+			y_axis_type=self.y_axis_type,
+			radar_indicators=self.radar_indicators,
+		)
+
+		if media_type in [
+			dp.ListMediaType.png,
+			dp.ListMediaType.jpeg,
+			dp.ListMediaType.jpg,
+			dp.ListMediaType.webp,
+			dp.ListMediaType.svg
+		]:
+			return await genchart.fig_to_image(fig,media_type)
+		elif media_type == dp.ListMediaType.json:
+			return await genchart.fig_to_json(fig)
+		else:
+			return fig
