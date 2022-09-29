@@ -1252,6 +1252,7 @@ class WhaleRadar():
 			startdate=self.startdate,
 			enddate=self.enddate,
 			y_axis_type=self.y_axis_type,
+			method="Whale",
 			radar_indicators=self.radar_indicators,
 		)
 

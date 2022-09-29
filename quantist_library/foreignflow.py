@@ -514,6 +514,7 @@ class ForeignRadar():
 		fig = await genchart.radar_chart(
 			startdate=self.startdate,enddate=self.enddate,
 			y_axis_type=self.y_axis_type,
+			method="Foreign",
 			radar_indicators=self.radar_indicators
 		)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:

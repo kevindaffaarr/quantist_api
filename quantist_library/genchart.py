@@ -313,6 +313,7 @@ async def broker_chart(
 async def radar_chart(
 	startdate:datetime.date,enddate:datetime.date,
 	y_axis_type:str|None="correlation",
+	method:str|None = "Foreign",
 	radar_indicators:pd.DataFrame=...
 	) -> go.Figure:
 	
@@ -332,12 +333,12 @@ async def radar_chart(
 	
 	# UPDATE AXES
 	fig.update_yaxes(title_text=y_axis_type.capitalize(), showgrid=True, zerolinewidth=3)
-	fig.update_xaxes(title_text="Foreign Money Flow",showgrid=True,zerolinewidth=3)
+	fig.update_xaxes(title_text="Money Flow",showgrid=True,zerolinewidth=3)
 	fig.update_xaxes(rangeslider={"autorange":True,"visible":False})
 	
 	# ANNOTATION
 	fig.add_annotation(xref="paper",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
-		text=f"<b>🔦 Chart by Quantist.io</b> | <b>Method: <span style='color:#BB86FC'>Foreign Flow</span></b> | Data date: {datetime.datetime.strftime(startdate,'%Y-%m-%d')} - {datetime.datetime.strftime(enddate,'%Y-%m-%d')}",
+		text=f"<b>🔦 Chart by Quantist.io</b> | <b>Method: <span style='color:#BB86FC'>{method} Flow</span></b> | Data date: {datetime.datetime.strftime(startdate,'%Y-%m-%d')} - {datetime.datetime.strftime(enddate,'%Y-%m-%d')}",
 		textangle=0,align="left",
 		showarrow=False
 	)
@@ -358,7 +359,7 @@ async def radar_chart(
 	fig.add_annotation(xref="x domain",yref="y domain",x=1,y=0,text=f"<b>{q4}</b>",showarrow=False,font=dict(color="#BB86FC"))
 
 	# TITLE
-	fig.update_layout(title={"text":f"<b>Whale Radar</b>", "x":0.5})
+	fig.update_layout(title={"text":f"<b>{method} Radar</b>", "x":0.5})
 	
 	# UPDATE_LAYOUT GLOBAL DEFAULT TEMPLATE
 	fig.update_layout(legend={"orientation":"h","y":-0.1})
