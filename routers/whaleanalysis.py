@@ -97,11 +97,11 @@ async def get_foreign_chart(
 		headers = {
 			"stockcode": stock_ff_full.stockcode,
 			"last_date": stock_ff_full.ff_indicators.index[-1].strftime("%Y-%m-%d"),
-			"last_fmf": stock_ff_full.ff_indicators['fmf'][-1].astype(str),
-			"last_fprop": stock_ff_full.ff_indicators['fprop'][-1].astype(str),
-			"last_fpricecorrel": stock_ff_full.ff_indicators['fpricecorrel'][-1].astype(str),
-			"last_fmapricecorrel": stock_ff_full.ff_indicators['fmapricecorrel'][-1].astype(str),
-			"last_fvwap": stock_ff_full.ff_indicators['fvwap'][-1].astype(str),
+			"last_mf": stock_ff_full.ff_indicators['fmf'][-1].astype(str),
+			"last_prop": stock_ff_full.ff_indicators['fprop'][-1].astype(str),
+			"last_pricecorrel": stock_ff_full.ff_indicators['fpricecorrel'][-1].astype(str),
+			"last_mapricecorrel": stock_ff_full.ff_indicators['fmapricecorrel'][-1].astype(str),
+			"last_vwap": stock_ff_full.ff_indicators['fvwap'][-1].astype(str),
 			"last_close": stock_ff_full.ff_indicators['close'][-1].astype(str),
 		}
 		
@@ -216,11 +216,11 @@ async def get_broker_chart(
 		headers = {
 			"stockcode": stock_bf_full.stockcode,
 			"last_date": stock_bf_full.bf_indicators.index[-1].strftime("%Y-%m-%d"),
-			"last_wmf": stock_bf_full.bf_indicators['wmf'][-1].astype(str),
-			"last_wprop": stock_bf_full.bf_indicators['wprop'][-1].astype(str),
-			"last_wpricecorrel": stock_bf_full.bf_indicators['wpricecorrel'][-1].astype(str),
-			"last_wmapricecorrel": stock_bf_full.bf_indicators['wmapricecorrel'][-1].astype(str),
-			"last_wvwap": stock_bf_full.bf_indicators['wvwap'][-1].astype(str),
+			"last_mf": stock_bf_full.bf_indicators['wmf'][-1].astype(str),
+			"last_prop": stock_bf_full.bf_indicators['wprop'][-1].astype(str),
+			"last_pricecorrel": stock_bf_full.bf_indicators['wpricecorrel'][-1].astype(str),
+			"last_mapricecorrel": stock_bf_full.bf_indicators['wmapricecorrel'][-1].astype(str),
+			"last_vwap": stock_bf_full.bf_indicators['wvwap'][-1].astype(str),
 			"last_close": stock_bf_full.bf_indicators['close'][-1].astype(str),
 		}
 
