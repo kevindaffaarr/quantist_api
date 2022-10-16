@@ -648,6 +648,7 @@ class WhaleRadar():
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
 		n_selected_cluster:int | None = None,
+		radar_period: int | None = None,
 		period_wmf: int | None = None,
 		period_wpricecorrel: int | None = None,
 		default_months_range: int | None = None,
@@ -669,6 +670,7 @@ class WhaleRadar():
 		self.screener_min_value = screener_min_value
 		self.screener_min_frequency = screener_min_frequency
 		self.n_selected_cluster = n_selected_cluster
+		self.radar_period = radar_period
 		self.period_wmf = period_wmf
 		self.period_wpricecorrel = period_wpricecorrel
 		self.default_months_range = default_months_range
@@ -689,22 +691,23 @@ class WhaleRadar():
 		default_radar = await self.__get_default_radar(dbs=self.dbs)
 
 		# Data Parameter
-		self.period_wmf = int(default_radar['default_radar_period_wmf']) if self.startdate is None else None
-		self.period_wpricecorrel = int(default_radar['default_radar_period_wpricecorrel']) if self.startdate is None else None
+		self.period_wmf = int(default_radar['default_bf_period_wmf']) if self.period_wmf is None else None
+		self.period_wpricecorrel = int(default_radar['default_bf_period_wpricecorrel']) if self.period_wpricecorrel is None else None
 		self.bar_range = max(self.period_wmf,self.period_wpricecorrel) if self.startdate is None else None
 		self.enddate = datetime.date.today() if self.enddate is None else self.enddate
 		
 		self.default_months_range = int(default_radar['default_months_range']) if self.default_months_range is None else self.default_months_range
 		if self.startdate is None:
-			self.default_months_range = int((self.default_months_range/2) + (20/self.bar_range))
+			self.default_months_range = int((self.default_months_range/2) + int(self.bar_range/20) + (self.bar_range % 20 > 0))
 		else:
-			self.default_months_range = int((self.default_months_range/2) + (20/(self.enddate-self.startdate).days))
+			self.default_months_range = int((self.default_months_range/2) + int((self.enddate-self.startdate).days/20) + ((self.enddate-self.startdate).days % 20 >0))
 
 		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
 		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
 
-		self.training_start_index = int(default_radar['default_bf_training_start_index'])/100 if self.training_start_index is None else self.training_start_index/100
-		self.training_end_index = int(default_radar['default_bf_training_end_index'])/100 if self.training_end_index is None else self.training_end_index/100
+		self.radar_period = int(default_radar['default_radar_period']) if self.startdate is None else None
+		self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100
+		self.training_end_index = (int(default_radar['default_bf_training_end_index'])-50)/(100/2) if self.training_end_index is None else self.training_end_index/100
 		self.min_n_cluster = int(default_radar['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster
 		self.max_n_cluster = int(default_radar['default_bf_max_n_cluster']) if self.max_n_cluster is None else self.max_n_cluster
 		self.splitted_min_n_cluster = int(default_radar['default_bf_splitted_min_n_cluster']) if self.splitted_min_n_cluster is None else self.splitted_min_n_cluster
@@ -754,15 +757,19 @@ class WhaleRadar():
 			raw_data_broker_nval[raw_data_broker_nval.index.get_level_values(0).isin(self.filtered_stockcodes)]
 
 		# Update Date Based on Data Queried
-		bar_range = max(self.period_wmf,self.period_wpricecorrel) if self.startdate is None else None
-		self.startdate = raw_data_full.groupby("code").tail(bar_range).index.get_level_values("date").date.min()
 		self.enddate = raw_data_full.index.get_level_values("date").date.max()
-
-		# Get only bar_range rows from last row for each group by code from raw_data_full
-		raw_data_full = raw_data_full.groupby("code").tail(bar_range)
-		raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(bar_range)
-		raw_data_broker_nval = raw_data_broker_nval.groupby("code").tail(bar_range)
-
+		if self.startdate is None:
+			self.startdate = raw_data_full.groupby("code").tail(self.radar_period).index.get_level_values("date").date.min()
+			# Get only self.radar_period rows from last row for each group by code from raw_data_full
+			raw_data_full = raw_data_full.groupby("code").tail(self.radar_period)
+			raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(self.radar_period)
+			raw_data_broker_nval = raw_data_broker_nval.groupby("code").tail(self.radar_period)
+		else:
+			# Get rows from self.startdate until self.enddate from raw_data_full in the first level of pandas index
+			raw_data_full = raw_data_full.query("date >= @self.startdate and date <= @self.enddate")
+			raw_data_broker_nvol = raw_data_broker_nvol.query("date >= @self.startdate and date <= @self.enddate")
+			raw_data_broker_nval = raw_data_broker_nval.query("date >= @self.startdate and date <= @self.enddate")
+		
 		# Get Whale Radar Indicators
 		self.radar_indicators = await self.calc_radar_indicators(
 			raw_data_full = raw_data_full,
