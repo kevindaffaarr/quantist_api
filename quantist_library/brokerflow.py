@@ -728,9 +728,11 @@ class WhaleRadar():
 				filtered_stockcodes=self.filtered_stockcodes,
 				enddate=self.enddate,
 				default_months_range=self.default_months_range,
+				training_end_index=self.training_end_index,
 				dbs=self.dbs
 				)
-		
+		self.filtered_stockcodes = raw_data_full.index.get_level_values(0).unique().to_series()
+
 		# Get broker flow parameters for each stock in filtered_stockcodes
 		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
 			await self.__get_bf_parameters(
@@ -747,7 +749,7 @@ class WhaleRadar():
 		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
 		self.filtered_stockcodes = \
 			self.filtered_stockcodes[\
-				(abs(self.optimum_corr['optimum_corr']) > self.filter_opt_corr).reset_index(drop=True)\
+				(abs(self.optimum_corr['optimum_corr']) > self.filter_opt_corr)\
 			].reset_index(drop=True)
 		raw_data_full = \
 			raw_data_full[raw_data_full.index.get_level_values(0).isin(self.filtered_stockcodes)]
@@ -893,8 +895,11 @@ class WhaleRadar():
 		filtered_stockcodes: pd.Series = ...,
 		enddate: datetime.date = ...,
 		default_months_range: int | None = 6,
+		training_end_index: int | None = 0.75,
 		dbs: db.Session | None = next(db.get_dbs()),
 		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		MINIMUM_TRAINING_SET = 5
+
 		# Get Stockdata Full
 		raw_data_full = await self.__get_stock_price_data(
 			filtered_stockcodes=filtered_stockcodes,
@@ -902,6 +907,11 @@ class WhaleRadar():
 			default_months_range=default_months_range,
 			dbs=dbs
 			)
+
+		# Filter only data that has first level index of raw_data_full is more than one row
+		raw_data_full = raw_data_full.groupby(level=0).filter(lambda x: len(x) > ((MINIMUM_TRAINING_SET//training_end_index) + 1))
+		# Get filtered_stockcodes from raw_data_full first level
+		filtered_stockcodes = raw_data_full.index.get_level_values(0).unique().to_series()
 
 		# Get Raw Data Broker Full
 		raw_data_broker_full = await self.__get_full_broker_transaction(
