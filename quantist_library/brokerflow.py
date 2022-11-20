@@ -364,7 +364,7 @@ class StockBFFull():
 			corr_list = []
 
 			# Iterate optimum n_cluster
-			for n_selected_cluster in range(1,len(centroids_cluster)+1):
+			for n_selected_cluster in range(1,len(centroids_cluster)):
 				# Get correlation between close and selected_broker_ncum
 				selected_broker_ncum_corr = await self.__get_corr_selected_broker_ncum(
 					clustered_features,
