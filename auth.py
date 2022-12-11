@@ -6,8 +6,8 @@ import json
 # Get string of dict of REGISTERED_API_KEYS from environment variables
 # Then the string converted to dict by json.loads
 # String format: {"api_key1":"secret1","api_key2":"secret2"}
-REGISTERED_API_KEYS: str = os.getenv("REGISTERED_API_KEYS")
-REGISTERED_API_KEYS: dict = json.loads(REGISTERED_API_KEYS)
+REGISTERED_API_KEYS_STR: str = os.getenv("REGISTERED_API_KEYS", "{}")
+REGISTERED_API_KEYS: dict = json.loads(REGISTERED_API_KEYS_STR)
 API_KEY_NAME = "X-API-KEY"
 
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)

@@ -114,13 +114,13 @@ async def get_foreign_chart(
 			dp.ListMediaType.jpg,
 			dp.ListMediaType.webp
 			]:
-			media_type = f"image/{media_type}"
+			mime_type:str = f"image/{media_type}"
 		elif media_type == dp.ListMediaType.svg:
-			media_type = "image/svg+xml"
+			mime_type:str = "image/svg+xml"
 		else:
-			media_type = "application/json"
+			mime_type:str = "application/json"
 
-		return Response(content=chart, media_type=media_type, headers=headers)
+		return Response(content=chart, media_type=mime_type, headers=headers)
 
 @router.get("/chart/broker", tags=[Tags.chart.name])
 @timeit
@@ -142,8 +142,8 @@ async def get_broker_chart(
 	wpow_medium_wprop: int | None = None,
 	wpow_medium_wpricecorrel: int | None = None,
 	wpow_medium_wmapricecorrel: int | None = None,
-	training_start_index: int | None = None,
-	training_end_index: int | None = None,
+	training_start_index: float | None = None,
+	training_end_index: float | None = None,
 	min_n_cluster: int | None = None,
 	max_n_cluster: int | None = None,
 	splitted_min_n_cluster: int | None = None,
@@ -229,7 +229,7 @@ async def get_broker_chart(
 
 		# Define media_type
 		if api_type == dp.ListBrokerApiType.all:
-			media_type = "application/zip"
+			mimetype:str = "application/zip"
 			return StreamingResponse(chart, media_type=media_type, headers=headers)
 
 		else:
@@ -238,12 +238,12 @@ async def get_broker_chart(
 				dp.ListMediaType.jpg,
 				dp.ListMediaType.webp
 				]:
-				media_type = f"image/{media_type}"
+				mimetype:str = f"image/{media_type}"
 			elif media_type == dp.ListMediaType.svg:
-				media_type = "image/svg+xml"
+				mimetype:str = "image/svg+xml"
 			else:
-				media_type = "application/json"
-			return Response(content=chart, media_type=media_type, headers=headers)
+				mimetype:str = "application/json"
+			return Response(content=chart, media_type=mimetype, headers=headers)
 			
 
 # ==========
@@ -256,7 +256,7 @@ async def get_foreign_radar(
 	media_type:dp.ListMediaType | None = dp.ListMediaType.json,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date | None = datetime.date.today(),
-	y_axis_type: dp.ListRadarType | None = "correlation",
+	y_axis_type: dp.ListRadarType | None = dp.ListRadarType.correlation,
 	stockcode_excludes: set[str] | None = Query(default=set()),
 	include_composite: bool | None = False,
 	screener_min_value: int | None = None,
@@ -311,13 +311,13 @@ async def get_foreign_radar(
 			dp.ListMediaType.jpg,
 			dp.ListMediaType.webp
 			]:
-			media_type = f"image/{media_type}"
+			mime_type:str = f"image/{media_type}"
 		elif media_type == dp.ListMediaType.svg:
-			media_type = "image/svg+xml"
+			mime_type:str = "image/svg+xml"
 		else:
-			media_type = "application/json"
+			mime_type:str = "application/json"
 		
-		return Response(content=chart, media_type=media_type, headers=headers)
+		return Response(content=chart, media_type=mime_type, headers=headers)
 
 @router.get("/radar/broker", tags=[Tags.radar.name])
 @timeit
@@ -335,8 +335,8 @@ async def get_broker_radar(
 	period_wmf: int | None = None,
 	period_wpricecorrel: int | None = None,
 	default_months_range: int | None = None,
-	training_start_index: int | None = None,
-	training_end_index: int | None = None,
+	training_start_index: float | None = None,
+	training_end_index: float | None = None,
 	min_n_cluster: int | None = None,
 	max_n_cluster: int | None = None,
 	splitted_min_n_cluster: int | None = None,
@@ -400,13 +400,13 @@ async def get_broker_radar(
 			dp.ListMediaType.jpg,
 			dp.ListMediaType.webp
 			]:
-			media_type = f"image/{media_type}"
+			mime_type:str = f"image/{media_type}"
 		elif media_type == dp.ListMediaType.svg:
-			media_type = "image/svg+xml"
+			mime_type:str = "image/svg+xml"
 		else:
-			media_type = "application/json"
+			mime_type:str = "application/json"
 		
-		return Response(content=chart, media_type=media_type, headers=headers)
+		return Response(content=chart, media_type=mime_type, headers=headers)
 
 
 # ==========
@@ -476,8 +476,8 @@ async def get_broker_data(
 	wpow_medium_wprop: int | None = None,
 	wpow_medium_wpricecorrel: int | None = None,
 	wpow_medium_wmapricecorrel: int | None = None,
-	training_start_index: int | None = None,
-	training_end_index: int | None = None,
+	training_start_index: float | None = None,
+	training_end_index: float | None = None,
 	min_n_cluster: int | None = None,
 	max_n_cluster: int | None = None,
 	splitted_min_n_cluster: int | None = None,
