@@ -146,8 +146,8 @@ class StockFFFull():
 			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index("date")
 		
 		# Pre-Data Query
-		startdate = raw_data_main.index[0].date() # Assign startdate to new defined startdate
-		self.startdate = raw_data_main.index[0].date() # Assign self.startdate to new defined startdate
+		startdate = raw_data_main.index[0].date() # type: ignore # Assign startdate to new defined startdate
+		self.startdate = raw_data_main.index[0].date() # type: ignore # Assign self.startdate to new defined startdate
 		qry_pre = qry.filter(db.StockData.date < startdate)\
 			.order_by(db.StockData.date.desc())\
 			.limit(preoffset_period_param)
@@ -200,8 +200,8 @@ class StockFFFull():
 			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
 		
 		# Pre-Data Query
-		startdate = raw_data_main.index[0].date() # Assign startdate to new defined startdate
-		self.startdate = raw_data_main.index[0].date() # Assign self.startdate
+		startdate = raw_data_main.index[0].date() # type: ignore # Assign startdate to new defined startdate
+		self.startdate = raw_data_main.index[0].date() # type: ignore # Assign self.startdate
 		qry_pre = qry.filter(db.IndexData.date < startdate)\
 			.order_by(db.IndexData.date.desc())\
 			.limit(preoffset_period_param)
@@ -323,6 +323,12 @@ class ForeignRadar():
 		period_fpricecorrel: int | None = None,
 		dbs: db.Session | None = next(db.get_dbs())
 		) -> None:
+		assert enddate is not None
+		assert y_axis_type is not None
+		assert stockcode_excludes is not None
+		assert include_composite is not None
+		assert dbs is not None
+
 		self.startdate = startdate
 		self.enddate = enddate
 		self.y_axis_type = y_axis_type
@@ -340,11 +346,6 @@ class ForeignRadar():
 	async def fit(self) -> ForeignRadar:
 		# Get default value of parameter
 		default_radar = await self.__get_default_radar()
-		self.period_fmf = int(default_radar['default_radar_period_fmf']) if self.startdate is None else None
-		self.period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel']) if self.startdate is None else None
-		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
-		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
-		self.screener_min_fprop = int(default_radar['default_screener_min_fprop']) if self.screener_min_fprop is None else self.screener_min_fprop
 		
 		# Get filtered stockcodes
 		filtered_stockcodes = await self.__get_stockcodes(
@@ -355,16 +356,22 @@ class ForeignRadar():
 			dbs=self.dbs)
 
 		# Get raw data
+		if self.startdate is None:
+			assert self.period_fmf is not None
+			assert self.period_fpricecorrel is not None
+			bar_range = max(self.period_fmf,self.period_fpricecorrel)
+		else:
+			bar_range = None
 		stocks_raw_data = await self.__get_stocks_raw_data(
 			startdate=self.startdate,
 			enddate=self.enddate,
 			filtered_stockcodes=filtered_stockcodes,
-			bar_range=max(self.period_fmf,self.period_fpricecorrel) if self.startdate is None else None,
+			bar_range=bar_range,
 			dbs=self.dbs)
 
 		# Set startdate and enddate based on data availability
-		self.startdate:datetime.date = stocks_raw_data['date'].min().date()
-		self.enddate:datetime.date = stocks_raw_data['date'].max().date()
+		self.startdate = stocks_raw_data['date'].min().date()
+		self.enddatestartdate = stocks_raw_data['date'].max().date()
 
 		# Calc Radar Indicators: last fpricecorrel OR last changepercentage
 		self.radar_indicators = await self.calc_radar_indicators(\
@@ -374,7 +381,7 @@ class ForeignRadar():
 			composite_raw_data = await self.__get_composite_raw_data(
 				startdate=self.startdate,
 				enddate=self.enddate,
-				bar_range=max(self.period_fmf,self.period_fpricecorrel) if self.startdate is None else None,
+				bar_range=bar_range,
 				dbs=self.dbs
 			)
 			composite_radar_indicators = await self.calc_radar_indicators(\
@@ -391,7 +398,16 @@ class ForeignRadar():
 		assert dbs is not None
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")))
-		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+		
+		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+		
+		self.period_fmf = int(default_radar['default_radar_period_fmf']) if self.startdate is None else None
+		self.period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel']) if self.startdate is None else None
+		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
+		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
+		self.screener_min_fprop = int(default_radar['default_screener_min_fprop']) if self.screener_min_fprop is None else self.screener_min_fprop
+		
+		return default_radar
 	
 	async def __get_stockcodes(self,
 		screener_min_value: int | None = 5000000000,
@@ -492,8 +508,8 @@ class ForeignRadar():
 			db.IndexData.code,
 			db.IndexData.date,
 			db.IndexData.close,
-			(db.IndexTransactionCompositeForeign.foreignbuyval/db.IndexData.close).label('foreignbuy'),
-			(db.IndexTransactionCompositeForeign.foreignsellval/db.IndexData.close).label('foreignsell')
+			(db.IndexTransactionCompositeForeign.foreignbuyval/db.IndexData.close).label('foreignbuy'), # type: ignore
+ 			(db.IndexTransactionCompositeForeign.foreignsellval/db.IndexData.close).label('foreignsell') # type: ignore
 			).\
 			filter(db.IndexData.code=="composite")\
 			.filter(db.IndexData.date.between(startdate,enddate))\
@@ -508,7 +524,7 @@ class ForeignRadar():
 
 	async def calc_radar_indicators(self,
 		stocks_raw_data:pd.DataFrame,
-		y_axis_type:dp.ListRadarType | None = "correlation"
+		y_axis_type:dp.ListRadarType | None = dp.ListRadarType.correlation,
 		) -> pd.DataFrame:
 		
 		radar_indicators = pd.DataFrame()
@@ -519,16 +535,17 @@ class ForeignRadar():
 		radar_indicators['mf'] = stocks_raw_data.groupby(by='code')['netval'].sum()
 
 		# X axis:
-		if y_axis_type == "correlation":
+		if y_axis_type == dp.ListRadarType.correlation:
 			# NetVol
 			stocks_raw_data['netvol'] = stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell']
 			# FF
 			stocks_raw_data['fvolflow'] = stocks_raw_data.groupby('code')['netvol'].cumsum()
 			# FPriceCorrel
-			radar_indicators[y_axis_type] = stocks_raw_data.groupby(by='code')['fvolflow']\
-				.corr(stocks_raw_data['close'])
+			radar_indicators[y_axis_type] = stocks_raw_data.groupby('code')[['fvolflow','close']].corr(method='pearson').iloc[0::2,-1]
+			# radar_indicators[y_axis_type] = stocks_raw_data.groupby(by='code')['fvolflow']\
+			# 	.corr(stocks_raw_data['close'])
 				
-		elif y_axis_type == "changepercentage":
+		elif y_axis_type == dp.ListRadarType.changepercentage:
 			radar_indicators[y_axis_type] = \
 				(stocks_raw_data.groupby(by='code')['close'].nth([-1])- \
 				stocks_raw_data.groupby(by='code')['close'].nth([0]))/ \
@@ -539,6 +556,8 @@ class ForeignRadar():
 		return radar_indicators
 	
 	async def chart(self,media_type:str | None = None):
+		assert self.startdate is not None
+
 		fig = await genchart.radar_chart(
 			startdate=self.startdate,enddate=self.enddate,
 			y_axis_type=self.y_axis_type,
