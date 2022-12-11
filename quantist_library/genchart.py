@@ -9,6 +9,9 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 def html_wrap(text:str, width:int | None = 16, n_lines:int | None = 2):
+	assert width is not None
+	assert n_lines is not None
+	
 	text_arr = textwrap.wrap(text=text, width=width)
 	text_arr = text_arr[0:n_lines]
 	if len(text_arr) >= n_lines:

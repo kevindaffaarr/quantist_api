@@ -82,3 +82,23 @@ class ListBrokerApiType(str, Enum):
 	all = "all"
 	brokerflow = "brokerflow"
 	brokercluster = "brokercluster"
+
+class AnalysisMethod(str, Enum):
+	foreign = "foreign"
+	broker = "broker"
+
+class ScreenerList(str, Enum):
+	most_accumulated = "most_accumulated"
+	most_distributed = "most_distributed"
+	highprop_inflow = "highprop_inflow"
+	highcorr_inflow = "highcorr_inflow"
+	rebound_flow = "rebound_flow"
+	drop_flow = "drop_flow"
+	inflow_stayprice = "inflow_pricestay"
+	neutral_downprice = "neutral_downprice"
+	rally_flow = "rally_flow"
+	crossup_vwap = "crossup_vwap"
+	crossdown_vwap = "crossdown_vwap"
+	price_around_vwap = "price_around_vwap"
+	price_around_vwap_inflow = "price_around_vwap_inflow"
+	peaking_transaction = "peaking_transaction"

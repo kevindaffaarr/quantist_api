@@ -46,6 +46,8 @@ class StockFFFull():
 		self.ff_indicators = pd.DataFrame()
 
 	async def fit(self) -> StockFFFull:
+		assert self.dbs is not None
+
 		# Get defaults value
 		default_ff = await self.__get_default_ff(self.dbs)
 
@@ -79,15 +81,15 @@ class StockFFFull():
 		preoffset_period_param = max(self.period_fmf,self.period_fprop,self.period_fpricecorrel,(self.period_fmapricecorrel+self.period_fvwap))-1
 
 		# Raw Data
-		if self.type == 'stock':
-			raw_data = await self.__get_stock_raw_data(self.dbs,self.stockcode,\
-				self.startdate,self.enddate,\
-				default_months_range,preoffset_period_param)
-		elif self.type == 'composite':
+		if self.type == 'composite':
 			raw_data = await self.__get_composite_raw_data(self.dbs,\
 				self.startdate,self.enddate,\
 				default_months_range,preoffset_period_param)
-			
+		else: #self.type == 'stock'
+			raw_data = await self.__get_stock_raw_data(self.dbs,self.stockcode,\
+				self.startdate,self.enddate,\
+				default_months_range,preoffset_period_param)
+		
 		# Foreign Flow Indicators
 		self.ff_indicators = await self.calc_ff_indicators(raw_data,\
 			self.period_fmf,self.period_fprop,self.period_fpricecorrel,self.period_fmapricecorrel,self.period_fvwap,\
@@ -102,6 +104,8 @@ class StockFFFull():
 		return self
 		
 	async def __get_default_ff(self, dbs:db.Session | None = next(db.get_dbs())) -> pd.Series:
+		assert dbs is not None
+
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_ff_%")) | \
 				(db.DataParam.param.like("default_stockcode")) | \
@@ -116,6 +120,8 @@ class StockFFFull():
 		default_months_range:int | None = None,
 		preoffset_period_param: int | None = 50
 		) -> pd.DataFrame:
+		assert dbs is not None
+
 		# Define startdate to 1 year before enddate if startdate is None
 		if startdate is None:
 			startdate = enddate - relativedelta(months=default_months_range)
@@ -137,7 +143,7 @@ class StockFFFull():
 		
 		# Main Query Fetching
 		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
-			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
+			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index("date")
 		
 		# Pre-Data Query
 		startdate = raw_data_main.index[0].date() # Assign startdate to new defined startdate
@@ -166,6 +172,8 @@ class StockFFFull():
 		default_months_range:int | None = None,
 		preoffset_period_param: int | None = 50
 		) -> pd.DataFrame:
+		assert dbs is not None
+
 		# Define startdate to 1 year before enddate if startdate is None
 		if startdate is None:
 			startdate = enddate - relativedelta(months=default_months_range)
@@ -227,6 +235,19 @@ class StockFFFull():
 		fpow_medium_fmapricecorrel: int | None = 30,
 		preoffset_period_param: int | None = 0
 		) -> pd.DataFrame:
+		assert period_fmf is not None
+		assert period_fprop is not None
+		assert period_fpricecorrel is not None
+		assert period_fmapricecorrel is not None
+		assert period_fvwap is not None
+		assert fpow_high_fprop is not None
+		assert fpow_high_fpricecorrel is not None
+		assert fpow_high_fmapricecorrel is not None
+		assert fpow_medium_fprop is not None
+		assert fpow_medium_fpricecorrel is not None
+		assert fpow_medium_fmapricecorrel is not None
+		assert preoffset_period_param is not None
+
 		# Define fbval, fsval, netvol, netval
 		raw_data['fbval'] = raw_data['close']*raw_data['foreignbuy']
 		raw_data['fsval'] = raw_data['close']*raw_data['foreignsell']
@@ -292,7 +313,7 @@ class ForeignRadar():
 	def __init__(self,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date | None = datetime.date.today(),
-		y_axis_type: dp.ListRadarType | None = "correlation",
+		y_axis_type: dp.ListRadarType | None = dp.ListRadarType.correlation,
 		stockcode_excludes: set[str] | None = set(),
 		include_composite: bool | None = False,
 		screener_min_value: int | None = None,
@@ -367,6 +388,7 @@ class ForeignRadar():
 		return self
 		
 	async def __get_default_radar(self, dbs:db.Session | None = next(db.get_dbs())) -> pd.Series:
+		assert dbs is not None
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")))
 		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
@@ -378,6 +400,8 @@ class ForeignRadar():
 		stockcode_excludes: set[str] | None = set(),
 		dbs: db.Session | None = next(db.get_dbs())
 		) -> pd.Series:
+		assert screener_min_fprop is not None
+		assert dbs is not None
 		"""
 		Get filtered stockcodes
 		Filtered by:value>screener_min_value, frequency>screener_min_frequency 
@@ -385,7 +409,7 @@ class ForeignRadar():
 					stockcode_excludes
 		"""
 		# Query Definition
-		stockcode_excludes_lower = set(x.lower() for x in stockcode_excludes)
+		stockcode_excludes_lower = set(x.lower() for x in stockcode_excludes) if stockcode_excludes is not None else set()
 		qry = dbs.query(db.ListStock.code)\
 			.filter((db.ListStock.value > screener_min_value) &
 					(db.ListStock.frequency > screener_min_frequency) &
@@ -404,6 +428,8 @@ class ForeignRadar():
 		bar_range: int | None = 5,
 		dbs: db.Session | None = next(db.get_dbs())
 		) -> pd.DataFrame:
+		assert dbs is not None
+
 		# Jika belum ada startdate, maka perlu ditentukan batas mulainya
 		if startdate is None:
 			# Ambil tanggal-tanggal pada BBCA yang meliputi enddate dan limit hingga bar_range
@@ -442,6 +468,8 @@ class ForeignRadar():
 		bar_range:int|None=5,
 		dbs:db.Session | None = next(db.get_dbs())
 		) ->  pd.DataFrame:
+		assert dbs is not None
+
 		# Jika belum ada startdate, maka perlu ditentukan batas mulainya
 		if startdate is None:
 			# Ambil tanggal-tanggal pada composite yang meliputi enddate dan limit hingga bar_range
