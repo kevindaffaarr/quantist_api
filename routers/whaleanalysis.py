@@ -96,7 +96,7 @@ async def get_foreign_chart(
 		# Define Headers
 		headers = {
 			"stockcode": stock_ff_full.stockcode,
-			"last_date": stock_ff_full.ff_indicators.index[-1].strftime("%Y-%m-%d"),
+			"last_date": stock_ff_full.ff_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
 			"last_mf": stock_ff_full.ff_indicators['fmf'][-1].astype(str),
 			"last_prop": stock_ff_full.ff_indicators['fprop'][-1].astype(str),
 			"last_pricecorrel": stock_ff_full.ff_indicators['fpricecorrel'][-1].astype(str),
@@ -200,7 +200,7 @@ async def get_broker_chart(
 			chart = BytesIO()
 			with zipfile.ZipFile(chart, "a", zipfile.ZIP_DEFLATED, False) as zf:
 				for key, value in chart_all.items():
-					zf.writestr(f"{key}.{media_type}", value)
+					zf.writestr(f"{key}.{media_type}", value) # type: ignore
 			chart.seek(0)
 		else:
 			raise ValueError("api_type is not valid")
@@ -215,7 +215,7 @@ async def get_broker_chart(
 		# Define Headers
 		headers = {
 			"stockcode": stock_bf_full.stockcode,
-			"last_date": stock_bf_full.bf_indicators.index[-1].strftime("%Y-%m-%d"),
+			"last_date": stock_bf_full.bf_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
 			"last_mf": stock_bf_full.bf_indicators['wmf'][-1].astype(str),
 			"last_prop": stock_bf_full.bf_indicators['wprop'][-1].astype(str),
 			"last_pricecorrel": stock_bf_full.bf_indicators['wpricecorrel'][-1].astype(str),
@@ -230,7 +230,7 @@ async def get_broker_chart(
 		# Define media_type
 		if api_type == dp.ListBrokerApiType.all:
 			mimetype:str = "application/zip"
-			return StreamingResponse(chart, media_type=media_type, headers=headers)
+			return StreamingResponse(chart, media_type=media_type, headers=headers) # type: ignore
 
 		else:
 			if media_type in [dp.ListMediaType.png,
@@ -297,6 +297,7 @@ async def get_foreign_radar(
 	else:
 		# Define the responses from Quantist: headers, content, and media_type
 		# Define Headers
+		assert whale_radar_object.startdate is not None
 		headers = {
 			"startdate": whale_radar_object.startdate.strftime("%Y-%m-%d"),
 			"enddate": whale_radar_object.enddate.strftime("%Y-%m-%d"),
@@ -387,8 +388,8 @@ async def get_broker_radar(
 		# Define the responses from Quantist: headers, content, and media_type
 		# Define Headers
 		headers = {
-			"startdate": whale_radar_object.startdate.strftime("%Y-%m-%d"),
-			"enddate": whale_radar_object.enddate.strftime("%Y-%m-%d"),
+			"startdate": whale_radar_object.startdate.strftime("%Y-%m-%d"), # type: ignore
+			"enddate": whale_radar_object.enddate.strftime("%Y-%m-%d"), # type: ignore
 		}
 		
 		# Define content

@@ -18,7 +18,9 @@ def html_wrap(text:str, width:int | None = 16, n_lines:int | None = 2):
 		text_arr[n_lines-1] = str(text_arr[n_lines-1]) + "..."
 	return "<br>".join(text_arr)
 
-async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...) -> go.Figure:
+async def foreign_chart(stockcode:str|None="", ff_indicators:pd.DataFrame=...) -> go.Figure:
+	assert stockcode is not None
+
 	# Make Subplots
 	fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
 		specs=[[{"secondary_y":True}],[{"secondary_y":True}]],
@@ -58,11 +60,12 @@ async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...)
 		name="Net Volume Profile",
 		orientation="h",opacity=0.1),
 		row=1,col=1,secondary_y=True)
-	bins=np.arange(fig.full_figure_for_development(warn=False).data[3].ybins.start,\
-		fig.full_figure_for_development(warn=False).data[3].ybins.end,\
-		fig.full_figure_for_development(warn=False).data[3].ybins.size)
-	hist_bar = ff_indicators.groupby(pd.cut(ff_indicators['close'],bins=bins))['netval'].sum()
-	fig.data[3].update(marker=dict(color=np.where(hist_bar<0,"Tomato","cyan")),xaxis='x3')
+	bins=np.arange(fig.full_figure_for_development(warn=False).data[3].ybins.start, # type:ignore
+		fig.full_figure_for_development(warn=False).data[3].ybins.end, # type:ignore
+		fig.full_figure_for_development(warn=False).data[3].ybins.size) # type:ignore
+	bins = pd.Series(bins)
+	hist_bar = ff_indicators['netval'].groupby(pd.cut(ff_indicators['close'].to_numpy(),bins=bins)).sum() # type:ignore
+	fig.data[3].update(marker=dict(color=np.where(hist_bar<0,"Tomato","cyan")),xaxis='x3') # type:ignore
 	# Foreign Proportion
 	fig.add_trace(go.Scatter(x=ff_indicators.index,y=ff_indicators['fprop']*100,
 		name="F Proportion %",marker_color="blue"
@@ -90,17 +93,21 @@ async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...)
 	fig.update_yaxes(title_text="F Proportion %", row=2, col=1, secondary_y=True, showgrid=True, range=[0,101])
 	fig.update_yaxes(title_text="F Net Value", row=2, col=1,secondary_y=False, showgrid=False, zeroline=False)
 
-	dt_all = pd.date_range(start=ff_indicators.index[0],end=ff_indicators.index[-1])
+	start_temp = ff_indicators.index[0]
+	end_temp = ff_indicators.index[-1]
+	assert isinstance(start_temp, datetime.date)
+	assert isinstance(end_temp, datetime.date)
+	dt_all = pd.date_range(start=start_temp,end=end_temp)
 	dt_obs = [d.strftime("%Y-%m-%d") for d in ff_indicators.index]
 	dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if not d in dt_obs]
 
 	fig.update_xaxes(title_text="Date", row=2, col=1, showgrid=True)
 	fig.update_xaxes(rangeslider={"autorange":True, "visible":False})
 	fig.update_xaxes(rangebreaks=[dict(values=dt_breaks)])
-	fig.update_layout(xaxis_range=[ff_indicators.index[0],ff_indicators.index[-1]+datetime.timedelta(days=round(len(ff_indicators)*0.1))])
+	fig.update_layout(xaxis_range=[start_temp,end_temp+datetime.timedelta(days=round(len(ff_indicators)*0.1))])
 
 	# ANNOTATION
-	fpricecorrel = ff_indicators.loc[ff_indicators.index[-1],'fpricecorrel']
+	fpricecorrel = ff_indicators.loc[ff_indicators.index[-1],'fpricecorrel'] # type:ignore
 	if fpricecorrel >= 0.7:
 		fpricecorrel_color = "SpringGreen"
 	elif fpricecorrel >= 0.4:
@@ -109,7 +116,7 @@ async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...)
 		fpricecorrel_color = "Red"
 	fpricecorrel = "{:.2f}%".format(fpricecorrel*100)
 
-	fmapricecorrel = ff_indicators.loc[ff_indicators.index[-1],'fmapricecorrel']
+	fmapricecorrel = ff_indicators.loc[ff_indicators.index[-1],'fmapricecorrel'] # type:ignore
 	if fmapricecorrel >= 0.7:
 		fmapricecorrel_color = "SpringGreen"
 	elif fmapricecorrel >= 0.4:
@@ -118,7 +125,7 @@ async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...)
 		fmapricecorrel_color = "Red"
 	fmapricecorrel = "{:.2f}%".format(fmapricecorrel*100)
 	
-	fpow = ff_indicators.loc[ff_indicators.index[-1],'fpow']
+	fpow = ff_indicators.loc[ff_indicators.index[-1],'fpow'] # type:ignore
 	if fpow == 3:
 		fpow_text = "<span style='color:SpringGreen'>High</span>"
 	elif fpow == 2:
@@ -127,7 +134,7 @@ async def foreign_chart(stockcode:str|None=None, ff_indicators:pd.DataFrame=...)
 		fpow_text = "<span style='color:Red'>Low</span>"
 	
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
-		text=f"<b>Date: {datetime.datetime.strftime(ff_indicators.index[-1],'%Y-%m-%d')}</b> \
+		text = f"<b>Date: {end_temp.strftime('%Y-%m-%d')}</b> \
 			<b>Close</b>: {'{:0.0f}'.format(ff_indicators.close[-1])}\
 			<b>F-VWAP</b>: {'{:0.0f}'.format(ff_indicators.fvwap[-1])}\
 			<b>F-Prop</b>: {'{:.2f}%'.format(ff_indicators.fprop[-1]*100)}\
@@ -168,6 +175,9 @@ async def broker_chart(
 	period_wmapricecorrel: int | None = None,
 	period_wvwap:int | None = None,
 	) -> go.Figure:
+	if optimum_corr is None:
+		optimum_corr = np.nan
+		
 	# Make Subplots
 	fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
 		specs=[[{"secondary_y":True}],[{"secondary_y":True}]],
@@ -206,11 +216,12 @@ async def broker_chart(
 		histfunc="sum",
 		name="Net Volume Profile",orientation="h",opacity=0.1),
 		row=1,col=1,secondary_y=True)
-	bins=np.arange(fig.full_figure_for_development(warn=False).data[3].ybins.start,\
-		fig.full_figure_for_development(warn=False).data[3].ybins.end,\
-		fig.full_figure_for_development(warn=False).data[3].ybins.size)
-	hist_bar = bf_indicators.groupby(pd.cut(bf_indicators['close'],bins=bins))['netvol'].sum()
-	fig.data[3].update(marker=dict(color=np.where(hist_bar<0,"tomato","cyan")),xaxis='x3')
+	bins=np.arange(fig.full_figure_for_development(warn=False).data[3].ybins.start, # type:ignore
+		fig.full_figure_for_development(warn=False).data[3].ybins.end, # type:ignore
+		fig.full_figure_for_development(warn=False).data[3].ybins.size) # type:ignore
+	bins = pd.Series(bins)
+	hist_bar = bf_indicators.groupby(pd.cut(bf_indicators['close'].to_numpy(),bins=bins))['netvol'].sum() # type:ignore
+	fig.data[3].update(marker=dict(color=np.where(hist_bar<0,"tomato","cyan")),xaxis='x3') # type:ignore
 
 	# Whale Proportion
 	fig.add_trace(go.Scatter(x=bf_indicators.index,y=bf_indicators['wprop']*100,
@@ -240,17 +251,21 @@ async def broker_chart(
 	fig.update_yaxes(title_text="W Proportion %", row=2, col=1, secondary_y=True, showgrid=True, range=[0,101])
 	fig.update_yaxes(title_text="W Net Value", row=2, col=1,secondary_y=False, showgrid=False, zeroline=False)
 
-	dt_all = pd.date_range(start=bf_indicators.index[0],end=bf_indicators.index[-1])
+	start_temp = bf_indicators.index[0]
+	end_temp = bf_indicators.index[-1]
+	assert isinstance(start_temp, datetime.datetime)
+	assert isinstance(end_temp, datetime.datetime)
+	dt_all = pd.date_range(start=start_temp,end=end_temp)
 	dt_obs = [d.strftime("%Y-%m-%d") for d in bf_indicators.index]
 	dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if not d in dt_obs]
 
 	fig.update_xaxes(title_text="Date", row=2, col=1, showgrid=True)
 	fig.update_xaxes(rangeslider={"autorange":True, "visible":False})
 	fig.update_xaxes(rangebreaks=[dict(values=dt_breaks)])
-	fig.update_layout(xaxis_range=[bf_indicators.index[0],bf_indicators.index[-1]+datetime.timedelta(days=round(len(bf_indicators)*0.1))])
+	fig.update_layout(xaxis_range=[start_temp,end_temp+datetime.timedelta(days=round(len(bf_indicators)*0.1))])
 
 	# ANNOTATION
-	wpricecorrel = bf_indicators.loc[bf_indicators.index[-1],'wpricecorrel']
+	wpricecorrel = bf_indicators.loc[end_temp,'wpricecorrel'] # type:ignore
 	if wpricecorrel >= 0.7:
 		wpricecorrel_color = "SpringGreen"
 	elif wpricecorrel >= 0.4:
@@ -259,7 +274,7 @@ async def broker_chart(
 		wpricecorrel_color = "Red"
 	wpricecorrel = "{:.2f}%".format(wpricecorrel*100)
 
-	wmapricecorrel = bf_indicators.loc[bf_indicators.index[-1],'wmapricecorrel']
+	wmapricecorrel = bf_indicators.loc[bf_indicators.index[-1],'wmapricecorrel'] # type:ignore
 	if wmapricecorrel >= 0.7:
 		wmapricecorrel_color = "SpringGreen"
 	elif wmapricecorrel >= 0.4:
@@ -268,7 +283,7 @@ async def broker_chart(
 		wmapricecorrel_color = "Red"
 	wmapricecorrel = "{:.2f}%".format(wmapricecorrel*100)
 	
-	wpow = bf_indicators.loc[bf_indicators.index[-1],'wpow']
+	wpow = bf_indicators.loc[bf_indicators.index[-1],'wpow'] # type:ignore
 	if wpow == 3:
 		wpow_text = "<span style='color:SpringGreen'>High</span>"
 	elif wpow == 2:
@@ -277,7 +292,7 @@ async def broker_chart(
 		wpow_text = "<span style='color:Red'>Low</span>"
 	
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
-		text=f"<b>Date: {datetime.datetime.strftime(bf_indicators.index[-1],'%Y-%m-%d')}</b> \
+		text = f"<b>Date: {end_temp.strftime('%Y-%m-%d')}</b> \
 			<b>Close</b>: {'{:0.0f}'.format(bf_indicators.close[-1])}\
 			<b>W-VWAP({period_wvwap if period_wvwap is not None else ''})</b>: {'{:0.0f}'.format(bf_indicators.wvwap[-1])}\
 			<b>W-Prop({period_wprop if period_wprop is not None else ''})</b>: {'{:.2f}%'.format(bf_indicators.wprop[-1]*100)}\
@@ -319,7 +334,8 @@ async def radar_chart(
 	method:str|None = "Foreign",
 	radar_indicators:pd.DataFrame=...
 	) -> go.Figure:
-	
+	assert y_axis_type in ["correlation", "changepercentage"]
+
 	# INIT
 	fig = go.Figure()
 
@@ -341,20 +357,20 @@ async def radar_chart(
 	
 	# ANNOTATION
 	fig.add_annotation(xref="paper",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
-		text=f"<b>🔦 Chart by Quantist.io</b> | <b>Method: <span style='color:#BB86FC'>{method} Flow</span></b> | Data date: {datetime.datetime.strftime(startdate,'%Y-%m-%d')} - {datetime.datetime.strftime(enddate,'%Y-%m-%d')}",
+		text=f"<b>🔦 Chart by Quantist.io</b> | <b>Method: <span style='color:#BB86FC'>{method} Flow</span></b> | Data date: {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}",
 		textangle=0,align="left",
 		showarrow=False
 	)
-	if y_axis_type == "correlation":
+	if y_axis_type == "changepercentage":
+		q1 = "ACCUMULATION AREA"
+		q2 = "MARKUP AREA"
+		q3 = "DISTRIBUTION AREA"
+		q4 = "MARKDOWN AREA"
+	else: # if y_axis_type == "correlation":
 		fig.update_yaxes(range=[-101,101])
 		q1 = "ACCUMULATION AREA"
 		q2 = "DISTRIBUTION AREA"
 		q3 = "MARKUP AREA"
-		q4 = "MARKDOWN AREA"
-	elif y_axis_type == "changepercentage":
-		q1 = "ACCUMULATION AREA"
-		q2 = "MARKUP AREA"
-		q3 = "DISTRIBUTION AREA"
 		q4 = "MARKDOWN AREA"
 	fig.add_annotation(xref="x domain",yref="y domain",x=1,y=1,text=f"<b>{q1}</b>",showarrow=False,font=dict(color="#BB86FC"))
 	fig.add_annotation(xref="x domain",yref="y domain",x=0,y=1,text=f"<b>{q2}</b>",showarrow=False,font=dict(color="#BB86FC"))
