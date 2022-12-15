@@ -371,7 +371,7 @@ class ForeignRadar():
 
 		# Set startdate and enddate based on data availability
 		self.startdate = stocks_raw_data['date'].min().date()
-		self.enddatestartdate = stocks_raw_data['date'].max().date()
+		self.enddate = stocks_raw_data['date'].max().date()
 
 		# Calc Radar Indicators: last fpricecorrel OR last changepercentage
 		self.radar_indicators = await self.calc_radar_indicators(\
@@ -541,7 +541,7 @@ class ForeignRadar():
 			# FF
 			stocks_raw_data['fvolflow'] = stocks_raw_data.groupby('code')['netvol'].cumsum()
 			# FPriceCorrel
-			radar_indicators[y_axis_type] = stocks_raw_data.groupby('code')[['fvolflow','close']].corr(method='pearson').iloc[0::2,-1]
+			radar_indicators[y_axis_type] = stocks_raw_data.groupby('code')[['fvolflow','close']].corr(method='pearson').iloc[0::2,-1].droplevel(1)
 			# radar_indicators[y_axis_type] = stocks_raw_data.groupby(by='code')['fvolflow']\
 			# 	.corr(stocks_raw_data['close'])
 				
@@ -570,3 +570,45 @@ class ForeignRadar():
 			return await genchart.fig_to_json(fig)
 		else:
 			return fig
+
+class ScreenerBase(ForeignRadar):
+	def __init__(self,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date | None = datetime.date.today(),
+		stockcode_excludes: set[str] | None = set(),
+		screener_min_value: int | None = None,
+		screener_min_frequency: int | None = None,
+		screener_min_fprop:int | None = None,
+		period_fmf: int | None = None,
+		period_fpricecorrel: int | None = None,
+		dbs: db.Session | None = next(db.get_dbs())		
+		) -> None:
+		assert dbs is not None
+
+		super().__init__(
+			startdate = startdate,
+			enddate = enddate,
+			stockcode_excludes = stockcode_excludes,
+			screener_min_value = screener_min_value,
+			screener_min_frequency = screener_min_frequency,
+			screener_min_fprop = screener_min_fprop,
+			period_fmf = period_fmf,
+			period_fpricecorrel = period_fpricecorrel,
+			dbs = dbs,
+		)
+
+class ScreenerMostAccum(ScreenerBase):
+	def __init__(self,
+		period: int | None = None,
+		start_date: datetime.date | None = None,
+		end_date: datetime.date | None = None,
+		) -> None:
+		pass
+
+	# get default screener parameters
+
+	# get list_stock that should be analyzed
+
+	# get ranked, filtered, and pre-calculated indicator data of selected list_stock
+	
+	# output: list of stock code and their indicator data

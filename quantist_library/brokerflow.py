@@ -79,7 +79,7 @@ class StockBFFull():
 		self.selected_broker = None
 		self.optimum_n_selected_cluster = None
 		self.optimum_corr = None
-		self.bf_indicators = None
+		self.bf_indicators:pd.DataFrame = pd.DataFrame()
 
 	async def fit(self) -> StockBFFull:
 		# Get default bf params
@@ -798,10 +798,10 @@ class WhaleRadar():
 			raw_data_broker_nval[raw_data_broker_nval.index.get_level_values(0).isin(self.filtered_stockcodes)]
 
 		# Update Date Based on Data Queried
-		self.enddate = raw_data_full.index.get_level_values("date").date.max()
+		self.enddate = raw_data_full.index.get_level_values("date").date.max() # type: ignore
 		if self.startdate is None:
 			assert self.radar_period is not None
-			self.startdate = raw_data_full.groupby("code").tail(self.radar_period).index.get_level_values("date").date.min()
+			self.startdate = raw_data_full.groupby("code").tail(self.radar_period).index.get_level_values("date").date.min() # type: ignore
 			# Get only self.radar_period rows from last row for each group by code from raw_data_full
 			raw_data_full = raw_data_full.groupby("code").tail(self.radar_period)
 			raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(self.radar_period)
@@ -1155,7 +1155,7 @@ class WhaleRadar():
 		# Cumulate value for nval
 		broker_ncum = raw_data_broker_nval.groupby(by='code').cumsum(axis=0)
 		# Get correlation between raw_data_ncum and close
-		corr_ncum_close = broker_ncum.groupby(by='code').corrwith(raw_data_close,axis=0)
+		corr_ncum_close = broker_ncum.groupby(by='code').corrwith(raw_data_close,axis=0) # type: ignore
 
 		# Get each broker's sum of transaction value
 		broker_sumval = raw_data_broker_sumval.groupby(by='code').sum()
@@ -1165,8 +1165,8 @@ class WhaleRadar():
 		broker_sumval.fillna(value=0, inplace=True)
 		
 		# Create broker features from corr_ncum_close and broker_sumval
-		corr_ncum_close = corr_ncum_close.unstack().swaplevel(0,1).sort_index(level=0).rename('corr_ncum_close')
-		broker_sumval = broker_sumval.unstack().swaplevel(0,1).sort_index(level=0).rename('broker_sumval')
+		corr_ncum_close = corr_ncum_close.unstack().swaplevel(0,1).sort_index(level=0).rename('corr_ncum_close') # type: ignore
+		broker_sumval = broker_sumval.unstack().swaplevel(0,1).sort_index(level=0).rename('broker_sumval') # type: ignore
 		broker_features = pd.concat([corr_ncum_close, broker_sumval], axis=1)
 
 		# Delete variable for memory management
@@ -1213,8 +1213,8 @@ class WhaleRadar():
 			features['code'] = code
 			features = features.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
 			if code in broker_features_pos.index.get_level_values('code'):
-				features = features + (broker_features_pos.loc[(code),"cluster"].max()) + 1
-			broker_features_neg = pd.concat([broker_features_neg, features], axis=0)
+				features = features + (broker_features_pos.loc[(code),"cluster"].max()) + 1 # type: ignore
+				broker_features_neg = pd.concat([broker_features_neg, features], axis=0)
 
 			centroids['code'] = code
 			if code in broker_features_pos.index.get_level_values('code'):
@@ -1262,14 +1262,14 @@ class WhaleRadar():
 	async def sum_selected_broker_transaction(self,
 		raw_data_broker_nvol: pd.DataFrame,
 		raw_data_broker_nval: pd.DataFrame,
-		selected_broker: list[str],
-		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		selected_broker: dict,
+		) -> tuple[pd.DataFrame, pd.DataFrame]:
 		
 		selected_broker_nvol = pd.DataFrame()
 		selected_broker_nval = pd.DataFrame()
 		for code in raw_data_broker_nvol.index.get_level_values('code').unique():
-			broker_nvol = raw_data_broker_nvol.loc[(code),selected_broker[code]].sum(axis=1)
-			broker_nval = raw_data_broker_nval.loc[(code),selected_broker[code]].sum(axis=1)
+			broker_nvol = raw_data_broker_nvol.loc[(code),selected_broker[code]].sum(axis=1) # type: ignore
+			broker_nval = raw_data_broker_nval.loc[(code),selected_broker[code]].sum(axis=1) # type: ignore
 			
 			# Concatenate
 			broker_nvol = pd.DataFrame(broker_nvol)
@@ -1312,7 +1312,7 @@ class WhaleRadar():
 		if y_axis_type.value == "correlation":
 			selected_broker_nvol_cumsum = selected_broker_nvol.groupby(level='code').cumsum()
 			radar_indicators[y_axis_type.value] = selected_broker_nvol_cumsum.groupby('code')\
-				.corrwith(raw_data_full['close'],axis=0)
+				.corrwith(raw_data_full['close'],axis=0) # type: ignore
 		elif y_axis_type.value == "changepercentage":
 			radar_indicators[y_axis_type.value] = \
 				(raw_data_full.groupby('code')['close'].nth([-1]) \
