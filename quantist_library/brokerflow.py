@@ -26,7 +26,7 @@ class StockBFFull():
 	def __init__(self,
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
-		enddate: datetime.date | None = datetime.date.today(),
+		enddate: datetime.date = datetime.date.today(),
 		n_selected_cluster:int | None = None,
 		period_wmf: int | None = None,
 		period_wprop: int | None = None,
@@ -46,9 +46,8 @@ class StockBFFull():
 		splitted_min_n_cluster: int | None = None,
 		splitted_max_n_cluster: int | None = None,
 		stepup_n_cluster_threshold: int | None = None,
-		dbs: db.Session | None = next(db.get_dbs()),
+		dbs: db.Session = next(db.get_dbs()),
 		) -> None:
-		assert dbs is not None
 
 		self.stockcode = stockcode
 		self.startdate = startdate
@@ -165,8 +164,7 @@ class StockBFFull():
 
 		return self
 
-	async def __get_default_bf(self,dbs: db.Session | None = next(db.get_dbs())) -> pd.Series:
-		assert dbs is not None
+	async def __get_default_bf(self,dbs: db.Session = next(db.get_dbs())) -> pd.Series:
 		
 		# Get Default Broker Flow
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
@@ -197,12 +195,10 @@ class StockBFFull():
 	async def __get_full_broker_transaction(self,
 		stockcode: str,
 		preoffset_startdate: datetime.date | None = None,
-		enddate: datetime.date | None = datetime.date.today(),
-		default_months_range: int | None = 12,
-		dbs: db.Session | None = next(db.get_dbs()),
+		enddate: datetime.date = datetime.date.today(),
+		default_months_range: int = 12,
+		dbs: db.Session = next(db.get_dbs()),
 		):
-		assert enddate is not None
-		assert dbs is not None
 
 		# if startdate is none, set to 1 year before enddate
 		if preoffset_startdate is None:
@@ -235,11 +231,10 @@ class StockBFFull():
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
-		preoffset_period_param: int | None = 50,
-		default_months_range: int | None = 12,
-		dbs: db.Session | None = next(db.get_dbs()),
+		preoffset_period_param: int = 50,
+		default_months_range: int = 12,
+		dbs: db.Session = next(db.get_dbs()),
 		) -> pd.DataFrame:
-		assert dbs is not None
 
 		# Define startdate if None equal to last year of enddate
 		if startdate is None:
@@ -292,9 +287,9 @@ class StockBFFull():
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
-		default_months_range: int | None = 12,
-		preoffset_period_param: int | None = 50,
-		dbs: db.Session | None = next(db.get_dbs()),
+		default_months_range: int = 12,
+		preoffset_period_param: int = 50,
+		dbs: db.Session = next(db.get_dbs()),
 		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		# Get Stockdata Full
 		raw_data_full = await self.__get_stock_price_data(
@@ -317,9 +312,8 @@ class StockBFFull():
 	async def __get_selected_broker(self,
 		clustered_features: pd.DataFrame,
 		centroids_cluster: pd.DataFrame,
-		n_selected_cluster: int | None = 1,
+		n_selected_cluster: int = 1,
 		) -> list[str]:
-		assert n_selected_cluster is not None
 
 		# Get index of max value in column 0 in centroid
 		selected_cluster = (centroids_cluster[0]).nlargest(n_selected_cluster).index.tolist()
@@ -347,7 +341,7 @@ class StockBFFull():
 		raw_data_close: pd.Series,
 		broker_ncum: pd.DataFrame,
 		centroids_cluster: pd.DataFrame,
-		n_selected_cluster: int | None = None,
+		n_selected_cluster: int = 1,
 		) -> float:
 		selected_broker = await self.__get_selected_broker(
 			clustered_features=clustered_features,
@@ -366,7 +360,7 @@ class StockBFFull():
 		raw_data_close: pd.Series,
 		broker_ncum: pd.DataFrame,
 		centroids_cluster: pd.DataFrame,
-		stepup_n_cluster_threshold: float | None = 0.05,
+		stepup_n_cluster_threshold: float = 0.05,
 		n_selected_cluster: int | None = None,
 		) -> tuple[list[str], int, float]:
 		# Check does n_selected_cluster already defined
@@ -424,11 +418,9 @@ class StockBFFull():
 		features: pd.DataFrame,
 		x: str,
 		y: str,
-		min_n_cluster:int | None = 4,
-		max_n_cluster:int | None = 10,
+		min_n_cluster:int = 4,
+		max_n_cluster:int = 10,
 		) -> tuple[pd.DataFrame, pd.DataFrame]:
-		assert min_n_cluster is not None
-		assert max_n_cluster is not None
 
 		# Get X and Y
 		X = features[[x,y]].values
@@ -463,17 +455,12 @@ class StockBFFull():
 		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
 		n_selected_cluster: int | None = None,
-		training_start_index: float | None = 0.5,
-		training_end_index: float | None = 0.75,
-		splitted_min_n_cluster: int | None = 2,
-		splitted_max_n_cluster: int | None = 5,
-		stepup_n_cluster_threshold: float | None = 0.05,
+		training_start_index: float = 0.5,
+		training_end_index: float = 0.75,
+		splitted_min_n_cluster: int = 2,
+		splitted_max_n_cluster: int = 5,
+		stepup_n_cluster_threshold: float = 0.05,
 		) -> tuple[list[str], int, float, pd.DataFrame]:
-		assert training_start_index is not None
-		assert training_end_index is not None
-		assert splitted_min_n_cluster is not None
-		assert splitted_max_n_cluster is not None
-		assert stepup_n_cluster_threshold is not None
 
 		# Only get third quartile of raw_data so not over-fitting
 		length = len(raw_data_close)
@@ -558,31 +545,19 @@ class StockBFFull():
 		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
 		selected_broker: list[str],
-		period_wmf: int | None = 1,
-		period_wprop: int | None = 10,
-		period_wpricecorrel: int | None = 10,
-		period_wmapricecorrel: int | None = 100,
-		period_wvwap:int | None = 21,
-		wpow_high_wprop: int | None = 40,
-		wpow_high_wpricecorrel: int | None = 50,
-		wpow_high_wmapricecorrel: int | None = 30,
-		wpow_medium_wprop: int | None = 20,
-		wpow_medium_wpricecorrel: int | None = 30,
-		wpow_medium_wmapricecorrel: int | None = 30,
-		preoffset_period_param: int | None = 50,
+		period_wmf: int = 1,
+		period_wprop: int = 10,
+		period_wpricecorrel: int = 10,
+		period_wmapricecorrel: int = 100,
+		period_wvwap:int = 21,
+		wpow_high_wprop: int = 40,
+		wpow_high_wpricecorrel: int = 50,
+		wpow_high_wmapricecorrel: int = 30,
+		wpow_medium_wprop: int = 20,
+		wpow_medium_wpricecorrel: int = 30,
+		wpow_medium_wmapricecorrel: int = 30,
+		preoffset_period_param: int = 50,
 		) -> pd.DataFrame:
-		assert period_wmf is not None
-		assert period_wprop is not None
-		assert period_wpricecorrel is not None
-		assert period_wmapricecorrel is not None
-		assert period_wvwap is not None
-		assert wpow_high_wprop is not None
-		assert wpow_high_wpricecorrel is not None
-		assert wpow_high_wmapricecorrel is not None
-		assert wpow_medium_wprop is not None
-		assert wpow_medium_wpricecorrel is not None
-		assert wpow_medium_wmapricecorrel is not None
-		assert preoffset_period_param is not None
 		# OHLC
 		# raw_data_full
 
@@ -640,7 +615,6 @@ class StockBFFull():
 
 	async def chart(self,media_type: str | None = None):
 		assert self.stockcode is not None
-		assert self.bf_indicators is not None
 		
 		fig = await genchart.broker_chart(
 			self.stockcode,self.bf_indicators,
@@ -676,10 +650,10 @@ class StockBFFull():
 class WhaleRadar():
 	def __init__(self,
 		startdate: datetime.date | None = None,
-		enddate: datetime.date | None = datetime.date.today(),
-		y_axis_type: dp.ListRadarType | None = dp.ListRadarType.correlation,
-		stockcode_excludes: set[str] | None = set(),
-		include_composite: bool | None = False,
+		enddate: datetime.date = datetime.date.today(),
+		y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
+		stockcode_excludes: set[str] = set(),
+		include_composite: bool = False,
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
 		n_selected_cluster:int | None = None,
@@ -695,7 +669,7 @@ class WhaleRadar():
 		splitted_max_n_cluster: int | None = None,
 		stepup_n_cluster_threshold: int | None = None,
 		filter_opt_corr: int | None = None,
-		dbs: db.Session | None = next(db.get_dbs()),
+		dbs: db.Session = next(db.get_dbs()),
 		) -> None:
 		self.startdate = startdate
 		self.enddate = enddate
@@ -719,7 +693,7 @@ class WhaleRadar():
 		self.filter_opt_corr = filter_opt_corr
 		self.dbs = dbs
 
-		self.radar_indicators = None
+		self.radar_indicators:pd.DataFrame
 	
 	async def fit (self) -> WhaleRadar:
 		# Get default bf params
@@ -823,8 +797,7 @@ class WhaleRadar():
 		
 		return self
 	
-	async def __get_default_radar(self, dbs:db.Session | None = next(db.get_dbs())) -> pd.Series:
-		assert dbs is not None
+	async def __get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
 
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter(
@@ -836,12 +809,11 @@ class WhaleRadar():
 		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 	
 	async def __get_stockcodes(self,
-		screener_min_value: int | None = 5000000000,
-		screener_min_frequency: int | None = 1000,
-		stockcode_excludes: set[str] | None = set(),
-		dbs: db.Session | None = next(db.get_dbs())
+		screener_min_value: int = 5000000000,
+		screener_min_frequency: int = 1000,
+		stockcode_excludes: set[str] = set(),
+		dbs: db.Session = next(db.get_dbs())
 		) -> pd.Series:
-		assert dbs is not None
 
 		"""
 		Get filtered stockcodes
@@ -883,10 +855,9 @@ class WhaleRadar():
 	async def __get_full_broker_transaction(self,
 		filtered_stockcodes: pd.Series = ...,
 		enddate: datetime.date = datetime.date.today(),
-		default_months_range: int | None = 12,
-		dbs: db.Session | None = next(db.get_dbs()),
+		default_months_range: int = 12,
+		dbs: db.Session = next(db.get_dbs()),
 		) -> pd.DataFrame:
-		assert dbs is not None
 
 		start_qry = enddate - relativedelta(months=default_months_range)
 
@@ -915,10 +886,9 @@ class WhaleRadar():
 	async def __get_stock_price_data(self,
 		filtered_stockcodes: pd.Series = ...,
 		enddate: datetime.date = datetime.date.today(),
-		default_months_range: int | None = 12,
-		dbs: db.Session | None = next(db.get_dbs()),
+		default_months_range: int = 12,
+		dbs: db.Session = next(db.get_dbs()),
 		) -> pd.DataFrame:
-		assert dbs is not None
 
 		start_qry = enddate - relativedelta(months=default_months_range)
 
@@ -941,13 +911,10 @@ class WhaleRadar():
 	async def __get_stock_raw_data(self,
 		filtered_stockcodes: pd.Series = ...,
 		enddate: datetime.date = ...,
-		default_months_range: int | None = 6,
-		training_end_index: float | None = 0.75,
-		dbs: db.Session | None = next(db.get_dbs()),
+		default_months_range: int = 6,
+		training_end_index: float = 0.75,
+		dbs: db.Session = next(db.get_dbs()),
 		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-		assert training_end_index is not None
-		assert dbs is not None
-
 		MINIMUM_TRAINING_SET: int = 5
 
 		# Get Stockdata Full
@@ -980,9 +947,8 @@ class WhaleRadar():
 	async def __get_selected_broker(self,
 		clustered_features: pd.DataFrame,
 		centroids_cluster: pd.DataFrame,
-		n_selected_cluster: int | None = 1,
+		n_selected_cluster: int = 1,
 		) -> list[str]:
-		assert n_selected_cluster is not None
 
 		# Get index of max value in column 0 in centroid
 		selected_cluster = (centroids_cluster[0]).nlargest(n_selected_cluster).index.tolist()
@@ -1010,7 +976,7 @@ class WhaleRadar():
 		raw_data_close: pd.Series,
 		broker_ncum: pd.DataFrame,
 		centroids_cluster: pd.DataFrame,
-		n_selected_cluster: int | None = None,
+		n_selected_cluster: int = 1,
 		) -> float:
 		selected_broker = await self.__get_selected_broker(
 			clustered_features=clustered_features,
@@ -1029,7 +995,7 @@ class WhaleRadar():
 		raw_data_close: pd.Series,
 		broker_ncum: pd.DataFrame,
 		centroids_cluster: pd.DataFrame,
-		stepup_n_cluster_threshold: float | None = 0.05,
+		stepup_n_cluster_threshold: float = 0.05,
 		n_selected_cluster: int | None = None,
 		) -> tuple[list[str], int, float]:
 		# Check does n_selected_cluster already defined
@@ -1087,11 +1053,9 @@ class WhaleRadar():
 		features: pd.DataFrame,
 		x: str,
 		y: str,
-		min_n_cluster:int | None = 4,
-		max_n_cluster:int | None = 10,
+		min_n_cluster:int = 4,
+		max_n_cluster:int = 10,
 		) -> tuple[pd.DataFrame, pd.DataFrame]:
-		assert min_n_cluster is not None
-		assert max_n_cluster is not None
 
 		# Get X and Y
 		X = features[[x,y]].values
@@ -1122,14 +1086,12 @@ class WhaleRadar():
 		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
 		n_selected_cluster: int | None = None,
-		training_start_index: float | None = 0.5,
-		training_end_index: float | None = 0.75,
-		splitted_min_n_cluster: int | None = 2,
-		splitted_max_n_cluster: int | None = 5,
-		stepup_n_cluster_threshold: float | None = 0.05,
+		training_start_index: float = 0.5,
+		training_end_index: float = 0.75,
+		splitted_min_n_cluster: int = 2,
+		splitted_max_n_cluster: int = 5,
+		stepup_n_cluster_threshold: float = 0.05,
 		) -> tuple[dict, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-		assert training_start_index is not None
-		assert training_end_index is not None
 
 		# Only get third quartile of raw_data so not over-fitting
 		length = raw_data_close.groupby(by='code').size()
@@ -1291,9 +1253,8 @@ class WhaleRadar():
 		raw_data_broker_nvol: pd.DataFrame,
 		raw_data_broker_nval: pd.DataFrame,
 		selected_broker: dict,
-		y_axis_type: dp.ListRadarType | None = dp.ListRadarType.correlation,
+		y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
 		) -> pd.DataFrame:
-		assert y_axis_type is not None
 		
 		# Data Preparation
 		selected_broker_nvol, selected_broker_nval = \
@@ -1309,11 +1270,11 @@ class WhaleRadar():
 		radar_indicators["mf"] = selected_broker_nval.groupby("code").sum()
 
 		# X Axis:
-		if y_axis_type.value == "correlation":
+		if y_axis_type == dp.ListRadarType.correlation:
 			selected_broker_nvol_cumsum = selected_broker_nvol.groupby(level='code').cumsum()
 			radar_indicators[y_axis_type.value] = selected_broker_nvol_cumsum.groupby('code')\
 				.corrwith(raw_data_full['close'],axis=0) # type: ignore
-		elif y_axis_type.value == "changepercentage":
+		elif y_axis_type == dp.ListRadarType.changepercentage:
 			radar_indicators[y_axis_type.value] = \
 				(raw_data_full.groupby('code')['close'].nth([-1]) \
 				-raw_data_full.groupby('code')['close'].nth([0])) \
@@ -1325,8 +1286,6 @@ class WhaleRadar():
 
 	async def chart(self, media_type: dp.ListMediaType | None = None):
 		assert self.startdate is not None
-		assert self.enddate is not None
-		assert self.radar_indicators is not None
 
 		fig = await genchart.radar_chart(
 			startdate=self.startdate,

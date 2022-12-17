@@ -7,19 +7,16 @@ from plotly.utils import PlotlyJSONEncoder
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+import dependencies as dp
 
-def html_wrap(text:str, width:int | None = 16, n_lines:int | None = 2):
-	assert width is not None
-	assert n_lines is not None
-	
+def html_wrap(text:str, width:int = 16, n_lines:int = 2):
 	text_arr = textwrap.wrap(text=text, width=width)
 	text_arr = text_arr[0:n_lines]
 	if len(text_arr) >= n_lines:
 		text_arr[n_lines-1] = str(text_arr[n_lines-1]) + "..."
 	return "<br>".join(text_arr)
 
-async def foreign_chart(stockcode:str|None="", ff_indicators:pd.DataFrame=...) -> go.Figure:
-	assert stockcode is not None
+async def foreign_chart(stockcode:str = "", ff_indicators:pd.DataFrame=...) -> go.Figure:
 
 	# Make Subplots
 	fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
@@ -330,12 +327,10 @@ async def broker_chart(
 
 async def radar_chart(
 	startdate:datetime.date,enddate:datetime.date,
-	y_axis_type:str|None="correlation",
-	method:str|None = "Foreign",
+	y_axis_type:dp.ListRadarType = dp.ListRadarType.correlation,
+	method:str = "Foreign",
 	radar_indicators:pd.DataFrame=...
 	) -> go.Figure:
-	assert y_axis_type in ["correlation", "changepercentage"]
-
 	# INIT
 	fig = go.Figure()
 
@@ -409,7 +404,7 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, code:str):
 async def fig_to_json(fig:go.Figure):
 	return json.dumps(fig, cls=PlotlyJSONEncoder)
 
-async def fig_to_image(fig:go.Figure,format:str | None = "jpeg"):
+async def fig_to_image(fig:go.Figure,format:str = "jpeg"):
 	# File Export:
 	# fig.write_image("img.jpeg", engine="kaleido", width=1920, height=1080)
 	# Bytes Export:
