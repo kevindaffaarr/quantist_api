@@ -13,7 +13,7 @@ API_KEY_NAME = "X-API-KEY"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 # Security function by API Key for fastapi
-async def get_api_key(api_key: str|None = Security(api_key_header)):
+async def get_api_key(api_key: str = Security(api_key_header)):
     if api_key not in REGISTERED_API_KEYS.keys():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
     print(f"{REGISTERED_API_KEYS[api_key]} is connected.")

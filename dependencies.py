@@ -28,13 +28,13 @@ class ListCode(BaseModel):
 # Metadata Tags
 # ==========
 class ExternalDocs(BaseModel):
-	description:str|None
+	description:str | None
 	url:str
 
 class MetadataTag(BaseModel):
 	name:str
-	description:str|None
-	external_docs:ExternalDocs|None
+	description:str | None
+	external_docs:ExternalDocs | None
 
 class Tags(Enum):
 	chart = MetadataTag(

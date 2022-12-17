@@ -43,10 +43,10 @@ async def get_default_response():
 @router.get("/chart/foreign", tags=[Tags.chart.name])
 @timeit
 async def get_foreign_chart(
-	media_type:dp.ListMediaType | None = dp.ListMediaType.json,
+	media_type:dp.ListMediaType = dp.ListMediaType.json,
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date | None = datetime.date.today(),
+	enddate: datetime.date = datetime.date.today(),
 	period_fmf: int | None = None,
 	period_fprop: int | None = None,
 	period_fpricecorrel: int | None = None,
@@ -125,11 +125,11 @@ async def get_foreign_chart(
 @router.get("/chart/broker", tags=[Tags.chart.name])
 @timeit
 async def get_broker_chart(
-	media_type:dp.ListMediaType | None = dp.ListMediaType.json,
-	api_type: dp.ListBrokerApiType | None = dp.ListBrokerApiType.brokerflow,
+	media_type:dp.ListMediaType = dp.ListMediaType.json,
+	api_type: dp.ListBrokerApiType = dp.ListBrokerApiType.brokerflow,
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date | None = datetime.date.today(),
+	enddate: datetime.date = datetime.date.today(),
 	n_selected_cluster:int | None = None,
 	period_wmf: int | None = None,
 	period_wprop: int | None = None,
@@ -253,12 +253,12 @@ async def get_broker_chart(
 @router.get("/radar/foreign", tags=[Tags.radar.name])
 @timeit
 async def get_foreign_radar(
-	media_type:dp.ListMediaType | None = dp.ListMediaType.json,
+	media_type:dp.ListMediaType = dp.ListMediaType.json,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date | None = datetime.date.today(),
-	y_axis_type: dp.ListRadarType | None = dp.ListRadarType.correlation,
-	stockcode_excludes: set[str] | None = Query(default=set()),
-	include_composite: bool | None = False,
+	enddate: datetime.date = datetime.date.today(),
+	y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
+	stockcode_excludes: set[str] = Query(default=set()),
+	include_composite: bool = False,
 	screener_min_value: int | None = None,
 	screener_min_frequency: int | None = None,
 	screener_min_fprop:int | None = None,
@@ -323,12 +323,12 @@ async def get_foreign_radar(
 @router.get("/radar/broker", tags=[Tags.radar.name])
 @timeit
 async def get_broker_radar(
-	media_type:dp.ListMediaType | None = dp.ListMediaType.json,
+	media_type:dp.ListMediaType = dp.ListMediaType.json,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date | None = datetime.date.today(),
-	y_axis_type: dp.ListRadarType | None = dp.ListRadarType.correlation,
-	stockcode_excludes: set[str] | None = Query(default=set()),
-	include_composite: bool | None = False,
+	enddate: datetime.date = datetime.date.today(),
+	y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
+	stockcode_excludes: set[str] = Query(default=set()),
+	include_composite: bool = False,
 	screener_min_value: int | None = None,
 	screener_min_frequency: int | None = None,
 	n_selected_cluster:int | None = None,
@@ -419,7 +419,7 @@ async def get_broker_radar(
 async def get_foreign_data(
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date | None = datetime.date.today(),
+	enddate: datetime.date = datetime.date.today(),
 	period_fmf: int | None = None,
 	period_fprop: int | None = None,
 	period_fpricecorrel: int | None = None,
@@ -461,10 +461,10 @@ async def get_foreign_data(
 @router.get("/full-data/broker", tags=[Tags.full_data.name])
 @timeit
 async def get_broker_data(
-	api_type: dp.ListBrokerApiType | None = dp.ListBrokerApiType.brokerflow,
+	api_type: dp.ListBrokerApiType = dp.ListBrokerApiType.brokerflow,
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date | None = datetime.date.today(),
+	enddate: datetime.date = datetime.date.today(),
 	n_selected_cluster:int | None = None,
 	period_wmf: int | None = None,
 	period_wprop: int | None = None,

@@ -12,7 +12,7 @@ class StockFFFull():
 	def __init__(self,
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
-		enddate: datetime.date | None = datetime.date.today(),
+		enddate: datetime.date = datetime.date.today(),
 		period_fmf: int | None = None,
 		period_fprop: int | None = None,
 		period_fpricecorrel: int | None = None,
@@ -24,7 +24,7 @@ class StockFFFull():
 		fpow_medium_fprop: int | None = None,
 		fpow_medium_fpricecorrel: int | None = None,
 		fpow_medium_fmapricecorrel: int | None = None,
-		dbs: db.Session | None = next(db.get_dbs())
+		dbs: db.Session = next(db.get_dbs())
 		) -> None:
 		self.stockcode = stockcode
 		self.startdate = startdate
@@ -46,8 +46,6 @@ class StockFFFull():
 		self.ff_indicators = pd.DataFrame()
 
 	async def fit(self) -> StockFFFull:
-		assert self.dbs is not None
-
 		# Get defaults value
 		default_ff = await self.__get_default_ff(self.dbs)
 
@@ -103,8 +101,7 @@ class StockFFFull():
 
 		return self
 		
-	async def __get_default_ff(self, dbs:db.Session | None = next(db.get_dbs())) -> pd.Series:
-		assert dbs is not None
+	async def __get_default_ff(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
 
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_ff_%")) | \
@@ -113,14 +110,13 @@ class StockFFFull():
 		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 	async def __get_stock_raw_data(self,
-		dbs:db.Session | None = next(db.get_dbs()),
+		dbs:db.Session = next(db.get_dbs()),
 		stockcode: str = ...,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		default_months_range:int | None = None,
-		preoffset_period_param: int | None = 50
+		preoffset_period_param: int = 50
 		) -> pd.DataFrame:
-		assert dbs is not None
 
 		# Define startdate to 1 year before enddate if startdate is None
 		if startdate is None:
@@ -166,13 +162,12 @@ class StockFFFull():
 		return raw_data
 
 	async def __get_composite_raw_data(self, 
-		dbs:db.Session | None = next(db.get_dbs()),
+		dbs:db.Session = next(db.get_dbs()),
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		default_months_range:int | None = None,
-		preoffset_period_param: int | None = 50
+		preoffset_period_param: int = 50
 		) -> pd.DataFrame:
-		assert dbs is not None
 
 		# Define startdate to 1 year before enddate if startdate is None
 		if startdate is None:
@@ -222,32 +217,19 @@ class StockFFFull():
 
 	async def calc_ff_indicators(self,
 		raw_data: pd.DataFrame,
-		period_fmf: int | None = 1,
-		period_fprop: int | None = 10,
-		period_fpricecorrel: int | None = 10,
-		period_fmapricecorrel: int | None = 100,
-		period_fvwap:int | None = 21,
-		fpow_high_fprop: int | None = 40,
-		fpow_high_fpricecorrel: int | None = 50,
-		fpow_high_fmapricecorrel: int | None = 30,
-		fpow_medium_fprop: int | None = 20,
-		fpow_medium_fpricecorrel: int | None = 30,
-		fpow_medium_fmapricecorrel: int | None = 30,
-		preoffset_period_param: int | None = 0
+		period_fmf: int = 1,
+		period_fprop: int = 10,
+		period_fpricecorrel: int = 10,
+		period_fmapricecorrel: int = 100,
+		period_fvwap:int = 21,
+		fpow_high_fprop: int = 40,
+		fpow_high_fpricecorrel: int = 50,
+		fpow_high_fmapricecorrel: int = 30,
+		fpow_medium_fprop: int = 20,
+		fpow_medium_fpricecorrel: int = 30,
+		fpow_medium_fmapricecorrel: int = 30,
+		preoffset_period_param: int = 0
 		) -> pd.DataFrame:
-		assert period_fmf is not None
-		assert period_fprop is not None
-		assert period_fpricecorrel is not None
-		assert period_fmapricecorrel is not None
-		assert period_fvwap is not None
-		assert fpow_high_fprop is not None
-		assert fpow_high_fpricecorrel is not None
-		assert fpow_high_fmapricecorrel is not None
-		assert fpow_medium_fprop is not None
-		assert fpow_medium_fpricecorrel is not None
-		assert fpow_medium_fmapricecorrel is not None
-		assert preoffset_period_param is not None
-
 		# Define fbval, fsval, netvol, netval
 		raw_data['fbval'] = raw_data['close']*raw_data['foreignbuy']
 		raw_data['fsval'] = raw_data['close']*raw_data['foreignsell']
@@ -301,6 +283,7 @@ class StockFFFull():
 		return raw_data.drop(raw_data.index[:preoffset_period_param])
 	
 	async def chart(self,media_type:str | None = None):
+		assert self.stockcode is not None
 		fig = await genchart.foreign_chart(self.stockcode,self.ff_indicators)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)
@@ -312,23 +295,17 @@ class StockFFFull():
 class ForeignRadar():
 	def __init__(self,
 		startdate: datetime.date | None = None,
-		enddate: datetime.date | None = datetime.date.today(),
-		y_axis_type: dp.ListRadarType | None = dp.ListRadarType.correlation,
-		stockcode_excludes: set[str] | None = set(),
-		include_composite: bool | None = False,
+		enddate: datetime.date = datetime.date.today(),
+		y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
+		stockcode_excludes: set[str] = set(),
+		include_composite: bool = False,
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
 		screener_min_fprop:int | None = None,
 		period_fmf: int | None = None,
 		period_fpricecorrel: int | None = None,
-		dbs: db.Session | None = next(db.get_dbs())
+		dbs: db.Session = next(db.get_dbs())
 		) -> None:
-		assert enddate is not None
-		assert y_axis_type is not None
-		assert stockcode_excludes is not None
-		assert include_composite is not None
-		assert dbs is not None
-
 		self.startdate = startdate
 		self.enddate = enddate
 		self.y_axis_type = y_axis_type
@@ -346,6 +323,12 @@ class ForeignRadar():
 	async def fit(self) -> ForeignRadar:
 		# Get default value of parameter
 		default_radar = await self.__get_default_radar()
+
+		self.period_fmf = int(default_radar['default_radar_period_fmf']) if self.startdate is None else None
+		self.period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel']) if self.startdate is None else None
+		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
+		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
+		self.screener_min_fprop = int(default_radar['default_screener_min_fprop']) if self.screener_min_fprop is None else self.screener_min_fprop
 		
 		# Get filtered stockcodes
 		filtered_stockcodes = await self.__get_stockcodes(
@@ -394,30 +377,20 @@ class ForeignRadar():
 
 		return self
 		
-	async def __get_default_radar(self, dbs:db.Session | None = next(db.get_dbs())) -> pd.Series:
-		assert dbs is not None
+	async def __get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")))
 		
-		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 		
-		self.period_fmf = int(default_radar['default_radar_period_fmf']) if self.startdate is None else None
-		self.period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel']) if self.startdate is None else None
-		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
-		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
-		self.screener_min_fprop = int(default_radar['default_screener_min_fprop']) if self.screener_min_fprop is None else self.screener_min_fprop
-		
-		return default_radar
 	
 	async def __get_stockcodes(self,
-		screener_min_value: int | None = 5000000000,
-		screener_min_frequency: int | None = 1000,
-		screener_min_fprop:int | None = 0,
-		stockcode_excludes: set[str] | None = set(),
-		dbs: db.Session | None = next(db.get_dbs())
+		screener_min_value: int = 5000000000,
+		screener_min_frequency: int = 1000,
+		screener_min_fprop:int = 0,
+		stockcode_excludes: set[str] = set(),
+		dbs: db.Session = next(db.get_dbs())
 		) -> pd.Series:
-		assert screener_min_fprop is not None
-		assert dbs is not None
 		"""
 		Get filtered stockcodes
 		Filtered by:value>screener_min_value, frequency>screener_min_frequency 
@@ -441,10 +414,9 @@ class ForeignRadar():
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		filtered_stockcodes:pd.Series = ...,
-		bar_range: int | None = 5,
-		dbs: db.Session | None = next(db.get_dbs())
+		bar_range:int | None = 5,
+		dbs: db.Session = next(db.get_dbs())
 		) -> pd.DataFrame:
-		assert dbs is not None
 
 		# Jika belum ada startdate, maka perlu ditentukan batas mulainya
 		if startdate is None:
@@ -479,12 +451,11 @@ class ForeignRadar():
 		return stocks_raw_data
 	
 	async def __get_composite_raw_data(self,
-		startdate:datetime.date|None=None,
-		enddate:datetime.date|None=None,
-		bar_range:int|None=5,
-		dbs:db.Session | None = next(db.get_dbs())
+		startdate:datetime.date | None =None,
+		enddate:datetime.date | None =None,
+		bar_range:int | None = 5,
+		dbs:db.Session = next(db.get_dbs())
 		) ->  pd.DataFrame:
-		assert dbs is not None
 
 		# Jika belum ada startdate, maka perlu ditentukan batas mulainya
 		if startdate is None:
@@ -524,7 +495,7 @@ class ForeignRadar():
 
 	async def calc_radar_indicators(self,
 		stocks_raw_data:pd.DataFrame,
-		y_axis_type:dp.ListRadarType | None = dp.ListRadarType.correlation,
+		y_axis_type:dp.ListRadarType = dp.ListRadarType.correlation,
 		) -> pd.DataFrame:
 		
 		radar_indicators = pd.DataFrame()
@@ -574,16 +545,15 @@ class ForeignRadar():
 class ScreenerBase(ForeignRadar):
 	def __init__(self,
 		startdate: datetime.date | None = None,
-		enddate: datetime.date | None = datetime.date.today(),
-		stockcode_excludes: set[str] | None = set(),
+		enddate: datetime.date = datetime.date.today(),
+		stockcode_excludes: set[str] = set(),
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
 		screener_min_fprop:int | None = None,
 		period_fmf: int | None = None,
 		period_fpricecorrel: int | None = None,
-		dbs: db.Session | None = next(db.get_dbs())		
+		dbs: db.Session = next(db.get_dbs())		
 		) -> None:
-		assert dbs is not None
 
 		super().__init__(
 			startdate = startdate,

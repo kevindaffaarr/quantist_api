@@ -14,10 +14,10 @@ env: str = os.getenv("ENV_PROD_DEV", "DEV")
 # Create Database SQLAlchemy Engine
 if env == "DEV":
 	# PostgreSQL
-	POSTGRES_DB_USER: str | None = os.getenv("POSTGRES_DB_USER")
-	POSTGRES_DB_PASSWORD: str | None = os.getenv("POSTGRES_DB_PASSWORD")
-	POSTGRES_DB_HOST: str | None = os.getenv("POSTGRES_DB_HOST")
-	POSTGRES_DB_NAME: str | None = os.getenv("POSTGRES_DB_NAME")
+	POSTGRES_DB_USER: str = os.getenv("POSTGRES_DB_USER","")
+	POSTGRES_DB_PASSWORD: str = os.getenv("POSTGRES_DB_PASSWORD","")
+	POSTGRES_DB_HOST: str = os.getenv("POSTGRES_DB_HOST","")
+	POSTGRES_DB_NAME: str = os.getenv("POSTGRES_DB_NAME","")
 	DB_URL: str = f"postgresql://{POSTGRES_DB_USER}:{POSTGRES_DB_PASSWORD}@{POSTGRES_DB_HOST}/{POSTGRES_DB_NAME}"
 
 	# Create Engine
@@ -25,12 +25,12 @@ if env == "DEV":
 
 elif env == "PROD":
 	# Bigquery
-	BIGQUERY_PROJECT_ID: str | None = os.getenv("BIGQUERY_PROJECT_ID")
-	BIGQUERY_DATASET_ID: str | None = os.getenv("BIGQUERY_DATASET_ID")
-	BIGQUERY_LOCATION: str | None = os.getenv("BIGQUERY_LOCATION")
+	BIGQUERY_PROJECT_ID: str = os.getenv("BIGQUERY_PROJECT_ID", "")
+	BIGQUERY_DATASET_ID: str = os.getenv("BIGQUERY_DATASET_ID", "")
+	BIGQUERY_LOCATION: str = os.getenv("BIGQUERY_LOCATION", "")
 	BIGQUERY_DB_URL: str = f"bigquery://{BIGQUERY_PROJECT_ID}/{BIGQUERY_DATASET_ID}"
 
-	BIGQUERY_CREDENTIALS_BASE64: str | None = os.getenv("BIGQUERY_CREDENTIALS_BASE64")
+	BIGQUERY_CREDENTIALS_BASE64: str = os.getenv("BIGQUERY_CREDENTIALS_BASE64", "")
 	# BIGQUERY_CREDENTIALS_JSON = json.loads(base64.b64decode(BIGQUERY_CREDENTIALS_BASE64))
 	# BIGQUERY_CREDENTIALS = service_account.Credentials.from_service_account_info(BIGQUERY_CREDENTIALS_JSON)
 
