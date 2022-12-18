@@ -1,3 +1,4 @@
+from typing import Literal
 from io import BytesIO
 import datetime
 import zipfile
@@ -538,6 +539,54 @@ async def get_broker_data(
 # ==========
 @router.get("/screener", tags=[Tags.screener.name])
 @router.get("/screener/foreign", tags=[Tags.screener.name])
+@router.get("/screener/foreign/top-money-flow", tags=[Tags.screener.name])
 @timeit
-async def get_screener_mostaccum():
-	pass
+async def get_screener_moneyflow(
+	accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
+	n_stockcodes: int = 10,
+	startdate: datetime.date | None = None,
+	enddate: datetime.date = datetime.date.today(),
+	stockcode_excludes: set[str] = Query(default=set()),
+	screener_min_value: int | None = None,
+	screener_min_frequency: int | None = None,
+	screener_min_fprop:int | None = None,
+	period_fmf: int | None = None,
+	period_fpricecorrel: int | None = None,
+	):
+	try:
+		screener_money_flow_object = ff.ScreenerMoneyFlow(
+			accum_or_distri=accum_or_distri,
+			n_stockcodes=n_stockcodes,
+			startdate=startdate,
+			enddate=enddate,
+			stockcode_excludes=stockcode_excludes,
+			screener_min_value=screener_min_value,
+			screener_min_frequency=screener_min_frequency,
+			screener_min_fprop=screener_min_fprop,
+			period_fmf=period_fmf,
+			period_fpricecorrel=period_fpricecorrel,
+		)
+		screener_money_flow_object = await screener_money_flow_object.screen()
+
+		top_stockcodes = screener_money_flow_object.top_stockcodes
+	
+	except KeyError as err:
+		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
+	
+	else:
+		# Define screener_metadata
+		screener_metadata = {
+			"screener_method": accum_or_distri,
+			"bar_range": str(screener_money_flow_object.bar_range),
+			"enddate": screener_money_flow_object.enddate.strftime("%Y-%m-%d"), # type: ignore
+		}
+		if isinstance(screener_money_flow_object.startdate, datetime.date):
+			screener_metadata["startdate"] = screener_money_flow_object.startdate.strftime("%Y-%m-%d")
+		else:
+			screener_metadata["startdate"] = None
+
+	# Return screener_metadata and top_stockcodes
+	return {
+		"screener_metadata":screener_metadata,
+		"top_stockcodes":top_stockcodes.to_dict(orient="index")
+		}
