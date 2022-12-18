@@ -1,9 +1,10 @@
 from __future__ import annotations
+from typing import Literal
 import datetime
 from dateutil.relativedelta import relativedelta
 import pandas as pd
 import numpy as np
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, desc, asc
 import database as db
 import dependencies as dp
 from quantist_library import genchart
@@ -322,7 +323,7 @@ class ForeignRadar():
 
 	async def fit(self) -> ForeignRadar:
 		# Get default value of parameter
-		default_radar = await self.__get_default_radar()
+		default_radar = await self._get_default_radar()
 
 		self.period_fmf = int(default_radar['default_radar_period_fmf']) if self.startdate is None else None
 		self.period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel']) if self.startdate is None else None
@@ -331,7 +332,7 @@ class ForeignRadar():
 		self.screener_min_fprop = int(default_radar['default_screener_min_fprop']) if self.screener_min_fprop is None else self.screener_min_fprop
 		
 		# Get filtered stockcodes
-		filtered_stockcodes = await self.__get_stockcodes(
+		filtered_stockcodes = await self._get_stockcodes(
 			screener_min_value=self.screener_min_value,
 			screener_min_frequency=self.screener_min_frequency,
 			screener_min_fprop=self.screener_min_fprop,
@@ -377,14 +378,14 @@ class ForeignRadar():
 
 		return self
 		
-	async def __get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
+	async def _get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")))
 		
 		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 		
 	
-	async def __get_stockcodes(self,
+	async def _get_stockcodes(self,
 		screener_min_value: int = 5000000000,
 		screener_min_frequency: int = 1000,
 		screener_min_fprop:int = 0,
@@ -567,18 +568,120 @@ class ScreenerBase(ForeignRadar):
 			dbs = dbs,
 		)
 
-class ScreenerMostAccum(ScreenerBase):
+	async def _fit_base(self) -> ScreenerBase:
+		# get default param radar
+		default_radar = await super()._get_default_radar()
+		self.period_fmf = int(default_radar['default_radar_period_fmf']) if self.startdate is None else None
+		self.period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel']) if self.startdate is None else None
+		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
+		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
+		self.screener_min_fprop = int(default_radar['default_screener_min_fprop']) if self.screener_min_fprop is None else self.screener_min_fprop
+
+		# Define startdate
+		if self.startdate is None:
+			assert self.period_fmf is not None
+			assert self.period_fpricecorrel is not None
+			self.bar_range = max(self.period_fmf,self.period_fpricecorrel)
+
+			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
+			sub_qry = self.dbs.query(db.StockData.date
+				).filter(db.StockData.code == 'bbca'
+				).filter(db.StockData.date <= self.enddate
+				).order_by(db.StockData.date.desc()
+				).limit(self.bar_range
+				).subquery()
+			sub_qry = self.dbs.query(func.min(sub_qry.c.date)).scalar_subquery()
+
+			self.startdate = sub_qry
+		else:
+			self.bar_range = None
+			# self.startdate = self.startdate
+
+		# get list_stock that should be analyzed
+		self.filtered_stockcodes = await super()._get_stockcodes(
+			screener_min_value=self.screener_min_value,
+			screener_min_frequency=self.screener_min_frequency,
+			screener_min_fprop=self.screener_min_fprop,
+			stockcode_excludes=self.stockcode_excludes,
+			dbs=self.dbs
+		)
+
+		return self
+
+class ScreenerMoneyFlow(ScreenerBase):
 	def __init__(self,
-		period: int | None = None,
-		start_date: datetime.date | None = None,
-		end_date: datetime.date | None = None,
+		accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
+		n_stockcodes: int = 10,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = datetime.date.today(),
+		stockcode_excludes: set[str] = set(),
+		screener_min_value: int | None = None,
+		screener_min_frequency: int | None = None,
+		screener_min_fprop:int | None = None,
+		period_fmf: int | None = None,
+		period_fpricecorrel: int | None = None,
+		dbs: db.Session = next(db.get_dbs())
 		) -> None:
-		pass
+		assert accum_or_distri in [dp.ScreenerList.most_accumulated, dp.ScreenerList.most_distributed], f'accum_or_distri must be {dp.ScreenerList.most_accumulated.value} or {dp.ScreenerList.most_distributed.value}'
 
-	# get default screener parameters
+		super().__init__(
+			startdate = startdate,
+			enddate = enddate,
+			stockcode_excludes = stockcode_excludes,
+			screener_min_value = screener_min_value,
+			screener_min_frequency = screener_min_frequency,
+			screener_min_fprop = screener_min_fprop,
+			period_fmf = period_fmf,
+			period_fpricecorrel = period_fpricecorrel,
+			dbs = dbs,
+		)
 
-	# get list_stock that should be analyzed
-
-	# get ranked, filtered, and pre-calculated indicator data of selected list_stock
+		self.n_stockcodes = n_stockcodes
+		self.accum_or_distri = accum_or_distri
 	
-	# output: list of stock code and their indicator data
+	async def screen(self) -> ScreenerMoneyFlow:
+		# get default param radar, defined startdate, and filtered_stockcodes that should be analyzed
+		await super()._fit_base()
+		
+		# get ranked, filtered, and pre-calculated indicator data of filtered_stockcodes
+		self.top_stockcodes = await self._get_mf_top_stockcodes(
+			accum_or_distri = self.accum_or_distri,
+			n_stockcodes = self.n_stockcodes,
+			startdate = self.startdate,
+			enddate = self.enddate,
+			filtered_stockcodes = self.filtered_stockcodes,
+			stockcode_excludes = self.stockcode_excludes,
+			dbs = self.dbs,
+		)
+
+		return self
+	
+	async def _get_mf_top_stockcodes(self,
+		accum_or_distri: dp.ScreenerList = dp.ScreenerList.most_accumulated,
+		n_stockcodes: int = 10,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = datetime.date.today(),
+		filtered_stockcodes: pd.Series = ...,
+		stockcode_excludes: set[str] = ...,
+		dbs: db.Session = next(db.get_dbs())
+		) -> pd.DataFrame:
+		# Main Query: get top n_stockcodes stockcodes that most most_accumulated
+		qry = dbs.query(
+			(db.StockData.code),
+			(func.sum(db.StockData.close*db.StockData.foreignbuy)-func.sum(db.StockData.close*db.StockData.foreignsell)).label('FMF'),
+			((func.sum(db.StockData.close*db.StockData.foreignbuy)+func.sum(db.StockData.close*db.StockData.foreignsell))/(func.sum(db.StockData.value)*2)).label('FProp'),
+			(func.corr((db.StockData.close*db.StockData.foreignbuy)-(db.StockData.close*db.StockData.foreignsell),db.StockData.close)).label('FPriceCorrel'),
+			).filter(db.StockData.code.in_(filtered_stockcodes)
+			).filter(db.StockData.code.notin_(stockcode_excludes)
+			).filter(db.StockData.date.between(startdate,enddate)
+			).group_by(db.StockData.code)
+		
+		if accum_or_distri == dp.ScreenerList.most_accumulated:
+			qry = qry.order_by(desc('FMF')).limit(n_stockcodes)
+		elif accum_or_distri == dp.ScreenerList.most_distributed:
+			qry = qry.order_by(asc('FMF')).limit(n_stockcodes)
+		
+		# Query fetching using pandas
+		top_stockcodes = pd.read_sql(sql=qry.statement, con=qry.session.bind).reset_index(drop=True)
+		
+		return top_stockcodes
