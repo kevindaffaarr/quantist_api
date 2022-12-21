@@ -136,22 +136,24 @@ class StockFFFull():
 		).filter(db.StockData.code == stockcode)
 		
 		# Main Query
-		qry_main = qry.filter(db.StockData.date.between(startdate, enddate))
+		qry_main = qry.filter(db.StockData.date.between(startdate, enddate)).order_by(db.StockData.date.asc())
 		
 		# Main Query Fetching
 		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
-			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index("date")
+			.reset_index(drop=True).set_index("date")
 		
 		# Pre-Data Query
 		startdate = raw_data_main.index[0].date() # type: ignore # Assign startdate to new defined startdate
 		self.startdate = raw_data_main.index[0].date() # type: ignore # Assign self.startdate to new defined startdate
 		qry_pre = qry.filter(db.StockData.date < startdate)\
 			.order_by(db.StockData.date.desc())\
-			.limit(preoffset_period_param)
+			.limit(preoffset_period_param)\
+			.subquery()
+		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc())
 
 		# Pre-Data Query Fetching
 		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"])\
-			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
+			.reset_index(drop=True).set_index('date')
 
 		# Concatenate Pre and Main Query
 		raw_data = pd.concat([raw_data_pre,raw_data_main])
@@ -189,22 +191,23 @@ class StockFFFull():
 		)
 		
 		# Main Query
-		qry_main = qry.filter(db.IndexData.date.between(startdate, enddate))
+		qry_main = qry.filter(db.IndexData.date.between(startdate, enddate)).order_by(db.IndexData.date.asc())
 		
 		# Main Query Fetching
 		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
-			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
+			.reset_index(drop=True).set_index('date')
 		
 		# Pre-Data Query
 		startdate = raw_data_main.index[0].date() # type: ignore # Assign startdate to new defined startdate
 		self.startdate = raw_data_main.index[0].date() # type: ignore # Assign self.startdate
 		qry_pre = qry.filter(db.IndexData.date < startdate)\
 			.order_by(db.IndexData.date.desc())\
-			.limit(preoffset_period_param)
+			.limit(preoffset_period_param).subquery()
+		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc())
 
 		# Pre-Data Query Fetching
 		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"])\
-			.sort_values(by="date",ascending=True).reset_index(drop=True).set_index('date')
+			.reset_index(drop=True).set_index('date')
 
 		# Concatenate Pre and Main Query
 		raw_data = pd.concat([raw_data_pre,raw_data_main])
@@ -444,11 +447,12 @@ class ForeignRadar():
 			db.StockData.foreignsell
 			)\
 			.filter(db.StockData.code.in_(filtered_stockcodes.to_list()))\
-			.filter(db.StockData.date.between(startdate,enddate))
-		
+			.filter(db.StockData.date.between(startdate,enddate))\
+			.order_by(db.StockData.code.asc(),db.StockData.date.asc())
+			
 		# Query Fetching: stocks raw data
 		stocks_raw_data = pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"])\
-			.sort_values(by=["code","date"],ascending=[True,True]).reset_index(drop=True)
+			.reset_index(drop=True)
 		return stocks_raw_data
 	
 	async def __get_composite_raw_data(self,
@@ -486,12 +490,12 @@ class ForeignRadar():
 			filter(db.IndexData.code=="composite")\
 			.filter(db.IndexData.date.between(startdate,enddate))\
 			.join(db.IndexTransactionCompositeForeign,
-				db.IndexTransactionCompositeForeign.date == db.IndexData.date
-			)
+				db.IndexTransactionCompositeForeign.date == db.IndexData.date)\
+			.order_by(db.IndexData.date.asc())
 
 		# Query Fetching: composite raw data
 		composite_raw_data = pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"])\
-			.sort_values(by=["date"],ascending=[True]).reset_index(drop=True)
+			.reset_index(drop=True)
 		return composite_raw_data
 
 	async def calc_radar_indicators(self,
