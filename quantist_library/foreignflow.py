@@ -665,12 +665,34 @@ class ScreenerMoneyFlow(ScreenerBase):
 		stockcode_excludes: set[str] = ...,
 		dbs: db.Session = next(db.get_dbs())
 		) -> pd.DataFrame:
-		# SUBQUERY 1: FPRICECORREL
-		# FPriceCorrel will turn null or just 1, -1 if enddate-startdate < 2 days, using default fpricecorrel if this happen
+		
+		# Get the top code
+		sub_qry_1 = dbs.query(
+			db.StockData.code,
+			(func.sum(db.StockData.close*db.StockData.foreignbuy)-func.sum(db.StockData.close*db.StockData.foreignsell)).label('FMF')
+		).filter(db.StockData.code.in_(filtered_stockcodes)
+		).filter(db.StockData.code.notin_(stockcode_excludes)
+		).filter(db.StockData.date.between(startdate,enddate)
+		).group_by(db.StockData.code)
+		if accum_or_distri == dp.ScreenerList.most_distributed:
+			sub_qry_1 = sub_qry_1.order_by(asc('FMF')).limit(n_stockcodes).subquery()
+		else:
+			sub_qry_1 = sub_qry_1.order_by(desc('FMF')).limit(n_stockcodes).subquery()
+
+		# Get the raw data (just for calculate the FPriceCorrel)
+		qry = dbs.query(
+			db.StockData.code,
+			db.StockData.date,
+			db.StockData.close,
+			(db.StockData.foreignbuy-db.StockData.foreignsell).label('netvol'), # type: ignore
+			(db.StockData.foreignbuy+db.StockData.foreignsell).label('sumvol'), # type: ignore
+			db.StockData.value,
+		).join(sub_qry_1, sub_qry_1.c.code == db.StockData.code
+		)
+
 		if startdate == enddate:
 			# Sub Query for FPriceCorrel with date from enddate to n rows based on self.period_fpricecorrel
 			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
-			print(self.period_fpricecorrel)
 			startdate_fpricecorrel = self.dbs.query(db.StockData.date
 				).filter(db.StockData.code == 'bbca'
 				).filter(db.StockData.date <= self.enddate
@@ -678,53 +700,34 @@ class ScreenerMoneyFlow(ScreenerBase):
 				).limit(self.period_fpricecorrel
 				).subquery()
 			startdate_fpricecorrel = dbs.query(func.min(startdate_fpricecorrel.c.date)).scalar_subquery()
-			sub_qry_1 = dbs.query(
-				db.StockData.code,
-				(func.corr((db.StockData.close*db.StockData.foreignbuy)-(db.StockData.close*db.StockData.foreignsell),db.StockData.close)).label('FPriceCorrel'),
-			).filter(db.StockData.code.in_(filtered_stockcodes)
-			).filter(db.StockData.code.notin_(stockcode_excludes)
-			).filter(db.StockData.date.between(startdate_fpricecorrel,enddate)
-			).group_by(db.StockData.code
-			).subquery()
-		# If startdate != enddate, the fpricefcorrel will be calculated based on startdate and enddate
+			qry = qry.filter(db.StockData.date.between(startdate_fpricecorrel,enddate))
 		else:
-			# Sub Query for FPriceCorrel between startdate enddate
-			sub_qry_1 = dbs.query(
-				db.StockData.code,
-				(func.corr((db.StockData.close*db.StockData.foreignbuy)-(db.StockData.close*db.StockData.foreignsell),db.StockData.close)).label('FPriceCorrel'),
-			).filter(db.StockData.code.in_(filtered_stockcodes)
-			).filter(db.StockData.code.notin_(stockcode_excludes)
-			).filter(db.StockData.date.between(startdate,enddate)
-			).group_by(db.StockData.code
-			).subquery()
+			qry = qry.filter(db.StockData.date.between(startdate,enddate))
 
-		# SUBQUERY 2: FMF and FProp in same day
-		# Sub Query for 
-		sub_qry_2 = dbs.query(
-			(db.StockData.code),
-			(func.sum(db.StockData.close*db.StockData.foreignbuy)-func.sum(db.StockData.close*db.StockData.foreignsell)).label('FMF'),
-			((func.sum(db.StockData.close*db.StockData.foreignbuy)+func.sum(db.StockData.close*db.StockData.foreignsell))/(func.sum(db.StockData.value)*2)).label('FProp'),
-			).filter(db.StockData.code.in_(filtered_stockcodes)
-			).filter(db.StockData.code.notin_(stockcode_excludes)
-			).filter(db.StockData.date.between(startdate,enddate)
-			).group_by(db.StockData.code
-			).subquery()
-		
-		# Main Query: Join Sub Query 1 and 2
-		qry = dbs.query(
-			sub_qry_2.c.code,
-			sub_qry_2.c.FMF,
-			sub_qry_2.c.FProp,
-			sub_qry_1.c.FPriceCorrel,
-			).join(sub_qry_1, sub_qry_2.c.code == sub_qry_1.c.code
-			)
-
-		if accum_or_distri == dp.ScreenerList.most_accumulated:
-			qry = qry.order_by(desc('FMF')).limit(n_stockcodes)
-		elif accum_or_distri == dp.ScreenerList.most_distributed:
-			qry = qry.order_by(asc('FMF')).limit(n_stockcodes)
-		
 		# Query fetching using pandas
-		top_stockcodes = pd.read_sql(sql=qry.statement, con=qry.session.bind).reset_index(drop=True)
+		raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind).reset_index(drop=True)\
+			.sort_values(['code','date']).set_index(['code','date'])
+
+		# Update startdate if startdate not datetime.date to the first date of the raw_data
+		if not isinstance(startdate, datetime.date):
+			startdate = raw_data.index.get_level_values('date').min()
+		assert isinstance(startdate, datetime.date)
 		
+		top_stockcodes = pd.DataFrame()
+		top_stockcodes['FPriceCorrel'] = raw_data.groupby("code")[["close","netvol"]].corr(method='pearson').iloc[0::2,-1].droplevel(1)
+
+		# Only get raw_data between startdate and enddate
+		raw_data = raw_data.loc[(slice(None), slice(startdate, enddate)), :]
+
+		# Calculate FMF, FProp, and FPriceCorrel
+		top_stockcodes['FMF'] = (raw_data['close']*(raw_data['netvol'])).groupby("code").sum()
+		top_stockcodes['FProp'] = (raw_data['close']*(raw_data['sumvol'])).groupby("code").sum()/(raw_data['value']*2).groupby("code").sum()
+		# replace nan with none
+		top_stockcodes = top_stockcodes.replace({np.nan: None})
+
+		# Order by FMF
+		if accum_or_distri == dp.ScreenerList.most_distributed:
+			top_stockcodes = top_stockcodes.sort_values(by='FMF', ascending=True)
+		else:
+			top_stockcodes = top_stockcodes.sort_values(by='FMF', ascending=False)
 		return top_stockcodes
