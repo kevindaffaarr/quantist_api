@@ -573,7 +573,7 @@ async def get_screener_moneyflow(
 		# Define screener_metadata
 		screener_metadata = {
 			"screener_method": accum_or_distri,
-			"bar_range": str(screener_money_flow_object.bar_range),
+			"bar_range": screener_money_flow_object.bar_range,
 			"enddate": screener_money_flow_object.enddate.strftime("%Y-%m-%d"), # type: ignore
 		}
 		if isinstance(screener_money_flow_object.startdate, datetime.date):
