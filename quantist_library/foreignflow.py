@@ -575,8 +575,8 @@ class ScreenerBase(ForeignRadar):
 	async def _fit_base(self) -> ScreenerBase:
 		# get default param radar
 		default_radar = await super()._get_default_radar()
-		self.period_fmf = int(default_radar['default_radar_period_fmf']) if self.startdate is None else None
-		self.period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel']) if self.startdate is None else None
+		self.period_fmf = int(default_radar['default_radar_period_fmf'])
+		self.period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel'])
 		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
 		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
 		self.screener_min_fprop = int(default_radar['default_screener_min_fprop']) if self.screener_min_fprop is None else self.screener_min_fprop
@@ -622,8 +622,6 @@ class ScreenerMoneyFlow(ScreenerBase):
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
 		screener_min_fprop:int | None = None,
-		period_fmf: int | None = None,
-		period_fpricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
 		assert accum_or_distri in [dp.ScreenerList.most_accumulated, dp.ScreenerList.most_distributed], f'accum_or_distri must be {dp.ScreenerList.most_accumulated.value} or {dp.ScreenerList.most_distributed.value}'
@@ -635,8 +633,6 @@ class ScreenerMoneyFlow(ScreenerBase):
 			screener_min_value = screener_min_value,
 			screener_min_frequency = screener_min_frequency,
 			screener_min_fprop = screener_min_fprop,
-			period_fmf = period_fmf,
-			period_fpricecorrel = period_fpricecorrel,
 			dbs = dbs,
 		)
 
@@ -669,17 +665,60 @@ class ScreenerMoneyFlow(ScreenerBase):
 		stockcode_excludes: set[str] = ...,
 		dbs: db.Session = next(db.get_dbs())
 		) -> pd.DataFrame:
-		# Main Query: get top n_stockcodes stockcodes that most most_accumulated
-		qry = dbs.query(
-			(db.StockData.code),
-			(func.sum(db.StockData.close*db.StockData.foreignbuy)-func.sum(db.StockData.close*db.StockData.foreignsell)).label('FMF'),
-			((func.sum(db.StockData.close*db.StockData.foreignbuy)+func.sum(db.StockData.close*db.StockData.foreignsell))/(func.sum(db.StockData.value)*2)).label('FProp'),
-			(func.corr((db.StockData.close*db.StockData.foreignbuy)-(db.StockData.close*db.StockData.foreignsell),db.StockData.close)).label('FPriceCorrel'),
+		# FPriceCorrel will turn null or just 1, -1 if enddate-startdate < 2 days, using default fpricecorrel if this happen
+		if startdate == enddate:
+			# Sub Query for FPriceCorrel with date from enddate to n rows based on self.period_fpricecorrel
+			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
+			print(self.period_fpricecorrel)
+			startdate_fpricecorrel = self.dbs.query(db.StockData.date
+				).filter(db.StockData.code == 'bbca'
+				).filter(db.StockData.date <= self.enddate
+				).order_by(db.StockData.date.desc()
+				).limit(self.period_fpricecorrel
+				).subquery()
+			startdate_fpricecorrel = dbs.query(func.min(startdate_fpricecorrel.c.date)).scalar_subquery()
+			sub_qry_1 = dbs.query(
+				db.StockData.code,
+				(func.corr((db.StockData.close*db.StockData.foreignbuy)-(db.StockData.close*db.StockData.foreignsell),db.StockData.close)).label('FPriceCorrel'),
 			).filter(db.StockData.code.in_(filtered_stockcodes)
 			).filter(db.StockData.code.notin_(stockcode_excludes)
-			).filter(db.StockData.date.between(startdate,enddate)
-			).group_by(db.StockData.code)
+			).filter(db.StockData.date.between(startdate_fpricecorrel,enddate)
+			).group_by(db.StockData.code
+			).subquery()
+
+			# Sub Query for FMF and FProp in same day
+			sub_qry_2 = dbs.query(
+				(db.StockData.code),
+				(func.sum(db.StockData.close*db.StockData.foreignbuy)-func.sum(db.StockData.close*db.StockData.foreignsell)).label('FMF'),
+				((func.sum(db.StockData.close*db.StockData.foreignbuy)+func.sum(db.StockData.close*db.StockData.foreignsell))/(func.sum(db.StockData.value)*2)).label('FProp'),
+				).filter(db.StockData.code.in_(filtered_stockcodes)
+				).filter(db.StockData.code.notin_(stockcode_excludes)
+				).filter(db.StockData.date == enddate
+				).group_by(db.StockData.code
+				).subquery()
+			
+			# Join Sub Query 1 and 2
+			qry = dbs.query(
+				sub_qry_2.c.code,
+				sub_qry_2.c.FMF,
+				sub_qry_2.c.FProp,
+				sub_qry_1.c.FPriceCorrel,
+				).join(sub_qry_1, sub_qry_2.c.code == sub_qry_1.c.code
+				)
 		
+		# If startdate != enddate, the fpricefcorrel will be calculated based on startdate and enddate
+		else:
+			# Main Query: get top n_stockcodes stockcodes that most most_accumulated
+			qry = dbs.query(
+				(db.StockData.code),
+				(func.sum(db.StockData.close*db.StockData.foreignbuy)-func.sum(db.StockData.close*db.StockData.foreignsell)).label('FMF'),
+				((func.sum(db.StockData.close*db.StockData.foreignbuy)+func.sum(db.StockData.close*db.StockData.foreignsell))/(func.sum(db.StockData.value)*2)).label('FProp'),
+				(func.corr((db.StockData.close*db.StockData.foreignbuy)-(db.StockData.close*db.StockData.foreignsell),db.StockData.close)).label('FPriceCorrel'),
+				).filter(db.StockData.code.in_(filtered_stockcodes)
+				).filter(db.StockData.code.notin_(stockcode_excludes)
+				).filter(db.StockData.date.between(startdate,enddate)
+				).group_by(db.StockData.code)
+
 		if accum_or_distri == dp.ScreenerList.most_accumulated:
 			qry = qry.order_by(desc('FMF')).limit(n_stockcodes)
 		elif accum_or_distri == dp.ScreenerList.most_distributed:

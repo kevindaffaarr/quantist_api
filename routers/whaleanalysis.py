@@ -550,8 +550,6 @@ async def get_screener_moneyflow(
 	screener_min_value: int | None = None,
 	screener_min_frequency: int | None = None,
 	screener_min_fprop:int | None = None,
-	period_fmf: int | None = None,
-	period_fpricecorrel: int | None = None,
 	):
 	try:
 		screener_money_flow_object = ff.ScreenerMoneyFlow(
@@ -563,8 +561,6 @@ async def get_screener_moneyflow(
 			screener_min_value=screener_min_value,
 			screener_min_frequency=screener_min_frequency,
 			screener_min_fprop=screener_min_fprop,
-			period_fmf=period_fmf,
-			period_fpricecorrel=period_fpricecorrel,
 		)
 		screener_money_flow_object = await screener_money_flow_object.screen()
 
