@@ -1542,7 +1542,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		self.accum_or_distri = accum_or_distri
 		self.n_stockcodes = n_stockcodes
 
-	async def screener(self) -> ScreenerMoneyFlow:
+	async def screen(self) -> ScreenerMoneyFlow:
 		# get default param radar, defined startdate,
 		# filtered_stockcodes should be analyzed, and the selected brokers each stock
 		await super()._fit_base()
