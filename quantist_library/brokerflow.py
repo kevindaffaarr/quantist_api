@@ -793,7 +793,7 @@ class WhaleRadar():
 		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
 		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
 		
-		self.radar_period = int(default_radar['default_radar_period']) if self.startdate is None else None
+		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else None
 		self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100
 		self.training_end_index = (int(default_radar['default_bf_training_end_index'])-50)/(100/2) if self.training_end_index is None else self.training_end_index/100
 		self.min_n_cluster = int(default_radar['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster
@@ -1446,15 +1446,26 @@ class ScreenerBase(WhaleRadar):
 			)
 		
 		# Get radar period filtered stockdata
-		self.startdate, self.enddate, self.raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
-			await self._get_radar_period_filtered_stock_data(
-				startdate = self.startdate,
-				radar_period = self.radar_period,
-				raw_data_full = raw_data_full,
-				raw_data_broker_nvol = raw_data_broker_nvol,
-				raw_data_broker_nval = raw_data_broker_nval,
-				raw_data_broker_sumval = raw_data_broker_sumval,
-			)
+		if self.startdate == self.enddate:
+			assert self.radar_period is not None
+			self.raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+				await self._special_screener_get_radar_period_filtered_stock_data(
+					radar_period = self.radar_period,
+					raw_data_full = raw_data_full,
+					raw_data_broker_nvol = raw_data_broker_nvol,
+					raw_data_broker_nval = raw_data_broker_nval,
+					raw_data_broker_sumval = raw_data_broker_sumval,
+				)
+		else:
+			self.startdate, self.enddate, self.raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+				await self._get_radar_period_filtered_stock_data(
+					startdate = self.startdate,
+					radar_period = self.radar_period,
+					raw_data_full = raw_data_full,
+					raw_data_broker_nvol = raw_data_broker_nvol,
+					raw_data_broker_nval = raw_data_broker_nval,
+					raw_data_broker_sumval = raw_data_broker_sumval,
+				)
 		
 		# Get sum of selected broker transaction for each stock
 		self.selected_broker_nvol, self.selected_broker_nval, self.selected_broker_sumval = \
@@ -1467,6 +1478,20 @@ class ScreenerBase(WhaleRadar):
 
 		return self
 	
+	async def _special_screener_get_radar_period_filtered_stock_data(self,
+		radar_period: int = ...,
+		raw_data_full: pd.DataFrame = ...,
+		raw_data_broker_nvol: pd.DataFrame = ...,
+		raw_data_broker_nval: pd.DataFrame = ...,
+		raw_data_broker_sumval: pd.DataFrame = ...,
+		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		# Get only radar_period rows from last row for each group by code from raw_data_full
+		raw_data_full = raw_data_full.groupby("code").tail(radar_period)
+		raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(radar_period)
+		raw_data_broker_nval = raw_data_broker_nval.groupby("code").tail(radar_period)
+		raw_data_broker_sumval = raw_data_broker_sumval.groupby("code").tail(radar_period)
+		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+
 class ScreenerMoneyFlow(ScreenerBase):
 	def __init__(self,
 		accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
