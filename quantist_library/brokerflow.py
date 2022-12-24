@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Literal
 import gc
 
 import datetime
@@ -9,7 +10,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
-from sqlalchemy.sql import func, desc, asc
+from sqlalchemy.sql import func
 
 import database as db
 import dependencies as dp
@@ -171,10 +172,6 @@ class StockBFFull():
 
 	# Get Net Val Sum Val Broker Transaction
 	async def __get_nvsv_broker_transaction(self,raw_data_broker_full: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-		# Calculate nval (bval-sval) and sumval (bval+sval)
-		raw_data_broker_full["nvol"] = raw_data_broker_full["bvol"] - raw_data_broker_full["svol"]
-		raw_data_broker_full["nval"] = raw_data_broker_full["bval"] - raw_data_broker_full["sval"]
-		raw_data_broker_full["sumval"] = raw_data_broker_full["bval"] + raw_data_broker_full["sval"]
 		# Aggretate by broker then broker to column for each net and sum
 		raw_data_broker_nvol = raw_data_broker_full.pivot(index=None,columns="broker",values="nvol")
 		raw_data_broker_nval = raw_data_broker_full.pivot(index=None,columns="broker",values="nval")
@@ -207,7 +204,10 @@ class StockBFFull():
 			db.StockTransaction.bvol,
 			db.StockTransaction.svol,
 			db.StockTransaction.bval,
-			db.StockTransaction.sval
+			db.StockTransaction.sval,
+			(db.StockTransaction.bvol - db.StockTransaction.svol).label("nvol"), # type: ignore
+			(db.StockTransaction.bval - db.StockTransaction.sval).label("nval"), # type: ignore
+			(db.StockTransaction.bval + db.StockTransaction.sval).label("sumval") # type: ignore
 		).filter((db.StockTransaction.code == stockcode))
 
 		# Main Query
@@ -666,7 +666,7 @@ class WhaleRadar():
 		splitted_min_n_cluster: int | None = None,
 		splitted_max_n_cluster: int | None = None,
 		stepup_n_cluster_threshold: int | None = None,
-		filter_opt_corr: int | None = None,
+		filter_opt_corr: float | None = None,
 		dbs: db.Session = next(db.get_dbs()),
 		) -> None:
 		self.startdate = startdate
@@ -703,6 +703,7 @@ class WhaleRadar():
 		assert self.training_start_index is not None
 		assert self.splitted_min_n_cluster is not None
 		assert self.splitted_max_n_cluster is not None
+		assert self.filter_opt_corr is not None
 
 		# Get Filtered StockCodes
 		self.filtered_stockcodes = await self._get_stockcodes(
@@ -712,19 +713,18 @@ class WhaleRadar():
 			dbs=self.dbs)
 
 		# Get raw data
-		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
-			await self.__get_stock_raw_data(
+		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
+			await self._get_stock_raw_data(
 				filtered_stockcodes=self.filtered_stockcodes,
 				enddate=self.enddate,
 				default_months_range=self.default_months_range,
 				training_end_index=self.training_end_index,
 				dbs=self.dbs
 				)
-		self.filtered_stockcodes = raw_data_full.index.get_level_values(0).unique().to_series()
 
 		# Get broker flow parameters for each stock in filtered_stockcodes
 		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
-			await self.__get_bf_parameters(
+			await self._get_bf_parameters(
 				raw_data_close=raw_data_full["close"],
 				raw_data_broker_nval=raw_data_broker_nval,
 				raw_data_broker_sumval=raw_data_broker_sumval,
@@ -736,45 +736,48 @@ class WhaleRadar():
 			)
 		
 		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
-		self.filtered_stockcodes = \
-			self.filtered_stockcodes[\
-				(abs(self.optimum_corr['optimum_corr']) > self.filter_opt_corr)\
-			].reset_index(drop=True)
-		raw_data_full = \
-			raw_data_full[raw_data_full.index.get_level_values(0).isin(self.filtered_stockcodes)]
-		raw_data_broker_nvol = \
-			raw_data_broker_nvol[raw_data_broker_nvol.index.get_level_values(0).isin(self.filtered_stockcodes)]
-		raw_data_broker_nval = \
-			raw_data_broker_nval[raw_data_broker_nval.index.get_level_values(0).isin(self.filtered_stockcodes)]
+		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+			await self._get_filtered_stockcodes_by_corr(
+				filter_opt_corr=self.filter_opt_corr,
+				optimum_corr=self.optimum_corr,
+				filtered_stockcodes=self.filtered_stockcodes,
+				raw_data_full=raw_data_full,
+				raw_data_broker_nvol=raw_data_broker_nvol,
+				raw_data_broker_nval=raw_data_broker_nval,
+				raw_data_broker_sumval=raw_data_broker_sumval
+			)
 
-		# Update Date Based on Data Queried
-		self.enddate = raw_data_full.index.get_level_values("date").date.max() # type: ignore
-		if self.startdate is None:
-			assert self.radar_period is not None
-			self.startdate = raw_data_full.groupby("code").tail(self.radar_period).index.get_level_values("date").date.min() # type: ignore
-			# Get only self.radar_period rows from last row for each group by code from raw_data_full
-			raw_data_full = raw_data_full.groupby("code").tail(self.radar_period)
-			raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(self.radar_period)
-			raw_data_broker_nval = raw_data_broker_nval.groupby("code").tail(self.radar_period)
-		else:
-			# Get rows from self.startdate until self.enddate from raw_data_full in the first level of pandas index
-			raw_data_full = raw_data_full.query("date >= @self.startdate and date <= @self.enddate")
-			raw_data_broker_nvol = raw_data_broker_nvol.query("date >= @self.startdate and date <= @self.enddate")
-			raw_data_broker_nval = raw_data_broker_nval.query("date >= @self.startdate and date <= @self.enddate")
+		# Get radar period filtered stockdata
+		self.startdate, self.enddate, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+			await self._get_radar_period_filtered_stock_data(
+				startdate = self.startdate,
+				radar_period = self.radar_period,
+				raw_data_full = raw_data_full,
+				raw_data_broker_nvol = raw_data_broker_nvol,
+				raw_data_broker_nval = raw_data_broker_nval,
+				raw_data_broker_sumval = raw_data_broker_sumval,
+			)
+		
+		# Get sum of selected broker transaction for each stock
+		selected_broker_nvol, selected_broker_nval, selected_broker_sumval = \
+			await self._sum_selected_broker_transaction(
+				raw_data_broker_nvol=raw_data_broker_nvol,
+				raw_data_broker_nval=raw_data_broker_nval,
+				raw_data_broker_sumval=raw_data_broker_sumval,
+				selected_broker=self.selected_broker,
+			)
 		
 		# Get Whale Radar Indicators
-		self.radar_indicators = await self.calc_radar_indicators(
+		self.radar_indicators = await self._calc_radar_indicators(
 			raw_data_full = raw_data_full,
-			raw_data_broker_nvol = raw_data_broker_nvol,
-			raw_data_broker_nval = raw_data_broker_nval,
-			selected_broker = self.selected_broker,
+			selected_broker_nvol = selected_broker_nvol,
+			selected_broker_nval = selected_broker_nval,
 			y_axis_type=self.y_axis_type,
 			)
 		
 		return self
 	
 	async def _get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
-
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter(
 				(db.DataParam.param.like("default_months_range")) | \
@@ -782,7 +785,6 @@ class WhaleRadar():
 				(db.DataParam.param.like("default_screener_%")) | \
 				(db.DataParam.param.like("default_bf_%"))
 				)
-		
 		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 		# Data Parameter
@@ -818,7 +820,6 @@ class WhaleRadar():
 		stockcode_excludes: set[str] = set(),
 		dbs: db.Session = next(db.get_dbs())
 		) -> pd.Series:
-
 		"""
 		Get filtered stockcodes
 		Filtered by:value>screener_min_value, 
@@ -839,11 +840,6 @@ class WhaleRadar():
 	async def __get_nvsv_broker_transaction(self,
 		raw_data_broker_full: pd.DataFrame
 		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-		# Calculate nval (bval-sval) and sumval (bval+sval)
-		raw_data_broker_full["nvol"] = raw_data_broker_full["bvol"] - raw_data_broker_full["svol"]
-		raw_data_broker_full["nval"] = raw_data_broker_full["bval"] - raw_data_broker_full["sval"]
-		raw_data_broker_full["sumval"] = raw_data_broker_full["bval"] + raw_data_broker_full["sval"]
-		# Aggretate by broker then broker to column for each net and sum
 		raw_data_broker_nvol = raw_data_broker_full.pivot(index=None,columns="broker",values="nvol")
 		raw_data_broker_nval = raw_data_broker_full.pivot(index=None,columns="broker",values="nval")
 		raw_data_broker_sumval = raw_data_broker_full.pivot(index=None,columns="broker",values="sumval")
@@ -863,7 +859,7 @@ class WhaleRadar():
 		dbs: db.Session = next(db.get_dbs()),
 		) -> pd.DataFrame:
 
-		start_qry = enddate - relativedelta(months=default_months_range)
+		start_date = enddate - relativedelta(months=default_months_range)
 
 		# Query Definition
 		qry = dbs.query(
@@ -873,9 +869,12 @@ class WhaleRadar():
 			db.StockTransaction.bvol,
 			db.StockTransaction.svol,
 			db.StockTransaction.bval,
-			db.StockTransaction.sval
+			db.StockTransaction.sval,
+			(db.StockTransaction.bvol - db.StockTransaction.svol).label("nvol"), # type: ignore
+			(db.StockTransaction.bval - db.StockTransaction.sval).label("nval"), # type: ignore
+			(db.StockTransaction.bval + db.StockTransaction.sval).label("sumval") # type: ignore
 		).filter(db.StockTransaction.code.in_(filtered_stockcodes.to_list()))\
-		.filter(db.StockTransaction.date.between(start_qry, enddate))\
+		.filter(db.StockTransaction.date.between(start_date, enddate))\
 		.order_by(db.StockTransaction.code.asc(), db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
@@ -891,19 +890,26 @@ class WhaleRadar():
 		filtered_stockcodes: pd.Series = ...,
 		enddate: datetime.date = datetime.date.today(),
 		default_months_range: int = 12,
+		minimum_training_set: int = 0,
 		dbs: db.Session = next(db.get_dbs()),
 		) -> pd.DataFrame:
 
-		start_qry = enddate - relativedelta(months=default_months_range)
+		start_date = enddate - relativedelta(months=default_months_range)
 
 		# Query Definition
-		qry = dbs.query(
-			db.StockData.code,
-			db.StockData.date,
-			db.StockData.close,
-		).filter(db.StockData.code.in_(filtered_stockcodes.to_list()))\
-		.filter(db.StockData.date.between(start_qry, enddate))\
-		.order_by(db.StockData.code.asc(), db.StockData.date.asc())
+		# Filter only data that has data in date range more than minimum_training_set rows
+		sub_qry = dbs.query(db.StockData.code, func.count(db.StockData.code).label("count"))\
+			.filter(db.StockData.code.in_(filtered_stockcodes.to_list()))\
+			.filter(db.StockData.date.between(start_date, enddate))\
+			.group_by(db.StockData.code)\
+			.having(func.count(db.StockData.code) > minimum_training_set)\
+			.subquery()
+
+		qry = dbs.query(db.StockData.code,db.StockData.date,db.StockData.close,db.StockData.value)\
+			.join(sub_qry, db.StockData.code == sub_qry.c.code)\
+			.filter(db.StockData.code.in_(filtered_stockcodes.to_list()))\
+			.filter(db.StockData.date.between(start_date, enddate))\
+			.order_by(db.StockData.code.asc(), db.StockData.date.asc())
 
 		# Main Query Fetching
 		raw_data_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])\
@@ -912,13 +918,13 @@ class WhaleRadar():
 		# End of Method: Return or Assign Attribute
 		return raw_data_full
 
-	async def __get_stock_raw_data(self,
+	async def _get_stock_raw_data(self,
 		filtered_stockcodes: pd.Series = ...,
 		enddate: datetime.date = ...,
 		default_months_range: int = 6,
 		training_end_index: float = 0.75,
 		dbs: db.Session = next(db.get_dbs()),
-		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series]:
 		MINIMUM_TRAINING_SET: int = 5
 
 		# Get Stockdata Full
@@ -926,11 +932,10 @@ class WhaleRadar():
 			filtered_stockcodes=filtered_stockcodes,
 			enddate=enddate,
 			default_months_range=default_months_range,
+			minimum_training_set=MINIMUM_TRAINING_SET,
 			dbs=dbs
 			)
 
-		# Filter only data that has first level index of raw_data_full is more than one row
-		raw_data_full = raw_data_full.groupby(level=0).filter(lambda x: len(x) > ((MINIMUM_TRAINING_SET//training_end_index) + 1))
 		# Get filtered_stockcodes from raw_data_full first level
 		filtered_stockcodes = raw_data_full.index.get_level_values(0).unique().to_series()
 
@@ -946,7 +951,7 @@ class WhaleRadar():
 		raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self.__get_nvsv_broker_transaction(raw_data_broker_full=raw_data_broker_full)
 
-		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, filtered_stockcodes
 	
 	async def __get_selected_broker(self,
 		clustered_features: pd.DataFrame,
@@ -1085,7 +1090,7 @@ class WhaleRadar():
 
 		return features, centroids_cluster
 
-	async def __get_bf_parameters(self,
+	async def _get_bf_parameters(self,
 		raw_data_close: pd.Series,
 		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
@@ -1225,48 +1230,78 @@ class WhaleRadar():
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr, broker_features
 
-	async def sum_selected_broker_transaction(self,
+	async def _sum_selected_broker_transaction(self,
 		raw_data_broker_nvol: pd.DataFrame,
 		raw_data_broker_nval: pd.DataFrame,
+		raw_data_broker_sumval: pd.DataFrame,
 		selected_broker: dict,
-		) -> tuple[pd.DataFrame, pd.DataFrame]:
+		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		
-		selected_broker_nvol = pd.DataFrame()
-		selected_broker_nval = pd.DataFrame()
-		for code in raw_data_broker_nvol.index.get_level_values('code').unique():
-			broker_nvol = raw_data_broker_nvol.loc[(code),selected_broker[code]].sum(axis=1) # type: ignore
-			broker_nval = raw_data_broker_nval.loc[(code),selected_broker[code]].sum(axis=1) # type: ignore
-			
-			# Concatenate
-			broker_nvol = pd.DataFrame(broker_nvol)
-			broker_nvol.columns = ['broker_nvol']
-			broker_nvol['code'] = code
-			broker_nvol = broker_nvol.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
-			selected_broker_nvol = pd.concat([selected_broker_nvol, broker_nvol], axis=0)
-
-			broker_nval = pd.DataFrame(broker_nval)
-			broker_nval.columns = ['broker_nval']
-			broker_nval['code'] = code
-			broker_nval = broker_nval.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
-			selected_broker_nval = pd.concat([selected_broker_nval, broker_nval], axis=0)
-
-		return selected_broker_nvol, selected_broker_nval
-			
-	async def calc_radar_indicators(self,
+		selected_broker_nvol = pd.DataFrame(raw_data_broker_nvol.groupby(level="code").apply(lambda x: x.loc[:,selected_broker[x.name]].sum(axis=1)).reset_index(level=0, drop=True)).rename(columns={0:'broker_nvol'})
+		selected_broker_nval = pd.DataFrame(raw_data_broker_nval.groupby(level="code").apply(lambda x: x.loc[:,selected_broker[x.name]].sum(axis=1)).reset_index(level=0, drop=True)).rename(columns={0:'broker_nval'})
+		selected_broker_sumval = pd.DataFrame(raw_data_broker_sumval.groupby(level="code").apply(lambda x: x.loc[:,selected_broker[x.name]].sum(axis=1)).reset_index(level=0, drop=True)).rename(columns={0:'broker_sumval'})
+		
+		return selected_broker_nvol, selected_broker_nval, selected_broker_sumval
+	
+	async def _get_filtered_stockcodes_by_corr(self,
+		filter_opt_corr: float,
+		optimum_corr: pd.DataFrame,
+		filtered_stockcodes: pd.Series,
 		raw_data_full: pd.DataFrame,
 		raw_data_broker_nvol: pd.DataFrame,
 		raw_data_broker_nval: pd.DataFrame,
-		selected_broker: dict,
+		raw_data_broker_sumval: pd.DataFrame,
+		) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		# Filter code based on self.optimum_corr should be greater than filter_opt_corr
+		filtered_stockcodes = \
+			filtered_stockcodes[(abs(optimum_corr['optimum_corr']) > filter_opt_corr)]\
+			.reset_index(drop=True)
+		raw_data_full = \
+			raw_data_full[raw_data_full.index.get_level_values(0).isin(filtered_stockcodes)]
+		raw_data_broker_nvol = \
+			raw_data_broker_nvol[raw_data_broker_nvol.index.get_level_values(0).isin(filtered_stockcodes)]
+		raw_data_broker_nval = \
+			raw_data_broker_nval[raw_data_broker_nval.index.get_level_values(0).isin(filtered_stockcodes)]
+		raw_data_broker_sumval = \
+			raw_data_broker_sumval[raw_data_broker_sumval.index.get_level_values(0).isin(filtered_stockcodes)]
+
+		return filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+
+	async def _get_radar_period_filtered_stock_data(self,
+		startdate: datetime.date | None = None,
+		radar_period: int | None = None,
+		raw_data_full: pd.DataFrame = ...,
+		raw_data_broker_nvol: pd.DataFrame = ...,
+		raw_data_broker_nval: pd.DataFrame = ...,
+		raw_data_broker_sumval: pd.DataFrame = ...,
+		) -> tuple[datetime.date, datetime.date, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		# Update startdate, and enddate based on Data Queried
+		# Then update raw_data_full, raw_data_broker_nvol, raw_data_broker_nval
+		enddate: datetime.date = raw_data_full.index.get_level_values("date").date.max() # type: ignore
+
+		if startdate is None:
+			assert radar_period is not None
+			startdate = raw_data_full.groupby("code").tail(radar_period).index.get_level_values("date").date.min() # type: ignore
+			assert startdate is not None
+			# Get only radar_period rows from last row for each group by code from raw_data_full
+			raw_data_full = raw_data_full.groupby("code").tail(radar_period)
+			raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(radar_period)
+			raw_data_broker_nval = raw_data_broker_nval.groupby("code").tail(radar_period)
+			raw_data_broker_sumval = raw_data_broker_sumval.groupby("code").tail(radar_period)
+		else:
+			# Get rows from startdate until enddate from raw_data_full in the first level of pandas index
+			raw_data_full = raw_data_full.query("date >= @startdate and date <= @enddate")
+			raw_data_broker_nvol = raw_data_broker_nvol.query("date >= @startdate and date <= @enddate")
+			raw_data_broker_nval = raw_data_broker_nval.query("date >= @startdate and date <= @enddate")
+			raw_data_broker_sumval = raw_data_broker_sumval.query("date >= @startdate and date <= @enddate")
+		return startdate, enddate, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+
+	async def _calc_radar_indicators(self,
+		raw_data_full: pd.DataFrame,
+		selected_broker_nvol: pd.DataFrame,
+		selected_broker_nval: pd.DataFrame,
 		y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
 		) -> pd.DataFrame:
-		
-		# Data Preparation
-		selected_broker_nvol, selected_broker_nval = \
-			await self.sum_selected_broker_transaction(
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_nval=raw_data_broker_nval,
-				selected_broker=selected_broker,
-			)
 
 		radar_indicators = pd.DataFrame()
 		
@@ -1311,3 +1346,235 @@ class WhaleRadar():
 			return await genchart.fig_to_json(fig)
 		else:
 			return fig
+
+class ScreenerBase(WhaleRadar):
+	def __init__(self,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = datetime.date.today(),
+		stockcode_excludes: set[str] = set(),
+		screener_min_value: int | None = None,
+		screener_min_frequency: int | None = None,
+		n_selected_cluster:int | None = None,
+		radar_period: int | None = None,
+		period_wmf: int | None = None,
+		period_wpricecorrel: int | None = None,
+		default_months_range: int | None = None,
+		training_start_index: float | None = None,
+		training_end_index: float | None = None,
+		min_n_cluster: int | None = None,
+		max_n_cluster: int | None = None,
+		splitted_min_n_cluster: int | None = None,
+		splitted_max_n_cluster: int | None = None,
+		stepup_n_cluster_threshold: int | None = None,
+		filter_opt_corr: int | None = None,
+		dbs: db.Session = next(db.get_dbs()),
+		) -> None:
+		super().__init__(
+			startdate=startdate,
+			enddate=enddate,
+			stockcode_excludes=stockcode_excludes,
+			screener_min_value=screener_min_value,
+			screener_min_frequency=screener_min_frequency,
+			n_selected_cluster=n_selected_cluster,
+			radar_period=radar_period,
+			period_wmf=period_wmf,
+			period_wpricecorrel=period_wpricecorrel,
+			default_months_range=default_months_range,
+			training_start_index=training_start_index,
+			training_end_index=training_end_index,
+			min_n_cluster=min_n_cluster,
+			max_n_cluster=max_n_cluster,
+			splitted_min_n_cluster=splitted_min_n_cluster,
+			splitted_max_n_cluster=splitted_max_n_cluster,
+			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
+			filter_opt_corr=filter_opt_corr,
+			dbs=dbs,
+		)
+	
+	async def _fit_base(self) -> ScreenerBase:
+		# Get default bf params
+		await super()._get_default_radar(dbs=self.dbs)
+		assert self.screener_min_value is not None
+		assert self.screener_min_frequency is not None
+		assert self.default_months_range is not None
+		assert self.training_end_index is not None
+		assert self.training_start_index is not None
+		assert self.splitted_min_n_cluster is not None
+		assert self.splitted_max_n_cluster is not None
+		assert self.filter_opt_corr is not None
+
+		# Get  filtered_stock that should be analyzed
+		self.filtered_stockcodes = await self._get_stockcodes(
+			screener_min_value=self.screener_min_value,
+			screener_min_frequency=self.screener_min_frequency,
+			stockcode_excludes=self.stockcode_excludes,
+			dbs=self.dbs)
+		
+		# Get raw data
+		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
+			await self._get_stock_raw_data(
+				filtered_stockcodes=self.filtered_stockcodes,
+				enddate=self.enddate,
+				default_months_range=self.default_months_range,
+				training_end_index=self.training_end_index,
+				dbs=self.dbs
+				)
+		
+		# Get broker flow parameters for each stock in filtered_stockcodes
+		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
+			await self._get_bf_parameters(
+				raw_data_close=raw_data_full["close"],
+				raw_data_broker_nval=raw_data_broker_nval,
+				raw_data_broker_sumval=raw_data_broker_sumval,
+				n_selected_cluster=self.n_selected_cluster,
+				training_start_index=self.training_start_index,
+				training_end_index=self.training_end_index,
+				splitted_min_n_cluster=self.splitted_min_n_cluster,
+				splitted_max_n_cluster=self.splitted_max_n_cluster,
+			)
+		
+		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
+		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+			await self._get_filtered_stockcodes_by_corr(
+				filter_opt_corr=self.filter_opt_corr,
+				optimum_corr=self.optimum_corr,
+				filtered_stockcodes=self.filtered_stockcodes,
+				raw_data_full=raw_data_full,
+				raw_data_broker_nvol=raw_data_broker_nvol,
+				raw_data_broker_nval=raw_data_broker_nval,
+				raw_data_broker_sumval=raw_data_broker_sumval,
+			)
+		
+		# Get radar period filtered stockdata
+		self.startdate, self.enddate, self.raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+			await self._get_radar_period_filtered_stock_data(
+				startdate = self.startdate,
+				radar_period = self.radar_period,
+				raw_data_full = raw_data_full,
+				raw_data_broker_nvol = raw_data_broker_nvol,
+				raw_data_broker_nval = raw_data_broker_nval,
+				raw_data_broker_sumval = raw_data_broker_sumval,
+			)
+		
+		# Get sum of selected broker transaction for each stock
+		self.selected_broker_nvol, self.selected_broker_nval, self.selected_broker_sumval = \
+			await self._sum_selected_broker_transaction(
+				raw_data_broker_nvol = raw_data_broker_nvol,
+				raw_data_broker_nval = raw_data_broker_nval,
+				raw_data_broker_sumval = raw_data_broker_sumval,
+				selected_broker = self.selected_broker
+			)
+
+		return self
+	
+class ScreenerMoneyFlow(ScreenerBase):
+	def __init__(self,
+		accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
+		n_stockcodes: int = 10,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = datetime.date.today(),
+		stockcode_excludes: set[str] = set(),
+		screener_min_value: int | None = None,
+		screener_min_frequency: int | None = None,
+		n_selected_cluster:int | None = None,
+		radar_period: int | None = None,
+		period_wmf: int | None = None,
+		period_wpricecorrel: int | None = None,
+		default_months_range: int | None = None,
+		training_start_index: float | None = None,
+		training_end_index: float | None = None,
+		min_n_cluster: int | None = None,
+		max_n_cluster: int | None = None,
+		splitted_min_n_cluster: int | None = None,
+		splitted_max_n_cluster: int | None = None,
+		stepup_n_cluster_threshold: int | None = None,
+		filter_opt_corr: int | None = None,
+		dbs: db.Session = next(db.get_dbs()),
+		) -> None:
+		
+		super().__init__(
+			startdate=startdate,
+			enddate=enddate,
+			stockcode_excludes=stockcode_excludes,
+			screener_min_value=screener_min_value,
+			screener_min_frequency=screener_min_frequency,
+			n_selected_cluster=n_selected_cluster,
+			radar_period=radar_period,
+			period_wmf=period_wmf,
+			period_wpricecorrel=period_wpricecorrel,
+			default_months_range=default_months_range,
+			training_start_index=training_start_index,
+			training_end_index=training_end_index,
+			min_n_cluster=min_n_cluster,
+			max_n_cluster=max_n_cluster,
+			splitted_min_n_cluster=splitted_min_n_cluster,
+			splitted_max_n_cluster=splitted_max_n_cluster,
+			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
+			filter_opt_corr=filter_opt_corr,
+			dbs=dbs,
+		)
+
+		self.accum_or_distri = accum_or_distri
+		self.n_stockcodes = n_stockcodes
+
+	async def screener(self) -> ScreenerMoneyFlow:
+		# get default param radar, defined startdate,
+		# filtered_stockcodes should be analyzed, and the selected brokers each stock
+		await super()._fit_base()
+
+		# get ranked, filtered, and pre-calculated indicator of filtered_stockcodes
+		self.top_stockcodes = await self._get_mf_top_stockcodes(
+			accum_or_distri=self.accum_or_distri,
+			n_stockcodes=self.n_stockcodes,
+			startdate=self.startdate,
+			enddate=self.enddate,
+		)
+		return self
+	
+	async def _get_mf_top_stockcodes(self,
+		accum_or_distri: dp.ScreenerList = dp.ScreenerList.most_accumulated,
+		n_stockcodes: int = 10,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = datetime.date.today()
+		) -> pd.DataFrame:
+		top_stockcodes = pd.DataFrame()
+		
+		# Sum of selected broker transaction for each stock
+		# Get only self.selected_broker_nval between startdate and enddate based on level 1 date index
+		if accum_or_distri == dp.ScreenerList.most_distributed:
+			top_stockcodes['wmf'] = self.selected_broker_nval.loc[
+				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
+				].groupby("code").sum().nsmallest(n=n_stockcodes, columns="broker_nval")['broker_nval']
+		else:
+			top_stockcodes['wmf'] = self.selected_broker_nval.loc[
+				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
+				].groupby("code").sum().nlargest(n=n_stockcodes, columns="broker_nval")['broker_nval']
+
+		# get selected_broker_nval that has level 0 index (code) in top_stockcodes
+		self.selected_broker_nval = self.selected_broker_nval[self.selected_broker_nval.index.get_level_values(0).isin(top_stockcodes.index)]
+		self.selected_broker_sumval = self.selected_broker_sumval[self.selected_broker_sumval.index.get_level_values(0).isin(top_stockcodes.index)]
+		self.raw_data_full = self.raw_data_full[self.raw_data_full.index.get_level_values(0).isin(top_stockcodes.index)]
+
+		# Calculate top_stockcodes WProp. Get only between startdate and enddate based on level 1 date index
+		top_stockcodes['wprop'] = (self.selected_broker_sumval.loc[
+				self.selected_broker_sumval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
+			]['broker_sumval'].groupby("code").sum())\
+			/(self.raw_data_full.loc[
+				self.raw_data_full.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
+			]['value'].groupby("code").sum()*2)
+		
+		# Calculate top_stockcodes WPriceCorrel
+		if startdate == enddate:
+			wvalflow = self.selected_broker_nval['broker_nval'].groupby("code").cumsum()
+			top_stockcodes['wpricecorrel'] = wvalflow.groupby("code").corr(self.raw_data_full['close']) # type: ignore
+		else:
+			wvalflow = self.selected_broker_nval.loc[
+				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
+				]['broker_nval'].groupby("code").cumsum()
+			
+			top_stockcodes['wpricecorrel'] = wvalflow.groupby("code").corr( # type: ignore
+				self.raw_data_full.loc[
+					self.raw_data_full.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
+				]['close'])
+
+		return top_stockcodes

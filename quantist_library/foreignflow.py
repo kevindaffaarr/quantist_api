@@ -669,15 +669,15 @@ class ScreenerMoneyFlow(ScreenerBase):
 		# Get the top code
 		sub_qry_1 = dbs.query(
 			db.StockData.code,
-			(func.sum(db.StockData.close*db.StockData.foreignbuy)-func.sum(db.StockData.close*db.StockData.foreignsell)).label('FMF')
+			(func.sum(db.StockData.close*db.StockData.foreignbuy)-func.sum(db.StockData.close*db.StockData.foreignsell)).label('fmf')
 		).filter(db.StockData.code.in_(filtered_stockcodes)
 		).filter(db.StockData.code.notin_(stockcode_excludes)
 		).filter(db.StockData.date.between(startdate,enddate)
 		).group_by(db.StockData.code)
 		if accum_or_distri == dp.ScreenerList.most_distributed:
-			sub_qry_1 = sub_qry_1.order_by(asc('FMF')).limit(n_stockcodes).subquery()
+			sub_qry_1 = sub_qry_1.order_by(asc('fmf')).limit(n_stockcodes).subquery()
 		else:
-			sub_qry_1 = sub_qry_1.order_by(desc('FMF')).limit(n_stockcodes).subquery()
+			sub_qry_1 = sub_qry_1.order_by(desc('fmf')).limit(n_stockcodes).subquery()
 
 		# Get the raw data (just for calculate the FPriceCorrel)
 		qry = dbs.query(
@@ -720,14 +720,14 @@ class ScreenerMoneyFlow(ScreenerBase):
 		raw_data = raw_data.loc[(slice(None), slice(startdate, enddate)), :]
 
 		# Calculate FMF, FProp, and FPriceCorrel
-		top_stockcodes['FMF'] = (raw_data['close']*(raw_data['netvol'])).groupby("code").sum()
+		top_stockcodes['fmf'] = (raw_data['close']*(raw_data['netvol'])).groupby("code").sum()
 		top_stockcodes['FProp'] = (raw_data['close']*(raw_data['sumvol'])).groupby("code").sum()/(raw_data['value']*2).groupby("code").sum()
 		# replace nan with none
 		top_stockcodes = top_stockcodes.replace({np.nan: None})
 
 		# Order by FMF
 		if accum_or_distri == dp.ScreenerList.most_distributed:
-			top_stockcodes = top_stockcodes.sort_values(by='FMF', ascending=True)
+			top_stockcodes = top_stockcodes.sort_values(by='fmf', ascending=True)
 		else:
-			top_stockcodes = top_stockcodes.sort_values(by='FMF', ascending=False)
+			top_stockcodes = top_stockcodes.sort_values(by='fmf', ascending=False)
 		return top_stockcodes
