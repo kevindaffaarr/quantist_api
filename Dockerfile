@@ -2,8 +2,11 @@
 
 # Use the official lightweight Python image.
 # https://hub.docker.com/_/python
+# FROM python:3.10.7-slim as base
 
-FROM python:3.10.7-slim as base
+# Use optimized uvicorn-gunicorn-fastapi image from tiangolo
+# https://github.com/tiangolo/uvicorn-gunicorn-fastapi-docker
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.10 as base
 
 # Allow statements and log messages to immediately appear in the Cloud Run logs
 ENV PYTHONUNBUFFERED 1
@@ -29,5 +32,6 @@ COPY --from=base / /
 FROM base as prod
 COPY --from=base / /
 
+# Already using tiangolo/uvicorn-gunicorn-fastapi image, so no need to specify
 # Run the web service on container startup.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
