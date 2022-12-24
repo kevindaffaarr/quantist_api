@@ -14,33 +14,33 @@ class StockFFFull():
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
-		period_fmf: int | None = None,
-		period_fprop: int | None = None,
-		period_fpricecorrel: int | None = None,
-		period_fmapricecorrel: int | None = None,
-		period_fvwap:int | None = None,
-		fpow_high_fprop: int | None = None,
-		fpow_high_fpricecorrel: int | None = None,
-		fpow_high_fmapricecorrel: int | None = None,
-		fpow_medium_fprop: int | None = None,
-		fpow_medium_fpricecorrel: int | None = None,
-		fpow_medium_fmapricecorrel: int | None = None,
+		period_mf: int | None = None,
+		period_prop: int | None = None,
+		period_pricecorrel: int | None = None,
+		period_mapricecorrel: int | None = None,
+		period_vwap:int | None = None,
+		pow_high_prop: int | None = None,
+		pow_high_pricecorrel: int | None = None,
+		pow_high_mapricecorrel: int | None = None,
+		pow_medium_prop: int | None = None,
+		pow_medium_pricecorrel: int | None = None,
+		pow_medium_mapricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
 		self.stockcode = stockcode
 		self.startdate = startdate
 		self.enddate = enddate
-		self.period_fmf = period_fmf
-		self.period_fprop = period_fprop
-		self.period_fpricecorrel = period_fpricecorrel
-		self.period_fmapricecorrel = period_fmapricecorrel
-		self.period_fvwap = period_fvwap
-		self.fpow_high_fprop = fpow_high_fprop
-		self.fpow_high_fpricecorrel = fpow_high_fpricecorrel
-		self.fpow_high_fmapricecorrel = fpow_high_fmapricecorrel
-		self.fpow_medium_fprop = fpow_medium_fprop
-		self.fpow_medium_fpricecorrel = fpow_medium_fpricecorrel
-		self.fpow_medium_fmapricecorrel = fpow_medium_fmapricecorrel
+		self.period_mf = period_mf
+		self.period_prop = period_prop
+		self.period_pricecorrel = period_pricecorrel
+		self.period_mapricecorrel = period_mapricecorrel
+		self.period_vwap = period_vwap
+		self.pow_high_prop = pow_high_prop
+		self.pow_high_pricecorrel = pow_high_pricecorrel
+		self.pow_high_mapricecorrel = pow_high_mapricecorrel
+		self.pow_medium_prop = pow_medium_prop
+		self.pow_medium_pricecorrel = pow_medium_pricecorrel
+		self.pow_medium_mapricecorrel = pow_medium_mapricecorrel
 		self.dbs = dbs
 
 		self.type = None
@@ -66,18 +66,18 @@ class StockFFFull():
 		default_months_range = int(default_ff['default_months_range']) if self.startdate is None else 0
 		self.enddate = datetime.date.today() if self.enddate is None else self.enddate
 		self.startdate = self.enddate - relativedelta(months=default_months_range) if self.startdate is None else self.startdate
-		self.period_fmf = int(default_ff['default_ff_period_fmf']) if self.period_fmf is None else self.period_fmf
-		self.period_fprop = int(default_ff['default_ff_period_fprop']) if self.period_fprop is None else self.period_fprop
-		self.period_fpricecorrel = int(default_ff['default_ff_period_fpricecorrel']) if self.period_fpricecorrel is None else self.period_fpricecorrel
-		self.period_fmapricecorrel = int(default_ff['default_ff_period_fmapricecorrel']) if self.period_fmapricecorrel is None else self.period_fmapricecorrel
-		self.period_fvwap = int(default_ff['default_ff_period_fvwap']) if self.period_fvwap is None else self.period_fvwap
-		self.fpow_high_fprop = int(default_ff['default_ff_fpow_high_fprop']) if self.fpow_high_fprop is None else self.fpow_high_fprop
-		self.fpow_high_fpricecorrel = int(default_ff['default_ff_fpow_high_fpricecorrel']) if self.fpow_high_fpricecorrel is None else self.fpow_high_fpricecorrel
-		self.fpow_high_fmapricecorrel = int(default_ff['default_ff_fpow_high_fmapricecorrel']) if self.fpow_high_fmapricecorrel is None else self.fpow_high_fmapricecorrel
-		self.fpow_medium_fprop = int(default_ff['default_ff_fpow_medium_fprop']) if self.fpow_medium_fprop is None else self.fpow_medium_fprop
-		self.fpow_medium_fpricecorrel = int(default_ff['default_ff_fpow_medium_fpricecorrel']) if self.fpow_medium_fpricecorrel is None else self.fpow_medium_fpricecorrel
-		self.fpow_medium_fmapricecorrel = int(default_ff['default_ff_fpow_medium_fmapricecorrel']) if self.fpow_medium_fmapricecorrel is None else self.fpow_medium_fmapricecorrel
-		preoffset_period_param = max(self.period_fmf,self.period_fprop,self.period_fpricecorrel,(self.period_fmapricecorrel+self.period_fvwap))-1
+		self.period_mf = int(default_ff['default_ff_period_mf']) if self.period_mf is None else self.period_mf
+		self.period_prop = int(default_ff['default_ff_period_prop']) if self.period_prop is None else self.period_prop
+		self.period_pricecorrel = int(default_ff['default_ff_period_pricecorrel']) if self.period_pricecorrel is None else self.period_pricecorrel
+		self.period_mapricecorrel = int(default_ff['default_ff_period_mapricecorrel']) if self.period_mapricecorrel is None else self.period_mapricecorrel
+		self.period_vwap = int(default_ff['default_ff_period_vwap']) if self.period_vwap is None else self.period_vwap
+		self.pow_high_prop = int(default_ff['default_ff_pow_high_prop']) if self.pow_high_prop is None else self.pow_high_prop
+		self.pow_high_pricecorrel = int(default_ff['default_ff_pow_high_pricecorrel']) if self.pow_high_pricecorrel is None else self.pow_high_pricecorrel
+		self.pow_high_mapricecorrel = int(default_ff['default_ff_pow_high_mapricecorrel']) if self.pow_high_mapricecorrel is None else self.pow_high_mapricecorrel
+		self.pow_medium_prop = int(default_ff['default_ff_pow_medium_prop']) if self.pow_medium_prop is None else self.pow_medium_prop
+		self.pow_medium_pricecorrel = int(default_ff['default_ff_pow_medium_pricecorrel']) if self.pow_medium_pricecorrel is None else self.pow_medium_pricecorrel
+		self.pow_medium_mapricecorrel = int(default_ff['default_ff_pow_medium_mapricecorrel']) if self.pow_medium_mapricecorrel is None else self.pow_medium_mapricecorrel
+		preoffset_period_param = max(self.period_mf,self.period_prop,self.period_pricecorrel,(self.period_mapricecorrel+self.period_vwap))-1
 
 		# Raw Data
 		if self.type == 'composite':
@@ -91,9 +91,9 @@ class StockFFFull():
 		
 		# Foreign Flow Indicators
 		self.ff_indicators = await self.calc_ff_indicators(raw_data,\
-			self.period_fmf,self.period_fprop,self.period_fpricecorrel,self.period_fmapricecorrel,self.period_fvwap,\
-			self.fpow_high_fprop,self.fpow_high_fpricecorrel,self.fpow_high_fmapricecorrel,self.fpow_medium_fprop,\
-			self.fpow_medium_fpricecorrel,self.fpow_medium_fmapricecorrel,\
+			self.period_mf,self.period_prop,self.period_pricecorrel,self.period_mapricecorrel,self.period_vwap,\
+			self.pow_high_prop,self.pow_high_pricecorrel,self.pow_high_mapricecorrel,self.pow_medium_prop,\
+			self.pow_medium_pricecorrel,self.pow_medium_mapricecorrel,\
 			preoffset_period_param
 			)
 
@@ -221,17 +221,17 @@ class StockFFFull():
 
 	async def calc_ff_indicators(self,
 		raw_data: pd.DataFrame,
-		period_fmf: int = 1,
-		period_fprop: int = 10,
-		period_fpricecorrel: int = 10,
-		period_fmapricecorrel: int = 100,
-		period_fvwap:int = 21,
-		fpow_high_fprop: int = 40,
-		fpow_high_fpricecorrel: int = 50,
-		fpow_high_fmapricecorrel: int = 30,
-		fpow_medium_fprop: int = 20,
-		fpow_medium_fpricecorrel: int = 30,
-		fpow_medium_fmapricecorrel: int = 30,
+		period_mf: int = 1,
+		period_prop: int = 10,
+		period_pricecorrel: int = 10,
+		period_mapricecorrel: int = 100,
+		period_vwap:int = 21,
+		pow_high_prop: int = 40,
+		pow_high_pricecorrel: int = 50,
+		pow_high_mapricecorrel: int = 30,
+		pow_medium_prop: int = 20,
+		pow_medium_pricecorrel: int = 30,
+		pow_medium_mapricecorrel: int = 30,
 		preoffset_period_param: int = 0
 		) -> pd.DataFrame:
 		# Define fbval, fsval, netvol, netval
@@ -243,41 +243,41 @@ class StockFFFull():
 		# FF
 		raw_data['fvolflow'] = raw_data['netvol'].cumsum()
 
-		# FMF
-		raw_data['fmf'] = raw_data['netval'].rolling(window=period_fmf).sum()
+		# MF
+		raw_data['mf'] = raw_data['netval'].rolling(window=period_mf).sum()
 
-		# FProp
-		raw_data['fprop'] = (raw_data['fbval']+raw_data['fsval']).rolling(window=period_fprop).sum()\
-			/(raw_data['value'].rolling(window=period_fprop).sum()*2)
+		# Prop
+		raw_data['prop'] = (raw_data['fbval']+raw_data['fsval']).rolling(window=period_prop).sum()\
+			/(raw_data['value'].rolling(window=period_prop).sum()*2)
 
 		# FNetProp
-		raw_data['fnetprop'] = abs(raw_data['netval']).rolling(window=period_fprop).sum()\
-			/(raw_data['value'].rolling(window=period_fprop).sum()*2)
+		raw_data['fnetprop'] = abs(raw_data['netval']).rolling(window=period_prop).sum()\
+			/(raw_data['value'].rolling(window=period_prop).sum()*2)
 
-		# FPriceCorrel
-		raw_data['fpricecorrel'] = raw_data['close'].rolling(window=period_fpricecorrel)\
+		# pricecorrel
+		raw_data['pricecorrel'] = raw_data['close'].rolling(window=period_pricecorrel)\
 			.corr(raw_data['fvolflow'])
 		
-		# FMAPriceCorrel
-		raw_data['fmapricecorrel'] = raw_data['fpricecorrel'].rolling(window=period_fmapricecorrel).mean()
+		# MAPriceCorrel
+		raw_data['mapricecorrel'] = raw_data['pricecorrel'].rolling(window=period_mapricecorrel).mean()
 		
-		# FVWAP
-		raw_data['fvwap'] = (raw_data['netval'].rolling(window=period_fvwap).apply(lambda x: x[x>0].sum()))\
-			/(raw_data['netvol'].rolling(window=period_fvwap).apply(lambda x: x[x>0].sum()))
+		# VWAP
+		raw_data['vwap'] = (raw_data['netval'].rolling(window=period_vwap).apply(lambda x: x[x>0].sum()))\
+			/(raw_data['netvol'].rolling(window=period_vwap).apply(lambda x: x[x>0].sum()))
 		
-		raw_data['fvwap'] = raw_data['fvwap'].mask(raw_data['fvwap'].le(0)).ffill()
+		raw_data['vwap'] = raw_data['vwap'].mask(raw_data['vwap'].le(0)).ffill()
 		
-		# FPow
-		raw_data['fpow'] = \
+		# Pow
+		raw_data['pow'] = \
 			np.where(
-				(raw_data["fprop"]>(fpow_high_fprop/100)) & \
-				(raw_data['fpricecorrel']>(fpow_high_fpricecorrel/100)) & \
-				(raw_data['fmapricecorrel']>(fpow_high_fmapricecorrel/100)), \
+				(raw_data["prop"]>(pow_high_prop/100)) & \
+				(raw_data['pricecorrel']>(pow_high_pricecorrel/100)) & \
+				(raw_data['mapricecorrel']>(pow_high_mapricecorrel/100)), \
 				3,
 				np.where(
-					(raw_data["fprop"]>(fpow_medium_fprop/100)) & \
-					(raw_data['fpricecorrel']>(fpow_medium_fpricecorrel/100)) & \
-					(raw_data['fmapricecorrel']>(fpow_medium_fmapricecorrel/100)), \
+					(raw_data["prop"]>(pow_medium_prop/100)) & \
+					(raw_data['pricecorrel']>(pow_medium_pricecorrel/100)) & \
+					(raw_data['mapricecorrel']>(pow_medium_mapricecorrel/100)), \
 					2, \
 					1
 				)
@@ -305,9 +305,9 @@ class ForeignRadar():
 		include_composite: bool = False,
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
-		screener_min_fprop:int | None = None,
-		period_fmf: int | None = None,
-		period_fpricecorrel: int | None = None,
+		screener_min_prop:int | None = None,
+		period_mf: int | None = None,
+		period_pricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
 		self.startdate = startdate
@@ -317,9 +317,9 @@ class ForeignRadar():
 		self.include_composite = include_composite
 		self.screener_min_value = screener_min_value
 		self.screener_min_frequency = screener_min_frequency
-		self.screener_min_fprop = screener_min_fprop
-		self.period_fmf = period_fmf
-		self.period_fpricecorrel = period_fpricecorrel
+		self.screener_min_prop = screener_min_prop
+		self.period_mf = period_mf
+		self.period_pricecorrel = period_pricecorrel
 		self.dbs = dbs
 
 		self.radar_indicators =  pd.DataFrame()
@@ -328,25 +328,25 @@ class ForeignRadar():
 		# Get default value of parameter
 		default_radar = await self._get_default_radar()
 
-		self.period_fmf = int(default_radar['default_radar_period_fmf']) if self.startdate is None else None
-		self.period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel']) if self.startdate is None else None
+		self.period_mf = int(default_radar['default_radar_period_mf']) if self.startdate is None else None
+		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.startdate is None else None
 		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
 		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
-		self.screener_min_fprop = int(default_radar['default_screener_min_fprop']) if self.screener_min_fprop is None else self.screener_min_fprop
+		self.screener_min_prop = int(default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop
 		
 		# Get filtered stockcodes
 		filtered_stockcodes = await self._get_stockcodes(
 			screener_min_value=self.screener_min_value,
 			screener_min_frequency=self.screener_min_frequency,
-			screener_min_fprop=self.screener_min_fprop,
+			screener_min_prop=self.screener_min_prop,
 			stockcode_excludes=self.stockcode_excludes,
 			dbs=self.dbs)
 
 		# Get raw data
 		if self.startdate is None:
-			assert self.period_fmf is not None
-			assert self.period_fpricecorrel is not None
-			bar_range = max(self.period_fmf,self.period_fpricecorrel)
+			assert self.period_mf is not None
+			assert self.period_pricecorrel is not None
+			bar_range = max(self.period_mf,self.period_pricecorrel)
 		else:
 			bar_range = None
 		stocks_raw_data = await self.__get_stocks_raw_data(
@@ -360,7 +360,7 @@ class ForeignRadar():
 		self.startdate = stocks_raw_data['date'].min().date()
 		self.enddate = stocks_raw_data['date'].max().date()
 
-		# Calc Radar Indicators: last fpricecorrel OR last changepercentage
+		# Calc Radar Indicators: last pricecorrel OR last changepercentage
 		self.radar_indicators = await self.calc_radar_indicators(\
 			stocks_raw_data=stocks_raw_data,y_axis_type=self.y_axis_type)
 
@@ -391,7 +391,7 @@ class ForeignRadar():
 	async def _get_stockcodes(self,
 		screener_min_value: int = 5000000000,
 		screener_min_frequency: int = 1000,
-		screener_min_fprop:int = 0,
+		screener_min_prop:int = 0,
 		stockcode_excludes: set[str] = set(),
 		dbs: db.Session = next(db.get_dbs())
 		) -> pd.Series:
@@ -408,7 +408,7 @@ class ForeignRadar():
 					(db.ListStock.frequency > screener_min_frequency) &
 					(db.ListStock.foreignbuyval > 0) &
 					(db.ListStock.foreignsellval > 0) &
-					(((db.ListStock.foreignsellval+db.ListStock.foreignbuyval)/(db.ListStock.value*2)) > (screener_min_fprop/100)) &
+					(((db.ListStock.foreignsellval+db.ListStock.foreignbuyval)/(db.ListStock.value*2)) > (screener_min_prop/100)) &
 					(db.ListStock.code.not_in(stockcode_excludes_lower)))
 		
 		# Query Fetching: filtered_stockcodes
@@ -505,7 +505,7 @@ class ForeignRadar():
 		
 		radar_indicators = pd.DataFrame()
 
-		# Y axis: fmf
+		# Y axis: mf
 		stocks_raw_data['netval'] = stocks_raw_data['close']*\
 			(stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell'])
 		radar_indicators['mf'] = stocks_raw_data.groupby(by='code')['netval'].sum()
@@ -516,7 +516,7 @@ class ForeignRadar():
 			stocks_raw_data['netvol'] = stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell']
 			# FF
 			stocks_raw_data['fvolflow'] = stocks_raw_data.groupby('code')['netvol'].cumsum()
-			# FPriceCorrel
+			# pricecorrel
 			radar_indicators[y_axis_type] = stocks_raw_data.groupby('code')[['fvolflow','close']].corr(method='pearson').iloc[0::2,-1].droplevel(1)
 			# radar_indicators[y_axis_type] = stocks_raw_data.groupby(by='code')['fvolflow']\
 			# 	.corr(stocks_raw_data['close'])
@@ -554,9 +554,9 @@ class ScreenerBase(ForeignRadar):
 		stockcode_excludes: set[str] = set(),
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
-		screener_min_fprop:int | None = None,
-		period_fmf: int | None = None,
-		period_fpricecorrel: int | None = None,
+		screener_min_prop:int | None = None,
+		period_mf: int | None = None,
+		period_pricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())		
 		) -> None:
 
@@ -566,26 +566,26 @@ class ScreenerBase(ForeignRadar):
 			stockcode_excludes = stockcode_excludes,
 			screener_min_value = screener_min_value,
 			screener_min_frequency = screener_min_frequency,
-			screener_min_fprop = screener_min_fprop,
-			period_fmf = period_fmf,
-			period_fpricecorrel = period_fpricecorrel,
+			screener_min_prop = screener_min_prop,
+			period_mf = period_mf,
+			period_pricecorrel = period_pricecorrel,
 			dbs = dbs,
 		)
 
 	async def _fit_base(self) -> ScreenerBase:
 		# get default param radar
 		default_radar = await super()._get_default_radar()
-		self.period_fmf = int(default_radar['default_radar_period_fmf'])
-		self.period_fpricecorrel = int(default_radar['default_radar_period_fpricecorrel'])
+		self.period_mf = int(default_radar['default_radar_period_mf'])
+		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel'])
 		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
 		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
-		self.screener_min_fprop = int(default_radar['default_screener_min_fprop']) if self.screener_min_fprop is None else self.screener_min_fprop
+		self.screener_min_prop = int(default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop
 
 		# Define startdate
 		if self.startdate is None:
-			assert self.period_fmf is not None
-			assert self.period_fpricecorrel is not None
-			self.bar_range = max(self.period_fmf,self.period_fpricecorrel)
+			assert self.period_mf is not None
+			assert self.period_pricecorrel is not None
+			self.bar_range = max(self.period_mf,self.period_pricecorrel)
 
 			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
 			sub_qry = self.dbs.query(db.StockData.date
@@ -605,7 +605,7 @@ class ScreenerBase(ForeignRadar):
 		self.filtered_stockcodes = await super()._get_stockcodes(
 			screener_min_value=self.screener_min_value,
 			screener_min_frequency=self.screener_min_frequency,
-			screener_min_fprop=self.screener_min_fprop,
+			screener_min_prop=self.screener_min_prop,
 			stockcode_excludes=self.stockcode_excludes,
 			dbs=self.dbs
 		)
@@ -621,7 +621,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		stockcode_excludes: set[str] = set(),
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
-		screener_min_fprop:int | None = None,
+		screener_min_prop:int | None = None,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
 		assert accum_or_distri in [dp.ScreenerList.most_accumulated, dp.ScreenerList.most_distributed], f'accum_or_distri must be {dp.ScreenerList.most_accumulated.value} or {dp.ScreenerList.most_distributed.value}'
@@ -632,7 +632,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 			stockcode_excludes = stockcode_excludes,
 			screener_min_value = screener_min_value,
 			screener_min_frequency = screener_min_frequency,
-			screener_min_fprop = screener_min_fprop,
+			screener_min_prop = screener_min_prop,
 			dbs = dbs,
 		)
 
@@ -669,17 +669,17 @@ class ScreenerMoneyFlow(ScreenerBase):
 		# Get the top code
 		sub_qry_1 = dbs.query(
 			db.StockData.code,
-			(func.sum(db.StockData.close*db.StockData.foreignbuy)-func.sum(db.StockData.close*db.StockData.foreignsell)).label('fmf')
+			(func.sum(db.StockData.close*db.StockData.foreignbuy)-func.sum(db.StockData.close*db.StockData.foreignsell)).label('mf')
 		).filter(db.StockData.code.in_(filtered_stockcodes)
 		).filter(db.StockData.code.notin_(stockcode_excludes)
 		).filter(db.StockData.date.between(startdate,enddate)
 		).group_by(db.StockData.code)
 		if accum_or_distri == dp.ScreenerList.most_distributed:
-			sub_qry_1 = sub_qry_1.order_by(asc('fmf')).limit(n_stockcodes).subquery()
+			sub_qry_1 = sub_qry_1.order_by(asc('mf')).limit(n_stockcodes).subquery()
 		else:
-			sub_qry_1 = sub_qry_1.order_by(desc('fmf')).limit(n_stockcodes).subquery()
+			sub_qry_1 = sub_qry_1.order_by(desc('mf')).limit(n_stockcodes).subquery()
 
-		# Get the raw data (just for calculate the FPriceCorrel)
+		# Get the raw data (just for calculate the pricecorrel)
 		qry = dbs.query(
 			db.StockData.code,
 			db.StockData.date,
@@ -691,16 +691,16 @@ class ScreenerMoneyFlow(ScreenerBase):
 		)
 
 		if startdate == enddate:
-			# Sub Query for FPriceCorrel with date from enddate to n rows based on self.period_fpricecorrel
+			# Sub Query for pricecorrel with date from enddate to n rows based on self.period_pricecorrel
 			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
-			startdate_fpricecorrel = self.dbs.query(db.StockData.date
+			startdate_pricecorrel = self.dbs.query(db.StockData.date
 				).filter(db.StockData.code == 'bbca'
 				).filter(db.StockData.date <= self.enddate
 				).order_by(db.StockData.date.desc()
-				).limit(self.period_fpricecorrel
+				).limit(self.period_pricecorrel
 				).subquery()
-			startdate_fpricecorrel = dbs.query(func.min(startdate_fpricecorrel.c.date)).scalar_subquery()
-			qry = qry.filter(db.StockData.date.between(startdate_fpricecorrel,enddate))
+			startdate_pricecorrel = dbs.query(func.min(startdate_pricecorrel.c.date)).scalar_subquery()
+			qry = qry.filter(db.StockData.date.between(startdate_pricecorrel,enddate))
 		else:
 			qry = qry.filter(db.StockData.date.between(startdate,enddate))
 
@@ -714,20 +714,20 @@ class ScreenerMoneyFlow(ScreenerBase):
 		assert isinstance(startdate, datetime.date)
 		
 		top_stockcodes = pd.DataFrame()
-		top_stockcodes['FPriceCorrel'] = raw_data.groupby("code")[["close","netvol"]].corr(method='pearson').iloc[0::2,-1].droplevel(1)
+		top_stockcodes['pricecorrel'] = raw_data.groupby("code")[["close","netvol"]].corr(method='pearson').iloc[0::2,-1].droplevel(1)
 
 		# Only get raw_data between startdate and enddate
 		raw_data = raw_data.loc[(slice(None), slice(startdate, enddate)), :]
 
-		# Calculate FMF, FProp, and FPriceCorrel
-		top_stockcodes['fmf'] = (raw_data['close']*(raw_data['netvol'])).groupby("code").sum()
-		top_stockcodes['FProp'] = (raw_data['close']*(raw_data['sumvol'])).groupby("code").sum()/(raw_data['value']*2).groupby("code").sum()
+		# Calculate MF, Prop, and pricecorrel
+		top_stockcodes['mf'] = (raw_data['close']*(raw_data['netvol'])).groupby("code").sum()
+		top_stockcodes['Prop'] = (raw_data['close']*(raw_data['sumvol'])).groupby("code").sum()/(raw_data['value']*2).groupby("code").sum()
 		# replace nan with none
 		top_stockcodes = top_stockcodes.replace({np.nan: None})
 
-		# Order by FMF
+		# Order by MF
 		if accum_or_distri == dp.ScreenerList.most_distributed:
-			top_stockcodes = top_stockcodes.sort_values(by='fmf', ascending=True)
+			top_stockcodes = top_stockcodes.sort_values(by='mf', ascending=True)
 		else:
-			top_stockcodes = top_stockcodes.sort_values(by='fmf', ascending=False)
+			top_stockcodes = top_stockcodes.sort_values(by='mf', ascending=False)
 		return top_stockcodes

@@ -25,17 +25,17 @@ class StockBFFull():
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		n_selected_cluster:int | None = None,
-		period_wmf: int | None = None,
-		period_wprop: int | None = None,
-		period_wpricecorrel: int | None = None,
-		period_wmapricecorrel: int | None = None,
-		period_wvwap:int | None = None,
-		wpow_high_wprop: int | None = None,
-		wpow_high_wpricecorrel: int | None = None,
-		wpow_high_wmapricecorrel: int | None = None,
-		wpow_medium_wprop: int | None = None,
-		wpow_medium_wpricecorrel: int | None = None,
-		wpow_medium_wmapricecorrel: int | None = None,
+		period_mf: int | None = None,
+		period_prop: int | None = None,
+		period_pricecorrel: int | None = None,
+		period_mapricecorrel: int | None = None,
+		period_vwap:int | None = None,
+		pow_high_prop: int | None = None,
+		pow_high_pricecorrel: int | None = None,
+		pow_high_mapricecorrel: int | None = None,
+		pow_medium_prop: int | None = None,
+		pow_medium_pricecorrel: int | None = None,
+		pow_medium_mapricecorrel: int | None = None,
 		training_start_index: float | None = None,
 		training_end_index: float | None = None,
 		min_n_cluster: int | None = None,
@@ -50,17 +50,17 @@ class StockBFFull():
 		self.startdate = startdate
 		self.enddate = enddate
 		self.n_selected_cluster = n_selected_cluster
-		self.period_wmf = period_wmf
-		self.period_wprop = period_wprop
-		self.period_wpricecorrel = period_wpricecorrel
-		self.period_wmapricecorrel = period_wmapricecorrel
-		self.period_wvwap = period_wvwap
-		self.wpow_high_wprop = wpow_high_wprop
-		self.wpow_high_wpricecorrel = wpow_high_wpricecorrel
-		self.wpow_high_wmapricecorrel = wpow_high_wmapricecorrel
-		self.wpow_medium_wprop = wpow_medium_wprop
-		self.wpow_medium_wpricecorrel = wpow_medium_wpricecorrel
-		self.wpow_medium_wmapricecorrel = wpow_medium_wmapricecorrel
+		self.period_mf = period_mf
+		self.period_prop = period_prop
+		self.period_pricecorrel = period_pricecorrel
+		self.period_mapricecorrel = period_mapricecorrel
+		self.period_vwap = period_vwap
+		self.pow_high_prop = pow_high_prop
+		self.pow_high_pricecorrel = pow_high_pricecorrel
+		self.pow_high_mapricecorrel = pow_high_mapricecorrel
+		self.pow_medium_prop = pow_medium_prop
+		self.pow_medium_pricecorrel = pow_medium_pricecorrel
+		self.pow_medium_mapricecorrel = pow_medium_mapricecorrel
 		self.training_start_index = training_start_index
 		self.training_end_index = training_end_index
 		self.min_n_cluster = min_n_cluster
@@ -95,18 +95,18 @@ class StockBFFull():
 		default_months_range = int(default_bf['default_months_range']) if self.startdate is None else 0
 		self.enddate = datetime.date.today() if self.enddate is None else self.enddate
 		self.startdate = self.enddate - relativedelta(months=default_months_range) if self.startdate is None else self.startdate
-		self.period_wmf = int(default_bf['default_bf_period_wmf']) if self.period_wmf is None else self.period_wmf
-		self.period_wprop = int(default_bf['default_bf_period_wprop']) if self.period_wprop is None else self.period_wprop
-		self.period_wpricecorrel = int(default_bf['default_bf_period_wpricecorrel']) if self.period_wpricecorrel is None else self.period_wpricecorrel
-		self.period_wmapricecorrel = int(default_bf['default_bf_period_wmapricecorrel']) if self.period_wmapricecorrel is None else self.period_wmapricecorrel
-		self.period_wvwap = int(default_bf['default_bf_period_wvwap']) if self.period_wvwap is None else self.period_wvwap
-		self.wpow_high_wprop = int(default_bf['default_bf_wpow_high_wprop']) if self.wpow_high_wprop is None else self.wpow_high_wprop
-		self.wpow_high_wpricecorrel = int(default_bf['default_bf_wpow_high_wpricecorrel']) if self.wpow_high_wpricecorrel is None else self.wpow_high_wpricecorrel
-		self.wpow_high_wmapricecorrel = int(default_bf['default_bf_wpow_high_wmapricecorrel']) if self.wpow_high_wmapricecorrel is None else self.wpow_high_wmapricecorrel
-		self.wpow_medium_wprop = int(default_bf['default_bf_wpow_medium_wprop']) if self.wpow_medium_wprop is None else self.wpow_medium_wprop
-		self.wpow_medium_wpricecorrel = int(default_bf['default_bf_wpow_medium_wpricecorrel']) if self.wpow_medium_wpricecorrel is None else self.wpow_medium_wpricecorrel
-		self.wpow_medium_wmapricecorrel = int(default_bf['default_bf_wpow_medium_wmapricecorrel']) if self.wpow_medium_wmapricecorrel is None else self.wpow_medium_wmapricecorrel
-		preoffset_period_param = max(self.period_wmf,self.period_wprop,self.period_wpricecorrel,(self.period_wmapricecorrel+self.period_wvwap))-1
+		self.period_mf = int(default_bf['default_bf_period_mf']) if self.period_mf is None else self.period_mf
+		self.period_prop = int(default_bf['default_bf_period_prop']) if self.period_prop is None else self.period_prop
+		self.period_pricecorrel = int(default_bf['default_bf_period_pricecorrel']) if self.period_pricecorrel is None else self.period_pricecorrel
+		self.period_mapricecorrel = int(default_bf['default_bf_period_mapricecorrel']) if self.period_mapricecorrel is None else self.period_mapricecorrel
+		self.period_vwap = int(default_bf['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap
+		self.pow_high_prop = int(default_bf['default_bf_pow_high_prop']) if self.pow_high_prop is None else self.pow_high_prop
+		self.pow_high_pricecorrel = int(default_bf['default_bf_pow_high_pricecorrel']) if self.pow_high_pricecorrel is None else self.pow_high_pricecorrel
+		self.pow_high_mapricecorrel = int(default_bf['default_bf_pow_high_mapricecorrel']) if self.pow_high_mapricecorrel is None else self.pow_high_mapricecorrel
+		self.pow_medium_prop = int(default_bf['default_bf_pow_medium_prop']) if self.pow_medium_prop is None else self.pow_medium_prop
+		self.pow_medium_pricecorrel = int(default_bf['default_bf_pow_medium_pricecorrel']) if self.pow_medium_pricecorrel is None else self.pow_medium_pricecorrel
+		self.pow_medium_mapricecorrel = int(default_bf['default_bf_pow_medium_mapricecorrel']) if self.pow_medium_mapricecorrel is None else self.pow_medium_mapricecorrel
+		preoffset_period_param = max(self.period_mf,self.period_prop,self.period_pricecorrel,(self.period_mapricecorrel+self.period_vwap))-1
 
 		self.training_start_index = int(default_bf['default_bf_training_start_index'])/100 if self.training_start_index is None else self.training_start_index/100
 		self.training_end_index = int(default_bf['default_bf_training_end_index'])/100 if self.training_end_index is None else self.training_end_index/100
@@ -145,17 +145,17 @@ class StockBFFull():
 			raw_data_broker_nval = raw_data_broker_nval,
 			raw_data_broker_sumval = raw_data_broker_sumval,
 			selected_broker = self.selected_broker,
-			period_wmf = self.period_wmf,
-			period_wprop = self.period_wprop,
-			period_wpricecorrel = self.period_wpricecorrel,
-			period_wmapricecorrel = self.period_wmapricecorrel,
-			period_wvwap = self.period_wvwap,
-			wpow_high_wprop = self.wpow_high_wprop,
-			wpow_high_wpricecorrel = self.wpow_high_wpricecorrel,
-			wpow_high_wmapricecorrel = self.wpow_high_wmapricecorrel,
-			wpow_medium_wprop = self.wpow_medium_wprop,
-			wpow_medium_wpricecorrel = self.wpow_medium_wpricecorrel,
-			wpow_medium_wmapricecorrel = self.wpow_medium_wmapricecorrel,
+			period_mf = self.period_mf,
+			period_prop = self.period_prop,
+			period_pricecorrel = self.period_pricecorrel,
+			period_mapricecorrel = self.period_mapricecorrel,
+			period_vwap = self.period_vwap,
+			pow_high_prop = self.pow_high_prop,
+			pow_high_pricecorrel = self.pow_high_pricecorrel,
+			pow_high_mapricecorrel = self.pow_high_mapricecorrel,
+			pow_medium_prop = self.pow_medium_prop,
+			pow_medium_pricecorrel = self.pow_medium_pricecorrel,
+			pow_medium_mapricecorrel = self.pow_medium_mapricecorrel,
 			preoffset_period_param = preoffset_period_param,
 		)
 
@@ -543,17 +543,17 @@ class StockBFFull():
 		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
 		selected_broker: list[str],
-		period_wmf: int = 1,
-		period_wprop: int = 10,
-		period_wpricecorrel: int = 10,
-		period_wmapricecorrel: int = 100,
-		period_wvwap:int = 21,
-		wpow_high_wprop: int = 40,
-		wpow_high_wpricecorrel: int = 50,
-		wpow_high_wmapricecorrel: int = 30,
-		wpow_medium_wprop: int = 20,
-		wpow_medium_wpricecorrel: int = 30,
-		wpow_medium_wmapricecorrel: int = 30,
+		period_mf: int = 1,
+		period_prop: int = 10,
+		period_pricecorrel: int = 10,
+		period_mapricecorrel: int = 100,
+		period_vwap:int = 21,
+		pow_high_prop: int = 40,
+		pow_high_pricecorrel: int = 50,
+		pow_high_mapricecorrel: int = 30,
+		pow_medium_prop: int = 20,
+		pow_medium_pricecorrel: int = 30,
+		pow_medium_mapricecorrel: int = 30,
 		preoffset_period_param: int = 50,
 		) -> pd.DataFrame:
 		# OHLC
@@ -571,38 +571,38 @@ class StockBFFull():
 		raw_data_full["wvolflow"] = selected_data_broker_nvol.cumsum()
 
 		# Whale Money Flow
-		raw_data_full['wmf'] = selected_data_broker_nval.rolling(window=period_wmf).sum()
+		raw_data_full['mf'] = selected_data_broker_nval.rolling(window=period_mf).sum()
 
 		# Whale Proportion
-		raw_data_full['wprop'] = selected_data_broker_sumval.rolling(window=period_wprop).sum() \
-			/ (raw_data_full['value'].rolling(window=period_wprop).sum()*2)
+		raw_data_full['prop'] = selected_data_broker_sumval.rolling(window=period_prop).sum() \
+			/ (raw_data_full['value'].rolling(window=period_prop).sum()*2)
 
 		# Whale Net Proportion
-		raw_data_full['wnetprop'] = selected_data_broker_nval.rolling(window=period_wprop).sum() \
-			/ (raw_data_full['value'].rolling(window=period_wprop).sum()*2)
+		raw_data_full['wnetprop'] = selected_data_broker_nval.rolling(window=period_prop).sum() \
+			/ (raw_data_full['value'].rolling(window=period_prop).sum()*2)
 
 		# Whale correlation
-		raw_data_full['wpricecorrel'] = raw_data_full["wvolflow"].rolling(window=period_wpricecorrel).corr(raw_data_full['close'])
+		raw_data_full['pricecorrel'] = raw_data_full["wvolflow"].rolling(window=period_pricecorrel).corr(raw_data_full['close'])
 
 		# Whale MA correlation
-		raw_data_full['wmapricecorrel'] = raw_data_full['wpricecorrel'].rolling(window=period_wmapricecorrel).mean()
+		raw_data_full['mapricecorrel'] = raw_data_full['pricecorrel'].rolling(window=period_mapricecorrel).mean()
 
 		# Whale-VWAP
-		raw_data_full['wvwap'] = (selected_data_broker_nval.rolling(window=period_wvwap).apply(lambda x: x[x>0].sum()))\
-			/(selected_data_broker_nvol.rolling(window=period_wvwap).apply(lambda x: x[x>0].sum()))
-		raw_data_full['wvwap'] = raw_data_full['wvwap'].mask(raw_data_full['wvwap'].le(0)).ffill()
+		raw_data_full['vwap'] = (selected_data_broker_nval.rolling(window=period_vwap).apply(lambda x: x[x>0].sum()))\
+			/(selected_data_broker_nvol.rolling(window=period_vwap).apply(lambda x: x[x>0].sum()))
+		raw_data_full['vwap'] = raw_data_full['vwap'].mask(raw_data_full['vwap'].le(0)).ffill()
 
 		# Whale Power
-		raw_data_full['wpow'] = \
+		raw_data_full['pow'] = \
 			np.where(
-				(raw_data_full["wprop"]>(wpow_high_wprop/100)) & \
-				(raw_data_full['wpricecorrel']>(wpow_high_wpricecorrel/100)) & \
-				(raw_data_full['wmapricecorrel']>(wpow_high_wmapricecorrel/100)), \
+				(raw_data_full["prop"]>(pow_high_prop/100)) & \
+				(raw_data_full['pricecorrel']>(pow_high_pricecorrel/100)) & \
+				(raw_data_full['mapricecorrel']>(pow_high_mapricecorrel/100)), \
 				3,
 				np.where(
-					(raw_data_full["wprop"]>(wpow_medium_wprop/100)) & \
-					(raw_data_full['wpricecorrel']>(wpow_medium_wpricecorrel/100)) & \
-					(raw_data_full['wmapricecorrel']>(wpow_medium_wmapricecorrel/100)), \
+					(raw_data_full["prop"]>(pow_medium_prop/100)) & \
+					(raw_data_full['pricecorrel']>(pow_medium_pricecorrel/100)) & \
+					(raw_data_full['mapricecorrel']>(pow_medium_mapricecorrel/100)), \
 					2, \
 					1
 				)
@@ -619,10 +619,10 @@ class StockBFFull():
 			self.selected_broker,
 			self.optimum_n_selected_cluster,
 			self.optimum_corr,
-			self.period_wprop,
-			self.period_wpricecorrel,
-			self.period_wmapricecorrel,
-			self.period_wvwap,
+			self.period_prop,
+			self.period_pricecorrel,
+			self.period_mapricecorrel,
+			self.period_vwap,
 			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)
@@ -656,8 +656,8 @@ class WhaleRadar():
 		screener_min_frequency: int | None = None,
 		n_selected_cluster:int | None = None,
 		radar_period: int | None = None,
-		period_wmf: int | None = None,
-		period_wpricecorrel: int | None = None,
+		period_mf: int | None = None,
+		period_pricecorrel: int | None = None,
 		default_months_range: int | None = None,
 		training_start_index: float | None = None,
 		training_end_index: float | None = None,
@@ -678,8 +678,8 @@ class WhaleRadar():
 		self.screener_min_frequency = screener_min_frequency
 		self.n_selected_cluster = n_selected_cluster
 		self.radar_period = radar_period
-		self.period_wmf = period_wmf
-		self.period_wpricecorrel = period_wpricecorrel
+		self.period_mf = period_mf
+		self.period_pricecorrel = period_pricecorrel
 		self.default_months_range = default_months_range
 		self.training_start_index = training_start_index
 		self.training_end_index = training_end_index
@@ -788,8 +788,8 @@ class WhaleRadar():
 		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 		# Data Parameter
-		self.period_wmf = int(default_radar['default_bf_period_wmf']) if self.period_wmf is None else None
-		self.period_wpricecorrel = int(default_radar['default_bf_period_wpricecorrel']) if self.period_wpricecorrel is None else None
+		self.period_mf = int(default_radar['default_bf_period_mf']) if self.period_mf is None else None
+		self.period_pricecorrel = int(default_radar['default_bf_period_pricecorrel']) if self.period_pricecorrel is None else None
 		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
 		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
 		
@@ -805,9 +805,9 @@ class WhaleRadar():
 		
 		self.default_months_range = int(default_radar['default_months_range']) if self.default_months_range is None else self.default_months_range
 		if self.startdate is None:
-			assert self.period_wmf is not None
-			assert self.period_wpricecorrel is not None
-			self.bar_range = max(self.period_wmf,self.period_wpricecorrel)
+			assert self.period_mf is not None
+			assert self.period_pricecorrel is not None
+			self.bar_range = max(self.period_mf,self.period_pricecorrel)
 			self.default_months_range = int((self.default_months_range/2) + int(self.bar_range/20) + (self.bar_range % 20 > 0))
 		else:
 			self.default_months_range = int((self.default_months_range/2) + int((self.enddate-self.startdate).days/20) + ((self.enddate-self.startdate).days % 20 >0))
@@ -1356,8 +1356,8 @@ class ScreenerBase(WhaleRadar):
 		screener_min_frequency: int | None = None,
 		n_selected_cluster:int | None = None,
 		radar_period: int | None = None,
-		period_wmf: int | None = None,
-		period_wpricecorrel: int | None = None,
+		period_mf: int | None = None,
+		period_pricecorrel: int | None = None,
 		default_months_range: int | None = None,
 		training_start_index: float | None = None,
 		training_end_index: float | None = None,
@@ -1377,8 +1377,8 @@ class ScreenerBase(WhaleRadar):
 			screener_min_frequency=screener_min_frequency,
 			n_selected_cluster=n_selected_cluster,
 			radar_period=radar_period,
-			period_wmf=period_wmf,
-			period_wpricecorrel=period_wpricecorrel,
+			period_mf=period_mf,
+			period_pricecorrel=period_pricecorrel,
 			default_months_range=default_months_range,
 			training_start_index=training_start_index,
 			training_end_index=training_end_index,
@@ -1503,8 +1503,8 @@ class ScreenerMoneyFlow(ScreenerBase):
 		screener_min_frequency: int | None = None,
 		n_selected_cluster:int | None = None,
 		radar_period: int | None = None,
-		period_wmf: int | None = None,
-		period_wpricecorrel: int | None = None,
+		period_mf: int | None = None,
+		period_pricecorrel: int | None = None,
 		default_months_range: int | None = None,
 		training_start_index: float | None = None,
 		training_end_index: float | None = None,
@@ -1525,8 +1525,8 @@ class ScreenerMoneyFlow(ScreenerBase):
 			screener_min_frequency=screener_min_frequency,
 			n_selected_cluster=n_selected_cluster,
 			radar_period=radar_period,
-			period_wmf=period_wmf,
-			period_wpricecorrel=period_wpricecorrel,
+			period_mf=period_mf,
+			period_pricecorrel=period_pricecorrel,
 			default_months_range=default_months_range,
 			training_start_index=training_start_index,
 			training_end_index=training_end_index,
@@ -1567,11 +1567,11 @@ class ScreenerMoneyFlow(ScreenerBase):
 		# Sum of selected broker transaction for each stock
 		# Get only self.selected_broker_nval between startdate and enddate based on level 1 date index
 		if accum_or_distri == dp.ScreenerList.most_distributed:
-			top_stockcodes['wmf'] = self.selected_broker_nval.loc[
+			top_stockcodes['mf'] = self.selected_broker_nval.loc[
 				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
 				].groupby("code").sum().nsmallest(n=n_stockcodes, columns="broker_nval")['broker_nval']
 		else:
-			top_stockcodes['wmf'] = self.selected_broker_nval.loc[
+			top_stockcodes['mf'] = self.selected_broker_nval.loc[
 				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
 				].groupby("code").sum().nlargest(n=n_stockcodes, columns="broker_nval")['broker_nval']
 
@@ -1580,24 +1580,24 @@ class ScreenerMoneyFlow(ScreenerBase):
 		self.selected_broker_sumval = self.selected_broker_sumval[self.selected_broker_sumval.index.get_level_values(0).isin(top_stockcodes.index)]
 		self.raw_data_full = self.raw_data_full[self.raw_data_full.index.get_level_values(0).isin(top_stockcodes.index)]
 
-		# Calculate top_stockcodes WProp. Get only between startdate and enddate based on level 1 date index
-		top_stockcodes['wprop'] = (self.selected_broker_sumval.loc[
+		# Calculate top_stockcodes Prop. Get only between startdate and enddate based on level 1 date index
+		top_stockcodes['prop'] = (self.selected_broker_sumval.loc[
 				self.selected_broker_sumval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
 			]['broker_sumval'].groupby("code").sum())\
 			/(self.raw_data_full.loc[
 				self.raw_data_full.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
 			]['value'].groupby("code").sum()*2)
 		
-		# Calculate top_stockcodes WPriceCorrel
+		# Calculate top_stockcodes PriceCorrel
 		if startdate == enddate:
 			wvalflow = self.selected_broker_nval['broker_nval'].groupby("code").cumsum()
-			top_stockcodes['wpricecorrel'] = wvalflow.groupby("code").corr(self.raw_data_full['close']) # type: ignore
+			top_stockcodes['pricecorrel'] = wvalflow.groupby("code").corr(self.raw_data_full['close']) # type: ignore
 		else:
 			wvalflow = self.selected_broker_nval.loc[
 				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
 				]['broker_nval'].groupby("code").cumsum()
 			
-			top_stockcodes['wpricecorrel'] = wvalflow.groupby("code").corr( # type: ignore
+			top_stockcodes['pricecorrel'] = wvalflow.groupby("code").corr( # type: ignore
 				self.raw_data_full.loc[
 					self.raw_data_full.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
 				]['close'])

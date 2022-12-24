@@ -38,7 +38,7 @@ async def foreign_chart(stockcode:str = "", ff_indicators:pd.DataFrame=...) -> g
 		row=1, col=1, secondary_y=True
 	)
 	# Foreign VWAP
-	fig.add_trace(go.Scatter(x=ff_indicators.index,y=ff_indicators["fvwap"],
+	fig.add_trace(go.Scatter(x=ff_indicators.index,y=ff_indicators["vwap"],
 		name="F-VWAP",marker_color="red"
 		),
 		row=1,col=1,secondary_y=True
@@ -64,7 +64,7 @@ async def foreign_chart(stockcode:str = "", ff_indicators:pd.DataFrame=...) -> g
 	hist_bar = ff_indicators['netval'].groupby(pd.cut(ff_indicators['close'].to_numpy(),bins=bins)).sum() # type:ignore
 	fig.data[3].update(marker=dict(color=np.where(hist_bar<0,"Tomato","cyan")),xaxis='x3') # type:ignore
 	# Foreign Proportion
-	fig.add_trace(go.Scatter(x=ff_indicators.index,y=ff_indicators['fprop']*100,
+	fig.add_trace(go.Scatter(x=ff_indicators.index,y=ff_indicators['prop']*100,
 		name="F Proportion %",marker_color="blue"
 		),
 		row=2,col=1,secondary_y=True
@@ -76,8 +76,8 @@ async def foreign_chart(stockcode:str = "", ff_indicators:pd.DataFrame=...) -> g
 		row=2,col=1,secondary_y=True
 	)
 	# Foreign Net Value
-	fig.add_trace(go.Bar(x=ff_indicators.index,y=ff_indicators["fmf"],
-		name="F Net Value",marker_color=np.where(ff_indicators["fmf"]<0,"red","green")
+	fig.add_trace(go.Bar(x=ff_indicators.index,y=ff_indicators["mf"],
+		name="F Net Value",marker_color=np.where(ff_indicators["mf"]<0,"red","green")
 		),
 		row=2,col=1,secondary_y=False
 	)
@@ -104,41 +104,41 @@ async def foreign_chart(stockcode:str = "", ff_indicators:pd.DataFrame=...) -> g
 	fig.update_layout(xaxis_range=[start_temp,end_temp+datetime.timedelta(days=round(len(ff_indicators)*0.1))])
 
 	# ANNOTATION
-	fpricecorrel = ff_indicators.loc[ff_indicators.index[-1],'fpricecorrel'] # type:ignore
-	if fpricecorrel >= 0.7:
-		fpricecorrel_color = "SpringGreen"
-	elif fpricecorrel >= 0.4:
-		fpricecorrel_color = "Yellow"
+	pricecorrel = ff_indicators.loc[ff_indicators.index[-1],'pricecorrel'] # type:ignore
+	if pricecorrel >= 0.7:
+		pricecorrel_color = "SpringGreen"
+	elif pricecorrel >= 0.4:
+		pricecorrel_color = "Yellow"
 	else:
-		fpricecorrel_color = "Red"
-	fpricecorrel = "{:.2f}%".format(fpricecorrel*100)
+		pricecorrel_color = "Red"
+	pricecorrel = "{:.2f}%".format(pricecorrel*100)
 
-	fmapricecorrel = ff_indicators.loc[ff_indicators.index[-1],'fmapricecorrel'] # type:ignore
-	if fmapricecorrel >= 0.7:
-		fmapricecorrel_color = "SpringGreen"
-	elif fmapricecorrel >= 0.4:
-		fmapricecorrel_color = "Yellow"
+	mapricecorrel = ff_indicators.loc[ff_indicators.index[-1],'mapricecorrel'] # type:ignore
+	if mapricecorrel >= 0.7:
+		mapricecorrel_color = "SpringGreen"
+	elif mapricecorrel >= 0.4:
+		mapricecorrel_color = "Yellow"
 	else:
-		fmapricecorrel_color = "Red"
-	fmapricecorrel = "{:.2f}%".format(fmapricecorrel*100)
+		mapricecorrel_color = "Red"
+	mapricecorrel = "{:.2f}%".format(mapricecorrel*100)
 	
-	fpow = ff_indicators.loc[ff_indicators.index[-1],'fpow'] # type:ignore
-	if fpow == 3:
-		fpow_text = "<span style='color:SpringGreen'>High</span>"
-	elif fpow == 2:
-		fpow_text = "<span style='color:Yellow'>Medium</span>"
+	pow = ff_indicators.loc[ff_indicators.index[-1],'pow'] # type:ignore
+	if pow == 3:
+		pow_text = "<span style='color:SpringGreen'>High</span>"
+	elif pow == 2:
+		pow_text = "<span style='color:Yellow'>Medium</span>"
 	else:
-		fpow_text = "<span style='color:Red'>Low</span>"
+		pow_text = "<span style='color:Red'>Low</span>"
 	
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
 		text = f"<b>Date: {end_temp.strftime('%Y-%m-%d')}</b> \
 			<b>Close</b>: {'{:0.0f}'.format(ff_indicators.close[-1])}\
-			<b>F-VWAP</b>: {'{:0.0f}'.format(ff_indicators.fvwap[-1])}\
-			<b>F-Prop</b>: {'{:.2f}%'.format(ff_indicators.fprop[-1]*100)}\
+			<b>F-VWAP</b>: {'{:0.0f}'.format(ff_indicators.vwap[-1])}\
+			<b>F-Prop</b>: {'{:.2f}%'.format(ff_indicators.prop[-1]*100)}\
 			<b>F-NetProp</b>: {'{:.2f}%'.format(ff_indicators.fnetprop[-1]*100)}\
-			<br><b>F-Corr</b>: <span style='color:{fpricecorrel_color}'>{fpricecorrel}</span>\
-			<b>MA F-Corr</b>: <span style='color:{fmapricecorrel_color}'>{fmapricecorrel}</span>\
-			<b>F-Power</b>: {fpow_text}",
+			<br><b>F-Corr</b>: <span style='color:{pricecorrel_color}'>{pricecorrel}</span>\
+			<b>MA F-Corr</b>: <span style='color:{mapricecorrel_color}'>{mapricecorrel}</span>\
+			<b>F-Power</b>: {pow_text}",
 		font=dict(),align="left",
 		showarrow=False
 	)
@@ -167,10 +167,10 @@ async def broker_chart(
 	selected_broker: list[str] | None = None,
 	optimum_n_selected_cluster: int | None = None,
 	optimum_corr: float | None = None,
-	period_wprop: int | None = None,
-	period_wpricecorrel: int | None = None,
-	period_wmapricecorrel: int | None = None,
-	period_wvwap:int | None = None,
+	period_prop: int | None = None,
+	period_pricecorrel: int | None = None,
+	period_mapricecorrel: int | None = None,
+	period_vwap:int | None = None,
 	) -> go.Figure:
 	if optimum_corr is None:
 		optimum_corr = np.nan
@@ -195,7 +195,7 @@ async def broker_chart(
 		row=1, col=1, secondary_y=True
 	)
 	# Whale VWAP
-	fig.add_trace(go.Scatter(x=bf_indicators.index,y=bf_indicators["wvwap"],
+	fig.add_trace(go.Scatter(x=bf_indicators.index,y=bf_indicators["vwap"],
 		name="W-VWAP",marker_color="red"
 		),
 		row=1,col=1,secondary_y=True
@@ -221,7 +221,7 @@ async def broker_chart(
 	fig.data[3].update(marker=dict(color=np.where(hist_bar<0,"tomato","cyan")),xaxis='x3') # type:ignore
 
 	# Whale Proportion
-	fig.add_trace(go.Scatter(x=bf_indicators.index,y=bf_indicators['wprop']*100,
+	fig.add_trace(go.Scatter(x=bf_indicators.index,y=bf_indicators['prop']*100,
 		name="W Proportion %",marker_color="blue"
 		),
 		row=2,col=1,secondary_y=True
@@ -234,8 +234,8 @@ async def broker_chart(
 	)
 
 	# Whale Net Value
-	fig.add_trace(go.Bar(x=bf_indicators.index,y=bf_indicators["wmf"],
-		name="W Net Value",marker_color=np.where(bf_indicators["wmf"]<0,"red","green")
+	fig.add_trace(go.Bar(x=bf_indicators.index,y=bf_indicators["mf"],
+		name="W Net Value",marker_color=np.where(bf_indicators["mf"]<0,"red","green")
 		),
 		row=2,col=1,secondary_y=False
 	)
@@ -262,41 +262,41 @@ async def broker_chart(
 	fig.update_layout(xaxis_range=[start_temp,end_temp+datetime.timedelta(days=round(len(bf_indicators)*0.1))])
 
 	# ANNOTATION
-	wpricecorrel = bf_indicators.loc[end_temp,'wpricecorrel'] # type:ignore
-	if wpricecorrel >= 0.7:
-		wpricecorrel_color = "SpringGreen"
-	elif wpricecorrel >= 0.4:
-		wpricecorrel_color = "Yellow"
+	pricecorrel = bf_indicators.loc[end_temp,'pricecorrel'] # type:ignore
+	if pricecorrel >= 0.7:
+		pricecorrel_color = "SpringGreen"
+	elif pricecorrel >= 0.4:
+		pricecorrel_color = "Yellow"
 	else:
-		wpricecorrel_color = "Red"
-	wpricecorrel = "{:.2f}%".format(wpricecorrel*100)
+		pricecorrel_color = "Red"
+	pricecorrel = "{:.2f}%".format(pricecorrel*100)
 
-	wmapricecorrel = bf_indicators.loc[bf_indicators.index[-1],'wmapricecorrel'] # type:ignore
-	if wmapricecorrel >= 0.7:
-		wmapricecorrel_color = "SpringGreen"
-	elif wmapricecorrel >= 0.4:
-		wmapricecorrel_color = "Yellow"
+	mapricecorrel = bf_indicators.loc[bf_indicators.index[-1],'mapricecorrel'] # type:ignore
+	if mapricecorrel >= 0.7:
+		mapricecorrel_color = "SpringGreen"
+	elif mapricecorrel >= 0.4:
+		mapricecorrel_color = "Yellow"
 	else:
-		wmapricecorrel_color = "Red"
-	wmapricecorrel = "{:.2f}%".format(wmapricecorrel*100)
+		mapricecorrel_color = "Red"
+	mapricecorrel = "{:.2f}%".format(mapricecorrel*100)
 	
-	wpow = bf_indicators.loc[bf_indicators.index[-1],'wpow'] # type:ignore
-	if wpow == 3:
-		wpow_text = "<span style='color:SpringGreen'>High</span>"
-	elif wpow == 2:
-		wpow_text = "<span style='color:Yellow'>Medium</span>"
+	pow = bf_indicators.loc[bf_indicators.index[-1],'pow'] # type:ignore
+	if pow == 3:
+		pow_text = "<span style='color:SpringGreen'>High</span>"
+	elif pow == 2:
+		pow_text = "<span style='color:Yellow'>Medium</span>"
 	else:
-		wpow_text = "<span style='color:Red'>Low</span>"
+		pow_text = "<span style='color:Red'>Low</span>"
 	
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
 		text = f"<b>Date: {end_temp.strftime('%Y-%m-%d')}</b> \
 			<b>Close</b>: {'{:0.0f}'.format(bf_indicators.close[-1])}\
-			<b>W-VWAP({period_wvwap if period_wvwap is not None else ''})</b>: {'{:0.0f}'.format(bf_indicators.wvwap[-1])}\
-			<b>W-Prop({period_wprop if period_wprop is not None else ''})</b>: {'{:.2f}%'.format(bf_indicators.wprop[-1]*100)}\
-			<b>W-NetProp({period_wprop if period_wprop is not None else ''})</b>: {'{:.2f}%'.format(bf_indicators.wnetprop[-1]*100)}\
-			<br><b>W-Corr({period_wpricecorrel if period_wpricecorrel is not None else ''})</b>: <span style='color:{wpricecorrel_color}'>{wpricecorrel}</span>\
-			<b>MA W-Corr({period_wmapricecorrel if period_wmapricecorrel is not None else ''})</b>: <span style='color:{wmapricecorrel_color}'>{wmapricecorrel}</span>\
-			<b>W-Power</b>: {wpow_text}",
+			<b>W-VWAP({period_vwap if period_vwap is not None else ''})</b>: {'{:0.0f}'.format(bf_indicators.vwap[-1])}\
+			<b>W-Prop({period_prop if period_prop is not None else ''})</b>: {'{:.2f}%'.format(bf_indicators.prop[-1]*100)}\
+			<b>W-NetProp({period_prop if period_prop is not None else ''})</b>: {'{:.2f}%'.format(bf_indicators.wnetprop[-1]*100)}\
+			<br><b>W-Corr({period_pricecorrel if period_pricecorrel is not None else ''})</b>: <span style='color:{pricecorrel_color}'>{pricecorrel}</span>\
+			<b>MA W-Corr({period_mapricecorrel if period_mapricecorrel is not None else ''})</b>: <span style='color:{mapricecorrel_color}'>{mapricecorrel}</span>\
+			<b>W-Power</b>: {pow_text}",
 		font=dict(),align="left",
 		showarrow=False
 	)
