@@ -788,12 +788,12 @@ class WhaleRadar():
 		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 		# Data Parameter
-		self.period_mf = int(default_radar['default_bf_period_mf']) if self.period_mf is None else None
-		self.period_pricecorrel = int(default_radar['default_bf_period_pricecorrel']) if self.period_pricecorrel is None else None
+		self.period_mf = int(default_radar['default_radar_period_mf']) if self.period_mf is None else None
+		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.period_pricecorrel is None else None
 		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
 		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
 		
-		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else None
+		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else self.radar_period
 		self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100
 		self.training_end_index = (int(default_radar['default_bf_training_end_index'])-50)/(100/2) if self.training_end_index is None else self.training_end_index/100
 		self.min_n_cluster = int(default_radar['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster
@@ -1281,13 +1281,17 @@ class WhaleRadar():
 
 		if startdate is None:
 			assert radar_period is not None
+			assert self.period_pricecorrel is not None
+			
 			startdate = raw_data_full.groupby("code").tail(radar_period).index.get_level_values("date").date.min() # type: ignore
 			assert startdate is not None
-			# Get only radar_period rows from last row for each group by code from raw_data_full
-			raw_data_full = raw_data_full.groupby("code").tail(radar_period)
-			raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(radar_period)
-			raw_data_broker_nval = raw_data_broker_nval.groupby("code").tail(radar_period)
-			raw_data_broker_sumval = raw_data_broker_sumval.groupby("code").tail(radar_period)
+			
+			bar_range = max(radar_period, self.period_pricecorrel)
+			# Get only bar_range rows from last row for each group by code from raw_data_full
+			raw_data_full = raw_data_full.groupby("code").tail(bar_range)
+			raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(bar_range)
+			raw_data_broker_nval = raw_data_broker_nval.groupby("code").tail(bar_range)
+			raw_data_broker_sumval = raw_data_broker_sumval.groupby("code").tail(bar_range)
 		else:
 			# Get rows from startdate until enddate from raw_data_full in the first level of pandas index
 			raw_data_full = raw_data_full.query("date >= @startdate and date <= @enddate")
@@ -1589,7 +1593,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 			]['value'].groupby("code").sum()*2)
 		
 		# Calculate top_stockcodes PriceCorrel
-		if startdate == enddate:
+		if (startdate == enddate) or (self.radar_period == 1):
 			wvalflow = self.selected_broker_nval['broker_nval'].groupby("code").cumsum()
 			top_stockcodes['pricecorrel'] = wvalflow.groupby("code").corr(self.raw_data_full['close']) # type: ignore
 		else:
