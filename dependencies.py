@@ -94,7 +94,7 @@ class ScreenerList(str, Enum):
 	highcorr_inflow = "highcorr_inflow"
 	rebound_flow = "rebound_flow"
 	drop_flow = "drop_flow"
-	inflow_stayprice = "inflow_pricestay"
+	inflow_pricestay = "inflow_pricestay"
 	neutral_downprice = "neutral_downprice"
 	rally_flow = "rally_flow"
 	crossup_vwap = "crossup_vwap"
