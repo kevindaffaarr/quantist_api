@@ -6,7 +6,7 @@
 
 # Use optimized uvicorn-gunicorn-fastapi image from tiangolo
 # https://github.com/tiangolo/uvicorn-gunicorn-fastapi-docker
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.10 as base
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.10-slim as base
 
 # Allow statements and log messages to immediately appear in the Cloud Run logs
 ENV PYTHONUNBUFFERED 1
