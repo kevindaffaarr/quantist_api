@@ -716,6 +716,7 @@ class WhaleRadar():
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
 			await self._get_stock_raw_data(
 				filtered_stockcodes=self.filtered_stockcodes,
+				startdate=self.startdate,
 				enddate=self.enddate,
 				default_months_range=self.default_months_range,
 				training_end_index=self.training_end_index,
@@ -788,12 +789,12 @@ class WhaleRadar():
 		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 		# Data Parameter
-		self.period_mf = int(default_radar['default_bf_period_mf']) if self.period_mf is None else None
-		self.period_pricecorrel = int(default_radar['default_bf_period_pricecorrel']) if self.period_pricecorrel is None else None
+		self.period_mf = int(default_radar['default_radar_period_mf']) if self.period_mf is None else None
+		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.period_pricecorrel is None else None
 		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
 		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
 		
-		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else None
+		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else self.radar_period
 		self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100
 		self.training_end_index = (int(default_radar['default_bf_training_end_index'])-50)/(100/2) if self.training_end_index is None else self.training_end_index/100
 		self.min_n_cluster = int(default_radar['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster
@@ -888,11 +889,27 @@ class WhaleRadar():
 	
 	async def __get_stock_price_data(self,
 		filtered_stockcodes: pd.Series = ...,
+		startdate:datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		default_months_range: int = 12,
 		minimum_training_set: int = 0,
 		dbs: db.Session = next(db.get_dbs()),
 		) -> pd.DataFrame:
+
+		# Check data availability if startdate is not None
+		if startdate is not None:
+			qry = dbs.query(db.StockData.code
+				).filter(db.StockData.code.in_(filtered_stockcodes.to_list())
+				).filter(db.StockData.date.between(startdate, enddate)
+				).group_by(db.StockData.code
+				).having(func.count(db.StockData.code) > minimum_training_set)
+			
+			# Query Fetching
+			raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])
+
+			# Check how many row is returned
+			if raw_data.shape[0] == 0:
+				raise ValueError("No data available in date range")
 
 		start_date = enddate - relativedelta(months=default_months_range)
 
@@ -920,6 +937,7 @@ class WhaleRadar():
 
 	async def _get_stock_raw_data(self,
 		filtered_stockcodes: pd.Series = ...,
+		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
 		default_months_range: int = 6,
 		training_end_index: float = 0.75,
@@ -930,6 +948,7 @@ class WhaleRadar():
 		# Get Stockdata Full
 		raw_data_full = await self.__get_stock_price_data(
 			filtered_stockcodes=filtered_stockcodes,
+			startdate=startdate,
 			enddate=enddate,
 			default_months_range=default_months_range,
 			minimum_training_set=MINIMUM_TRAINING_SET,
@@ -1281,13 +1300,17 @@ class WhaleRadar():
 
 		if startdate is None:
 			assert radar_period is not None
+			assert self.period_pricecorrel is not None
+			
 			startdate = raw_data_full.groupby("code").tail(radar_period).index.get_level_values("date").date.min() # type: ignore
 			assert startdate is not None
-			# Get only radar_period rows from last row for each group by code from raw_data_full
-			raw_data_full = raw_data_full.groupby("code").tail(radar_period)
-			raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(radar_period)
-			raw_data_broker_nval = raw_data_broker_nval.groupby("code").tail(radar_period)
-			raw_data_broker_sumval = raw_data_broker_sumval.groupby("code").tail(radar_period)
+			
+			bar_range = max(radar_period, self.period_pricecorrel)
+			# Get only bar_range rows from last row for each group by code from raw_data_full
+			raw_data_full = raw_data_full.groupby("code").tail(bar_range)
+			raw_data_broker_nvol = raw_data_broker_nvol.groupby("code").tail(bar_range)
+			raw_data_broker_nval = raw_data_broker_nval.groupby("code").tail(bar_range)
+			raw_data_broker_sumval = raw_data_broker_sumval.groupby("code").tail(bar_range)
 		else:
 			# Get rows from startdate until enddate from raw_data_full in the first level of pandas index
 			raw_data_full = raw_data_full.query("date >= @startdate and date <= @enddate")
@@ -1319,7 +1342,7 @@ class WhaleRadar():
 				-raw_data_full.groupby('code')['close'].nth([0])) \
 				/raw_data_full.groupby('code')['close'].nth([0])
 		else:
-			raise Exception("Not a valid radar type")
+			raise ValueError("Not a valid radar type")
 
 		return radar_indicators
 
@@ -1414,6 +1437,7 @@ class ScreenerBase(WhaleRadar):
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
 			await self._get_stock_raw_data(
 				filtered_stockcodes=self.filtered_stockcodes,
+				startdate=self.startdate,
 				enddate=self.enddate,
 				default_months_range=self.default_months_range,
 				training_end_index=self.training_end_index,
@@ -1434,16 +1458,16 @@ class ScreenerBase(WhaleRadar):
 			)
 		
 		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
-		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
-			await self._get_filtered_stockcodes_by_corr(
-				filter_opt_corr=self.filter_opt_corr,
-				optimum_corr=self.optimum_corr,
-				filtered_stockcodes=self.filtered_stockcodes,
-				raw_data_full=raw_data_full,
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_nval=raw_data_broker_nval,
-				raw_data_broker_sumval=raw_data_broker_sumval,
-			)
+		# self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+		# 	await self._get_filtered_stockcodes_by_corr(
+		# 		filter_opt_corr=self.filter_opt_corr,
+		# 		optimum_corr=self.optimum_corr,
+		# 		filtered_stockcodes=self.filtered_stockcodes,
+		# 		raw_data_full=raw_data_full,
+		# 		raw_data_broker_nvol=raw_data_broker_nvol,
+		# 		raw_data_broker_nval=raw_data_broker_nval,
+		# 		raw_data_broker_sumval=raw_data_broker_sumval,
+		# 	)
 		
 		# Get radar period filtered stockdata
 		if self.startdate == self.enddate:
@@ -1589,7 +1613,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 			]['value'].groupby("code").sum()*2)
 		
 		# Calculate top_stockcodes PriceCorrel
-		if startdate == enddate:
+		if (startdate == enddate) or (self.radar_period == 1):
 			wvalflow = self.selected_broker_nval['broker_nval'].groupby("code").cumsum()
 			top_stockcodes['pricecorrel'] = wvalflow.groupby("code").corr(self.raw_data_full['close']) # type: ignore
 		else:

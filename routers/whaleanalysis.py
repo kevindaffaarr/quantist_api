@@ -91,7 +91,10 @@ async def get_foreign_chart(
 
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
-
+	except ValueError as err:
+		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,detail=err.args[0]) from err
 	else:
 		# Define the responses from Quantist: headers, content, and media_type
 		# Define Headers
@@ -210,6 +213,8 @@ async def get_broker_chart(
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
 	except ValueError as err:
 		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,detail=err.args[0]) from err
 
 	else:
 		# Define the responses from Quantist: headers, content, and media_type
@@ -294,6 +299,10 @@ async def get_foreign_radar(
 
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
+	except ValueError as err:
+		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,detail=err.args[0]) from err
 
 	else:
 		# Define the responses from Quantist: headers, content, and media_type
@@ -384,6 +393,10 @@ async def get_broker_radar(
 
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
+	except ValueError as err:
+		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,detail=err.args[0]) from err
 
 	else:
 		# Define the responses from Quantist: headers, content, and media_type
@@ -455,7 +468,11 @@ async def get_foreign_data(
 	
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
-	
+	except ValueError as err:
+		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,detail=err.args[0]) from err
+
 	else:
 		return full_data.to_dict(orient="index")
 
@@ -529,10 +546,13 @@ async def get_broker_data(
 	
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
-	
+	except ValueError as err:
+		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,detail=err.args[0]) from err
+
 	else:
 		return data
-
 
 # ==========
 # SCREENER ROUTER
@@ -546,6 +566,7 @@ async def get_screener_foreign_moneyflow(
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date = datetime.date.today(),
+	screener_period: int | None = None,
 	stockcode_excludes: set[str] = Query(default=set()),
 	screener_min_value: int | None = None,
 	screener_min_frequency: int | None = None,
@@ -557,6 +578,7 @@ async def get_screener_foreign_moneyflow(
 			n_stockcodes=n_stockcodes,
 			startdate=startdate,
 			enddate=enddate,
+			screener_period=screener_period,
 			stockcode_excludes=stockcode_excludes,
 			screener_min_value=screener_min_value,
 			screener_min_frequency=screener_min_frequency,
@@ -566,8 +588,10 @@ async def get_screener_foreign_moneyflow(
 
 		top_stockcodes = screener_moneyflow_object.top_stockcodes
 	
-	except Exception as err:
+	except ValueError as err:
 		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,detail=err.args[0]) from err
 	
 	else:
 		# Define screener_metadata
@@ -595,11 +619,11 @@ async def get_screener_broker_moneyflow(
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date = datetime.date.today(),
+	screener_period: int | None = None,
 	stockcode_excludes: set[str] = Query(default=set()),
 	screener_min_value: int | None = None,
 	screener_min_frequency: int | None = None,
 	n_selected_cluster:int | None = None,
-	radar_period: int | None = None,
 	period_mf: int | None = None,
 	period_pricecorrel: int | None = None,
 	default_months_range: int | None = None,
@@ -622,7 +646,7 @@ async def get_screener_broker_moneyflow(
 			screener_min_value = screener_min_value,
 			screener_min_frequency = screener_min_frequency,
 			n_selected_cluster = n_selected_cluster,
-			radar_period = radar_period,
+			radar_period = screener_period,
 			period_mf = period_mf,
 			period_pricecorrel = period_pricecorrel,
 			default_months_range = default_months_range,
@@ -638,8 +662,10 @@ async def get_screener_broker_moneyflow(
 		screener_moneyflow_object = await screener_moneyflow_object.screen()
 		top_stockcodes = screener_moneyflow_object.top_stockcodes
 	
-	except Exception as err:
+	except ValueError as err:
 		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,detail=err.args[0]) from err
 	
 	else:
 		# Define screener_metadata

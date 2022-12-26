@@ -527,7 +527,7 @@ class ForeignRadar():
 				stocks_raw_data.groupby(by='code')['close'].nth([0]))/ \
 				stocks_raw_data.groupby(by='code')['close'].nth([0])
 		else:
-			raise Exception("Not a valid radar type")
+			raise ValueError("Not a valid radar type")
 		
 		return radar_indicators
 	
@@ -551,6 +551,7 @@ class ScreenerBase(ForeignRadar):
 	def __init__(self,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
+		screener_period: int | None = None,
 		stockcode_excludes: set[str] = set(),
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
@@ -572,6 +573,8 @@ class ScreenerBase(ForeignRadar):
 			dbs = dbs,
 		)
 
+		self.screener_period = screener_period
+
 	async def _fit_base(self) -> ScreenerBase:
 		# get default param radar
 		default_radar = await super()._get_default_radar()
@@ -585,7 +588,10 @@ class ScreenerBase(ForeignRadar):
 		if self.startdate is None:
 			assert self.period_mf is not None
 			assert self.period_pricecorrel is not None
-			self.bar_range = max(self.period_mf,self.period_pricecorrel)
+			if self.screener_period:
+				self.bar_range = self.screener_period
+			else:
+				self.bar_range = max(self.period_mf,self.period_pricecorrel)
 
 			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
 			sub_qry = self.dbs.query(db.StockData.date
@@ -618,6 +624,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		n_stockcodes: int = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
+		screener_period: int | None = None,
 		stockcode_excludes: set[str] = set(),
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
@@ -636,8 +643,9 @@ class ScreenerMoneyFlow(ScreenerBase):
 			dbs = dbs,
 		)
 
-		self.n_stockcodes = n_stockcodes
 		self.accum_or_distri = accum_or_distri
+		self.n_stockcodes = n_stockcodes
+		self.screener_period = screener_period
 	
 	async def screen(self) -> ScreenerMoneyFlow:
 		# get default param radar, defined startdate, and filtered_stockcodes that should be analyzed
@@ -649,6 +657,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 			n_stockcodes = self.n_stockcodes,
 			startdate = self.startdate,
 			enddate = self.enddate,
+			screener_period=self.screener_period,
 			filtered_stockcodes = self.filtered_stockcodes,
 			stockcode_excludes = self.stockcode_excludes,
 			dbs = self.dbs,
@@ -661,6 +670,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		n_stockcodes: int = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
+		screener_period: int | None = None,
 		filtered_stockcodes: pd.Series = ...,
 		stockcode_excludes: set[str] = ...,
 		dbs: db.Session = next(db.get_dbs())
@@ -687,10 +697,9 @@ class ScreenerMoneyFlow(ScreenerBase):
 			(db.StockData.foreignbuy-db.StockData.foreignsell).label('netvol'), # type: ignore
 			(db.StockData.foreignbuy+db.StockData.foreignsell).label('sumvol'), # type: ignore
 			db.StockData.value,
-		).join(sub_qry_1, sub_qry_1.c.code == db.StockData.code
-		)
+		).join(sub_qry_1, sub_qry_1.c.code == db.StockData.code)
 
-		if startdate == enddate:
+		if (startdate == enddate) or (screener_period == 1):
 			# Sub Query for pricecorrel with date from enddate to n rows based on self.period_pricecorrel
 			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
 			startdate_pricecorrel = self.dbs.query(db.StockData.date
@@ -708,20 +717,26 @@ class ScreenerMoneyFlow(ScreenerBase):
 		raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind).reset_index(drop=True)\
 			.sort_values(['code','date']).set_index(['code','date'])
 
-		# Update startdate if startdate not datetime.date to the first date of the raw_data
-		if not isinstance(startdate, datetime.date):
-			startdate = raw_data.index.get_level_values('date').min()
-		assert isinstance(startdate, datetime.date)
+		# Check raw_data row, if zero, raise error: data not available
+		if raw_data.shape[0] == 0:
+			raise ValueError(f'No data available between {startdate} and {enddate}')
 		
 		top_stockcodes = pd.DataFrame()
 		top_stockcodes['pricecorrel'] = raw_data.groupby("code")[["close","netvol"]].corr(method='pearson').iloc[0::2,-1].droplevel(1)
-
+		
 		# Only get raw_data between startdate and enddate
-		raw_data = raw_data.loc[(slice(None), slice(startdate, enddate)), :]
+		if not isinstance(startdate, datetime.date):
+			# If screener_period is not None, get n last rows of raw_data for each code group based on screener_period
+			if screener_period is not None:
+				raw_data = raw_data.groupby("code").tail(screener_period)
+			else:
+				# Update startdate if startdate not datetime.date to the first date of the raw_data
+				startdate = raw_data.index.get_level_values('date').min()
+				raw_data = raw_data.loc[(slice(None), slice(startdate, enddate)), :]
 
 		# Calculate MF, Prop, and pricecorrel
 		top_stockcodes['mf'] = (raw_data['close']*(raw_data['netvol'])).groupby("code").sum()
-		top_stockcodes['Prop'] = (raw_data['close']*(raw_data['sumvol'])).groupby("code").sum()/(raw_data['value']*2).groupby("code").sum()
+		top_stockcodes['prop'] = (raw_data['close']*(raw_data['sumvol'])).groupby("code").sum()/(raw_data['value']*2).groupby("code").sum()
 		# replace nan with none
 		top_stockcodes = top_stockcodes.replace({np.nan: None})
 
@@ -730,4 +745,9 @@ class ScreenerMoneyFlow(ScreenerBase):
 			top_stockcodes = top_stockcodes.sort_values(by='mf', ascending=True)
 		else:
 			top_stockcodes = top_stockcodes.sort_values(by='mf', ascending=False)
+		
+		# Update startdate and enddate based on raw_data
+		self.startdate = raw_data.index.get_level_values('date').min()
+		self.enddate = raw_data.index.get_level_values('date').max()
+
 		return top_stockcodes
