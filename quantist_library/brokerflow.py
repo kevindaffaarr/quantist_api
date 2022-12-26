@@ -716,6 +716,7 @@ class WhaleRadar():
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
 			await self._get_stock_raw_data(
 				filtered_stockcodes=self.filtered_stockcodes,
+				startdate=self.startdate,
 				enddate=self.enddate,
 				default_months_range=self.default_months_range,
 				training_end_index=self.training_end_index,
@@ -888,11 +889,27 @@ class WhaleRadar():
 	
 	async def __get_stock_price_data(self,
 		filtered_stockcodes: pd.Series = ...,
+		startdate:datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		default_months_range: int = 12,
 		minimum_training_set: int = 0,
 		dbs: db.Session = next(db.get_dbs()),
 		) -> pd.DataFrame:
+
+		# Check data availability if startdate is not None
+		if startdate is not None:
+			qry = dbs.query(db.StockData.code
+				).filter(db.StockData.code.in_(filtered_stockcodes.to_list())
+				).filter(db.StockData.date.between(startdate, enddate)
+				).group_by(db.StockData.code
+				).having(func.count(db.StockData.code) > minimum_training_set)
+			
+			# Query Fetching
+			raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])
+
+			# Check how many row is returned
+			if raw_data.shape[0] == 0:
+				raise ValueError("No data available in date range")
 
 		start_date = enddate - relativedelta(months=default_months_range)
 
@@ -920,6 +937,7 @@ class WhaleRadar():
 
 	async def _get_stock_raw_data(self,
 		filtered_stockcodes: pd.Series = ...,
+		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
 		default_months_range: int = 6,
 		training_end_index: float = 0.75,
@@ -930,6 +948,7 @@ class WhaleRadar():
 		# Get Stockdata Full
 		raw_data_full = await self.__get_stock_price_data(
 			filtered_stockcodes=filtered_stockcodes,
+			startdate=startdate,
 			enddate=enddate,
 			default_months_range=default_months_range,
 			minimum_training_set=MINIMUM_TRAINING_SET,
@@ -1323,7 +1342,7 @@ class WhaleRadar():
 				-raw_data_full.groupby('code')['close'].nth([0])) \
 				/raw_data_full.groupby('code')['close'].nth([0])
 		else:
-			raise Exception("Not a valid radar type")
+			raise ValueError("Not a valid radar type")
 
 		return radar_indicators
 
@@ -1418,6 +1437,7 @@ class ScreenerBase(WhaleRadar):
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
 			await self._get_stock_raw_data(
 				filtered_stockcodes=self.filtered_stockcodes,
+				startdate=self.startdate,
 				enddate=self.enddate,
 				default_months_range=self.default_months_range,
 				training_end_index=self.training_end_index,
@@ -1438,16 +1458,16 @@ class ScreenerBase(WhaleRadar):
 			)
 		
 		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
-		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
-			await self._get_filtered_stockcodes_by_corr(
-				filter_opt_corr=self.filter_opt_corr,
-				optimum_corr=self.optimum_corr,
-				filtered_stockcodes=self.filtered_stockcodes,
-				raw_data_full=raw_data_full,
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_nval=raw_data_broker_nval,
-				raw_data_broker_sumval=raw_data_broker_sumval,
-			)
+		# self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+		# 	await self._get_filtered_stockcodes_by_corr(
+		# 		filter_opt_corr=self.filter_opt_corr,
+		# 		optimum_corr=self.optimum_corr,
+		# 		filtered_stockcodes=self.filtered_stockcodes,
+		# 		raw_data_full=raw_data_full,
+		# 		raw_data_broker_nvol=raw_data_broker_nvol,
+		# 		raw_data_broker_nval=raw_data_broker_nval,
+		# 		raw_data_broker_sumval=raw_data_broker_sumval,
+		# 	)
 		
 		# Get radar period filtered stockdata
 		if self.startdate == self.enddate:

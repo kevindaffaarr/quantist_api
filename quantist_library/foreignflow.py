@@ -527,7 +527,7 @@ class ForeignRadar():
 				stocks_raw_data.groupby(by='code')['close'].nth([0]))/ \
 				stocks_raw_data.groupby(by='code')['close'].nth([0])
 		else:
-			raise Exception("Not a valid radar type")
+			raise ValueError("Not a valid radar type")
 		
 		return radar_indicators
 	
