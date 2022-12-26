@@ -657,6 +657,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 			n_stockcodes = self.n_stockcodes,
 			startdate = self.startdate,
 			enddate = self.enddate,
+			screener_period=self.screener_period,
 			filtered_stockcodes = self.filtered_stockcodes,
 			stockcode_excludes = self.stockcode_excludes,
 			dbs = self.dbs,
@@ -725,9 +726,9 @@ class ScreenerMoneyFlow(ScreenerBase):
 		
 		# Only get raw_data between startdate and enddate
 		if not isinstance(startdate, datetime.date):
-			# If screener_period is not None, get n last rows of raw_data based on screener_period
+			# If screener_period is not None, get n last rows of raw_data for each code group based on screener_period
 			if screener_period is not None:
-				raw_data = raw_data.iloc[-screener_period:]
+				raw_data = raw_data.groupby("code").tail(screener_period)
 			else:
 				# Update startdate if startdate not datetime.date to the first date of the raw_data
 				startdate = raw_data.index.get_level_values('date').min()
