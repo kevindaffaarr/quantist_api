@@ -1175,7 +1175,7 @@ class WhaleRadar():
 		for code in broker_features_std_pos.index.get_level_values('code').unique():
 			features, centroids = \
 				await self.__kmeans_clustering(
-					features=broker_features_std_pos.loc[code],
+					features=broker_features_std_pos.loc[code,:],
 					x='corr_ncum_close',
 					y='broker_sumval',
 					min_n_cluster=splitted_min_n_cluster,
@@ -1194,7 +1194,7 @@ class WhaleRadar():
 		for code in broker_features_std_neg.index.get_level_values('code').unique():
 			features, centroids = \
 				await self.__kmeans_clustering(
-					features=broker_features_std_neg.loc[code],
+					features=broker_features_std_neg.loc[code,:],
 					x='corr_ncum_close',
 					y='broker_sumval',
 					min_n_cluster=splitted_min_n_cluster,
@@ -1208,7 +1208,7 @@ class WhaleRadar():
 
 			centroids['code'] = code
 			if code in broker_features_pos.index.get_level_values('code'):
-				centroids.index = centroids.index + centroids_pos.loc[(code)].index.max() + 1
+				centroids.index = centroids.index + centroids_pos.loc[code,:].index.max() + 1
 			centroids = centroids.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
 			centroids_neg = pd.concat([centroids_neg, centroids], axis=0)
 			
@@ -1231,12 +1231,13 @@ class WhaleRadar():
 		optimum_n_selected_cluster = {}
 		optimum_corr = {}
 		for code in broker_features.index.get_level_values('code').unique():
+			assert isinstance(code, str)
 			selected_broker_code, optimum_n_selected_cluster_code, optimum_corr_code = \
 				await self.__optimize_selected_cluster(
-					clustered_features=broker_features.loc[(code)],
-					raw_data_close=raw_data_close.loc[(code)],
-					broker_ncum=broker_ncum.loc[(code)],
-					centroids_cluster=broker_features_centroids.loc[(code)],
+					clustered_features=broker_features.loc[code,:],
+					raw_data_close=raw_data_close.loc[code],
+					broker_ncum=broker_ncum.loc[code,:],
+					centroids_cluster=broker_features_centroids.loc[code,:],
 					n_selected_cluster=n_selected_cluster,
 					stepup_n_cluster_threshold=stepup_n_cluster_threshold
 				)

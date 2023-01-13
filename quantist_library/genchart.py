@@ -95,7 +95,7 @@ async def foreign_chart(stockcode:str = "", ff_indicators:pd.DataFrame=...) -> g
 	assert isinstance(start_temp, datetime.date)
 	assert isinstance(end_temp, datetime.date)
 	dt_all = pd.date_range(start=start_temp,end=end_temp)
-	dt_obs = [d.strftime("%Y-%m-%d") for d in ff_indicators.index]
+	dt_obs = [d.strftime("%Y-%m-%d") for d in ff_indicators.index] # type: ignore
 	dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if not d in dt_obs]
 
 	fig.update_xaxes(title_text="Date", row=2, col=1, showgrid=True)
@@ -253,7 +253,7 @@ async def broker_chart(
 	assert isinstance(start_temp, datetime.datetime)
 	assert isinstance(end_temp, datetime.datetime)
 	dt_all = pd.date_range(start=start_temp,end=end_temp)
-	dt_obs = [d.strftime("%Y-%m-%d") for d in bf_indicators.index]
+	dt_obs = [d.strftime("%Y-%m-%d") for d in bf_indicators.index] # type: ignore
 	dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if not d in dt_obs]
 
 	fig.update_xaxes(title_text="Date", row=2, col=1, showgrid=True)
