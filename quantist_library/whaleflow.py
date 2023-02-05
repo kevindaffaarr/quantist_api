@@ -216,9 +216,9 @@ class BrokerFlow(WhaleFlow):
 		self.splitted_max_n_cluster = splitted_max_n_cluster
 		self.stepup_n_cluster_threshold = stepup_n_cluster_threshold
 	
-	async def get_wf_obj(self) -> BrokerFlow:
+	async def __get_wf_obj(self) -> BrokerFlow:
 		# BrokerFlow
-		self.wf_obj = bf.StockBFFull(
+		wf_obj = bf.StockBFFull(
 			stockcode = self.stockcode,
 			startdate = self.startdate,
 			enddate = self.enddate,
@@ -243,10 +243,17 @@ class BrokerFlow(WhaleFlow):
 			stepup_n_cluster_threshold = self.stepup_n_cluster_threshold,
 			dbs = self.dbs,
 		)
-		self.wf_obj = await self.wf_obj.fit()
-
+		wf_obj = await wf_obj.fit()
+		# Update Attribute of ForeignFlow from wf_obj
+		self.__dict__.update(vars(wf_obj))
 		return self
 	
-	async def full_data_processing(self):
-		await self.get_wf_obj()
+	async def fit(self):
+		await self.__get_wf_obj()
 		await WhaleFlow._full_data_processing(self)
+
+	async def chart(self, media_type: dp.ListMediaType | None = None):
+		return await WhaleFlow._gen_full_chart(self,
+			wf_indicators=self.wf_indicators,
+			media_type=media_type,
+			)

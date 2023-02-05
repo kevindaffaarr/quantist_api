@@ -46,7 +46,7 @@ async def quantist_stock_chart(
 			vertical_spacing=0, horizontal_spacing=0.05,
 			row_heights=[0.7,0.3],
 			column_widths=[0.85,0.15],
-			subplot_titles=("","Jumlah Pemegang Saham","",""))
+			subplot_titles=("","Holding Composition","",""))
 	else:
 		fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
 			specs=[[{"secondary_y":True}],[{"secondary_y":True}]],
