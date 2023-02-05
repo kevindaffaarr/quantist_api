@@ -135,10 +135,9 @@ class HoldingSectors(str, Enum):
 	foreign_ot = "foreign_ot"
 	foreign_total = "foreign_total"
 
-class HolderSectorsCat(dict, Enum):
+class HoldingSectorsCat(dict, Enum):
 	default = {
 		"foreign": [HoldingSectors.foreign_total],
-		"local_individual": [HoldingSectors.local_id],
 		"local_institutional": [
 			HoldingSectors.local_is,
 			HoldingSectors.local_cp,
@@ -148,5 +147,6 @@ class HolderSectorsCat(dict, Enum):
 			HoldingSectors.local_sc,
 			HoldingSectors.local_fd,
 			HoldingSectors.local_ot,
-		]
+		],
+		"local_individual": [HoldingSectors.local_id]
 	}

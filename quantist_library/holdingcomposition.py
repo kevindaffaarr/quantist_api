@@ -24,13 +24,13 @@ class HoldingComposition():
 		stockcode: str,
 		startdate: datetime.date|None = None,
 		enddate: datetime.date|None = datetime.date.today().replace(day=1) - datetime.timedelta(days=1),
-		categorization: dp.HolderSectorsCat|None = dp.HolderSectorsCat.default,
+		categorization: dp.HoldingSectorsCat|None = dp.HoldingSectorsCat.default,
 		) -> None:
 		"""
 		Class initiation, and validate startdate and enddate
 		"""
 		assert isinstance(enddate, datetime.date)
-		assert isinstance(categorization, dp.HolderSectorsCat)
+		assert isinstance(categorization, dp.HoldingSectorsCat)
 
 		self.stockcode = stockcode.lower()
 		self.startdate = startdate

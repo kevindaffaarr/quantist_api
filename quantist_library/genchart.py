@@ -24,6 +24,7 @@ async def quantist_stock_chart(
 	period_pricecorrel: int | None = None,
 	period_mapricecorrel: int | None = None,
 	period_vwap:int | None = None,
+	holding_composition: pd.DataFrame | None = None,
 	selected_broker: list[str] | None = None,
 	optimum_n_selected_cluster: int | None = None,
 	optimum_corr: float | None = None,
@@ -39,11 +40,18 @@ async def quantist_stock_chart(
 		optimum_corr = np.nan
 		
 	# Make Subplots
-	fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-		specs=[[{"secondary_y":True}],[{"secondary_y":True}]],
-		vertical_spacing=0,
-		row_heights=[0.7,0.3])
-	fig.update_layout(xaxis3= {'anchor': 'y', 'overlaying': 'x','showgrid':False,"visible":False})
+	if holding_composition is not None:
+		fig = make_subplots(rows=2, cols=2, shared_xaxes=True,
+			specs=[[{"secondary_y":True},{"secondary_y":False}],[{"secondary_y":True},{"secondary_y":False}]],
+			vertical_spacing=0, horizontal_spacing=0.05,
+			row_heights=[0.7,0.3],
+			column_widths=[0.85,0.15],
+			subplot_titles=("","Jumlah Pemegang Saham","",""))
+	else:
+		fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+			specs=[[{"secondary_y":True}],[{"secondary_y":True}]],
+			vertical_spacing=0,
+			row_heights=[0.7,0.3])
 
 	# Add Trace
 	# OHLC Candlestick
@@ -53,63 +61,90 @@ async def quantist_stock_chart(
 		high=wf_indicators["high"],
 		low=wf_indicators["low"],
 		close=wf_indicators["close"],
-		name="Price"
+		name="Price",
+		legendrank=1
 		),
 		row=1, col=1, secondary_y=True
 	)
 	# Whale VWAP
 	fig.add_trace(go.Scatter(x=wf_indicators.index,y=wf_indicators["vwap"],
-		name=f"{abv}-VWAP",marker_color="red"
+		name=f"{abv}-VWAP",marker_color="red",
+		legendrank=2
 		),
 		row=1,col=1,secondary_y=True
 	)
 	# Whale Flow
 	fig.add_trace(go.Scatter(x=wf_indicators.index,y=wf_indicators["volflow"],
-		name=f"{abv} Vol Flow",marker_color="orange"
+		name=f"{abv} Vol Flow",marker_color="orange",
+		legendrank=3
 		),
 		row=1,col=1,secondary_y=False
 	)
-	# Whale Volume Profile
-	fig.add_trace(go.Histogram(
-		x=wf_indicators['netvol'],
-		y=wf_indicators['close'],
-		histfunc="sum",
-		name="Net Volume Profile",orientation="h",opacity=0.1),
-		row=1,col=1,secondary_y=True)
-	bins=np.arange(fig.full_figure_for_development(warn=False).data[3].ybins.start, # type:ignore
-		fig.full_figure_for_development(warn=False).data[3].ybins.end, # type:ignore
-		fig.full_figure_for_development(warn=False).data[3].ybins.size) # type:ignore
-	bins = pd.Series(bins)
-	hist_bar = wf_indicators.groupby(pd.cut(wf_indicators['close'].to_numpy(),bins=bins))['netvol'].sum() # type:ignore
-	fig.data[3].update(marker=dict(color=np.where(hist_bar<0,"tomato","cyan")),xaxis='x3') # type:ignore
 
 	# Whale Proportion
 	fig.add_trace(go.Scatter(x=wf_indicators.index,y=wf_indicators['prop']*100,
-		name=f"{abv} Proportion %",marker_color="blue"
+		name=f"{abv} Proportion %",marker_color="blue",
+		legendrank=4
 		),
 		row=2,col=1,secondary_y=True
 	)
 	# Whale Net Proportion
 	fig.add_trace(go.Scatter(x=wf_indicators.index,y=wf_indicators['netprop']*100,
-		name=f"{abv} Net Proportion %",marker_color="green"
+		name=f"{abv} Net Proportion %",marker_color="green",
+		legendrank=5
 		),
 		row=2,col=1,secondary_y=True
 	)
 
 	# Whale Net Value
 	fig.add_trace(go.Bar(x=wf_indicators.index,y=wf_indicators["mf"],
-		name=f"{abv} Net Value",marker_color=np.where(wf_indicators["mf"]<0,"red","green")
+		name=f"{abv} Net Value",marker_color=np.where(wf_indicators["mf"]<0,"red","green"),
+		legendrank=6
 		),
-		row=2,col=1,secondary_y=False
+		row=2,col=1,secondary_y=False,
 	)
 	
+	# Holding Composition
+	if holding_composition is not None:
+		# Append scrpless_ratio*100 to month_list text separate by |
+		month_list = [f"{holding_composition.loc[x,'scripless_ratio']*100:.2f} | {x.strftime('%b')}-{x.strftime('%y')}" for x in holding_composition.index] # type: ignore
+		for col_name in holding_composition.drop(labels=['scripless_ratio'],axis=1).columns:
+			fig.add_trace(go.Bar(
+				name=col_name,
+				x=month_list,y=holding_composition[col_name]*100,
+				legendrank=9,),
+				row=1,col=2,secondary_y=False,
+			)
+		fig.update_layout(barmode='stack', xaxis2_tickangle=90)
+
+	# Whale Volume Profile
+	assert isinstance(fig.data, tuple)
+	vol_profile_index = len(fig.data)
+	fig.add_trace(go.Histogram(
+		x=wf_indicators['netvol'],
+		y=wf_indicators['close'],
+		histfunc="sum",
+		name="Net Volume Profile",orientation="h",opacity=0.1,
+		legendrank=8),
+		row=1,col=1,secondary_y=True)
+	bins=np.arange(fig.full_figure_for_development(warn=False).data[vol_profile_index].ybins.start, # type:ignore
+		fig.full_figure_for_development(warn=False).data[vol_profile_index].ybins.end, # type:ignore
+		fig.full_figure_for_development(warn=False).data[vol_profile_index].ybins.size) # type:ignore
+	bins = pd.Series(bins)
+	hist_bar = wf_indicators.groupby(pd.cut(wf_indicators['close'].to_numpy(),bins=bins))['netvol'].sum() # type:ignore
+	fig.data[vol_profile_index].update(marker=dict(color=np.where(hist_bar<0,"tomato","cyan")),xaxis=f'x{vol_profile_index}') # type:ignore
+
 	# UPDATE AXES
+	# Column 1
 	# Row 1
 	fig.update_yaxes(title_text="Price", row=1, col=1, secondary_y=True, showgrid=True)
 	fig.update_yaxes(row=1, col=1,secondary_y=False,showgrid=False, zeroline=False)
 	# Row 2
 	fig.update_yaxes(title_text=f"{abv} Proportion %", row=2, col=1, secondary_y=True, showgrid=True, range=[0,101])
 	fig.update_yaxes(title_text=f"{abv} Net Value", row=2, col=1,secondary_y=False, showgrid=False, zeroline=False)
+	# Column 2
+	# Row 1
+	fig.update_yaxes(title_text="Ratio %", row=1, col=2, secondary_y=False, showgrid=True, side='right')
 
 	start_temp = wf_indicators.index[0]
 	end_temp = wf_indicators.index[-1]
@@ -120,9 +155,13 @@ async def quantist_stock_chart(
 	dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if not d in dt_obs]
 
 	fig.update_xaxes(title_text="Date", row=2, col=1, showgrid=True)
+	fig.update_xaxes(title_text="Scripless% | Date", row=1, col=2, showgrid=True, showticklabels=True)
 	fig.update_xaxes(rangeslider={"autorange":True, "visible":False})
-	fig.update_xaxes(rangebreaks=[dict(values=dt_breaks)])
-	fig.update_layout(xaxis_range=[start_temp,end_temp+datetime.timedelta(days=round(len(wf_indicators)*0.1))])
+	fig.update_xaxes(col=1, rangebreaks=[dict(values=dt_breaks)])
+	# fig.update_layout({"xaxis_range":[start_temp,end_temp+datetime.timedelta(days=round(len(wf_indicators)*0.1))]})
+	# fig.update_layout({"xaxis2_range":None})
+
+	fig.update_layout({f"xaxis{vol_profile_index}":{'anchor': 'y', 'overlaying': 'x','showgrid':False,"visible":False}})
 
 	# ANNOTATION
 	pricecorrel = wf_indicators.loc[end_temp,'pricecorrel'] # type:ignore
@@ -182,7 +221,7 @@ async def quantist_stock_chart(
 	fig.update_layout(title={"text":f"<b>{STOCKCODE}</b>", "x":0.5})
 
 	# UPDATE_LAYOUT GLOBAL DEFAULT TEMPLATE
-	fig.update_layout(legend={"orientation":"h","y":-0.1})
+	fig.update_layout(legend={"orientation":"h","y":-0.1, "traceorder":"normal"})
 	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
 	fig.update_layout(dragmode="pan")
 	fig.update_layout(margin=dict(l=0,r=0,b=50,t=75,pad=0))
