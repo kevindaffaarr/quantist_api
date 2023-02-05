@@ -102,3 +102,35 @@ class ScreenerList(str, Enum):
 	price_around_vwap = "price_around_vwap"
 	price_around_vwap_inflow = "price_around_vwap_inflow"
 	peaking_transaction = "peaking_transaction"
+
+class HoldingSectors(str, Enum):
+	# Dictionary:
+	# IS: Insurance
+	# CP: Corporate
+	# PF: Pension Fund
+	# IB: Financial Instution (Investment Bank)
+	# ID: Individual
+	# MF: Mutual Fund
+	# SC: Securities Company
+	# FD: Foundation
+	# OT: Others
+	local_is = "local_is"
+	local_cp = "local_cp"
+	local_pf = "local_pf"
+	local_ib = "local_ib"
+	local_id = "local_id"
+	local_mf = "local_mf"
+	local_sc = "local_sc"
+	local_fd = "local_fd"
+	local_ot = "local_ot"
+	local_total = "local_total"
+	foreign_is = "foreign_is"
+	foreign_cp = "foreign_cp"
+	foreign_pf = "foreign_pf"
+	foreign_ib = "foreign_ib"
+	foreign_id = "foreign_id"
+	foreign_mf = "foreign_mf"
+	foreign_sc = "foreign_sc"
+	foreign_fd = "foreign_fd"
+	foreign_ot = "foreign_ot"
+	foreign_total = "foreign_total"
