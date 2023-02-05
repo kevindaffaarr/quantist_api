@@ -75,7 +75,7 @@ class StockBFFull():
 		self.selected_broker = None
 		self.optimum_n_selected_cluster = None
 		self.optimum_corr = None
-		self.bf_indicators:pd.DataFrame = pd.DataFrame()
+		self.wf_indicators:pd.DataFrame = pd.DataFrame()
 
 	async def fit(self) -> StockBFFull:
 		# Get default bf params
@@ -139,7 +139,7 @@ class StockBFFull():
 			)
 
 		# Calc broker flow indicators
-		self.bf_indicators = await self.calc_bf_indicators(
+		self.wf_indicators = await self.calc_wf_indicators(
 			raw_data_full = raw_data_full,
 			raw_data_broker_nvol = raw_data_broker_nvol,
 			raw_data_broker_nval = raw_data_broker_nval,
@@ -537,7 +537,7 @@ class StockBFFull():
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr, broker_features
 
-	async def calc_bf_indicators(self,
+	async def calc_wf_indicators(self,
 		raw_data_full: pd.DataFrame,
 		raw_data_broker_nvol: pd.DataFrame,
 		raw_data_broker_nval: pd.DataFrame,
@@ -615,7 +615,7 @@ class StockBFFull():
 		assert self.stockcode is not None
 		fig = await genchart.quantist_stock_chart(
 			stockcode=self.stockcode,
-			wf_indicators=self.bf_indicators,
+			wf_indicators=self.wf_indicators,
 			analysis_method=dp.AnalysisMethod.broker,
 			period_prop=self.period_prop,
 			period_pricecorrel=self.period_pricecorrel,

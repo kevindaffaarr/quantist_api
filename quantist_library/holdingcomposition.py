@@ -8,22 +8,6 @@ import pandas as pd
 import database as db
 import dependencies as dp
 
-class HolderSectorsCat(dict, Enum):
-	default = {
-		"foreign": [dp.HoldingSectors.foreign_total],
-		"local_individual": [dp.HoldingSectors.local_id],
-		"local_institutional": [
-			dp.HoldingSectors.local_is,
-			dp.HoldingSectors.local_cp,
-			dp.HoldingSectors.local_pf,
-			dp.HoldingSectors.local_ib,
-			dp.HoldingSectors.local_mf,
-			dp.HoldingSectors.local_sc,
-			dp.HoldingSectors.local_fd,
-			dp.HoldingSectors.local_ot,
-		]
-	}
-
 class HoldingComposition():
 	"""
 	Input: stockcode, date range, categorization
@@ -40,13 +24,13 @@ class HoldingComposition():
 		stockcode: str,
 		startdate: datetime.date|None = None,
 		enddate: datetime.date|None = datetime.date.today().replace(day=1) - datetime.timedelta(days=1),
-		categorization: HolderSectorsCat|None = HolderSectorsCat.default,
+		categorization: dp.HolderSectorsCat|None = dp.HolderSectorsCat.default,
 		) -> None:
 		"""
 		Class initiation, and validate startdate and enddate
 		"""
 		assert isinstance(enddate, datetime.date)
-		assert isinstance(categorization, HolderSectorsCat)
+		assert isinstance(categorization, dp.HolderSectorsCat)
 
 		self.stockcode = stockcode.lower()
 		self.startdate = startdate

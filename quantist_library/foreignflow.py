@@ -44,7 +44,7 @@ class StockFFFull():
 		self.dbs = dbs
 
 		self.type = None
-		self.ff_indicators = pd.DataFrame()
+		self.wf_indicators = pd.DataFrame()
 
 	async def fit(self) -> StockFFFull:
 		# Get defaults value
@@ -90,7 +90,7 @@ class StockFFFull():
 				default_months_range,preoffset_period_param)
 		
 		# Foreign Flow Indicators
-		self.ff_indicators = await self.calc_ff_indicators(raw_data,\
+		self.wf_indicators = await self.calc_wf_indicators(raw_data,\
 			self.period_mf,self.period_prop,self.period_pricecorrel,self.period_mapricecorrel,self.period_vwap,\
 			self.pow_high_prop,self.pow_high_pricecorrel,self.pow_high_mapricecorrel,self.pow_medium_prop,\
 			self.pow_medium_pricecorrel,self.pow_medium_mapricecorrel,\
@@ -219,7 +219,7 @@ class StockFFFull():
 		# End of Method: Return or Assign Attribute
 		return raw_data
 
-	async def calc_ff_indicators(self,
+	async def calc_wf_indicators(self,
 		raw_data: pd.DataFrame,
 		period_mf: int = 1,
 		period_prop: int = 10,
@@ -290,7 +290,7 @@ class StockFFFull():
 		assert self.stockcode is not None
 		fig = await genchart.quantist_stock_chart(
 			stockcode=self.stockcode,
-			wf_indicators=self.ff_indicators,
+			wf_indicators=self.wf_indicators,
 			analysis_method=dp.AnalysisMethod.foreign,
 			period_prop=self.period_prop,
 			period_pricecorrel=self.period_pricecorrel,

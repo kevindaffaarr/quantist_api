@@ -100,13 +100,13 @@ async def get_foreign_chart(
 		# Define Headers
 		headers = {
 			"stockcode": stock_ff_full.stockcode,
-			"last_date": stock_ff_full.ff_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
-			"last_mf": stock_ff_full.ff_indicators['mf'][-1].astype(str),
-			"last_prop": stock_ff_full.ff_indicators['prop'][-1].astype(str),
-			"last_pricecorrel": stock_ff_full.ff_indicators['pricecorrel'][-1].astype(str),
-			"last_mapricecorrel": stock_ff_full.ff_indicators['mapricecorrel'][-1].astype(str),
-			"last_vwap": stock_ff_full.ff_indicators['vwap'][-1].astype(str),
-			"last_close": stock_ff_full.ff_indicators['close'][-1].astype(str),
+			"last_date": stock_ff_full.wf_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
+			"last_mf": stock_ff_full.wf_indicators['mf'][-1].astype(str),
+			"last_prop": stock_ff_full.wf_indicators['prop'][-1].astype(str),
+			"last_pricecorrel": stock_ff_full.wf_indicators['pricecorrel'][-1].astype(str),
+			"last_mapricecorrel": stock_ff_full.wf_indicators['mapricecorrel'][-1].astype(str),
+			"last_vwap": stock_ff_full.wf_indicators['vwap'][-1].astype(str),
+			"last_close": stock_ff_full.wf_indicators['close'][-1].astype(str),
 		}
 		
 		# Define content
@@ -221,13 +221,13 @@ async def get_broker_chart(
 		# Define Headers
 		headers = {
 			"stockcode": stock_bf_full.stockcode,
-			"last_date": stock_bf_full.bf_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
-			"last_mf": stock_bf_full.bf_indicators['mf'][-1].astype(str),
-			"last_prop": stock_bf_full.bf_indicators['prop'][-1].astype(str),
-			"last_pricecorrel": stock_bf_full.bf_indicators['pricecorrel'][-1].astype(str),
-			"last_mapricecorrel": stock_bf_full.bf_indicators['mapricecorrel'][-1].astype(str),
-			"last_vwap": stock_bf_full.bf_indicators['vwap'][-1].astype(str),
-			"last_close": stock_bf_full.bf_indicators['close'][-1].astype(str),
+			"last_date": stock_bf_full.wf_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
+			"last_mf": stock_bf_full.wf_indicators['mf'][-1].astype(str),
+			"last_prop": stock_bf_full.wf_indicators['prop'][-1].astype(str),
+			"last_pricecorrel": stock_bf_full.wf_indicators['pricecorrel'][-1].astype(str),
+			"last_mapricecorrel": stock_bf_full.wf_indicators['mapricecorrel'][-1].astype(str),
+			"last_vwap": stock_bf_full.wf_indicators['vwap'][-1].astype(str),
+			"last_close": stock_bf_full.wf_indicators['close'][-1].astype(str),
 		}
 
 		# Define content
@@ -464,7 +464,7 @@ async def get_foreign_data(
 			pow_medium_mapricecorrel=pow_medium_mapricecorrel,
 			)
 		stock_ff_full = await stock_ff_full.fit()
-		full_data = stock_ff_full.ff_indicators
+		full_data = stock_ff_full.wf_indicators
 	
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
@@ -531,11 +531,11 @@ async def get_broker_data(
 		stock_bf_full = await stock_bf_full.fit()
 
 		if api_type == dp.ListBrokerApiType.brokerflow:
-			data = stock_bf_full.bf_indicators.to_dict(orient="index"),
+			data = stock_bf_full.wf_indicators.to_dict(orient="index"),
 		elif api_type == dp.ListBrokerApiType.brokercluster:
 			data = stock_bf_full.broker_features.to_dict(orient="index"),
 		elif api_type == dp.ListBrokerApiType.all:
-			flow = stock_bf_full.bf_indicators
+			flow = stock_bf_full.wf_indicators
 			cluster = stock_bf_full.broker_features
 			data = {
 				"flow": flow.to_dict(orient="index"),
