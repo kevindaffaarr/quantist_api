@@ -52,14 +52,37 @@ class HoldingComposition():
 		Get the data from database filtered by stockcode, sectype, and date range
 		"""
 		# Get the data from database
-		qry = dbs.query(db.KseiKepemilikanEfek)\
+		qry = dbs.query(
+				db.KseiKepemilikanEfek.date,
+				db.KseiKepemilikanEfek.code,
+				db.KseiKepemilikanEfek.local_is,
+				db.KseiKepemilikanEfek.local_cp,
+				db.KseiKepemilikanEfek.local_pf,
+				db.KseiKepemilikanEfek.local_ib,
+				db.KseiKepemilikanEfek.local_id,
+				db.KseiKepemilikanEfek.local_mf,
+				db.KseiKepemilikanEfek.local_sc,
+				db.KseiKepemilikanEfek.local_fd,
+				db.KseiKepemilikanEfek.local_ot,
+				db.KseiKepemilikanEfek.local_total,
+				db.KseiKepemilikanEfek.foreign_is,
+				db.KseiKepemilikanEfek.foreign_cp,
+				db.KseiKepemilikanEfek.foreign_pf,
+				db.KseiKepemilikanEfek.foreign_ib,
+				db.KseiKepemilikanEfek.foreign_id,
+				db.KseiKepemilikanEfek.foreign_mf,
+				db.KseiKepemilikanEfek.foreign_sc,
+				db.KseiKepemilikanEfek.foreign_fd,
+				db.KseiKepemilikanEfek.foreign_ot,
+				db.KseiKepemilikanEfek.foreign_total,
+			).distinct(db.KseiKepemilikanEfek.date)\
 			.filter(db.KseiKepemilikanEfek.code == self.stockcode)\
 			.filter(db.KseiKepemilikanEfek.sectype == 'equity')\
 			.filter(db.KseiKepemilikanEfek.date >= self.startdate)\
 			.filter(db.KseiKepemilikanEfek.date <= self.enddate)
 		
 		return pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).set_index("date").sort_index()
-
+	
 	async def __get_data_scripless(self, list_date:list, dbs:db.Session = next(db.get_dbs())) -> pd.DataFrame:
 		# Query table stockdata: tradebleshares divided by listedshares for self.stockcode each list_date
 		qry = dbs.query(db.StockData.date, db.StockData.tradebleshares, db.StockData.listedshares)\
@@ -85,8 +108,8 @@ class HoldingComposition():
 		# Get the data KSEI
 		data_ksei = await self.__get_data_ksei(dbs=dbs)
 
-		# Get data scripless ratio for each date in data_ksei
-		list_date = data_ksei.index.tolist()
+		# Get data scripless ratio for each date from data_ksei and convert to datetime.date
+		list_date = data_ksei.index.to_pydatetime().tolist() # type: ignore
 		data_scripless = await self.__get_data_scripless(list_date=list_date, dbs=dbs)
 
 		# ==========
