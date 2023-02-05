@@ -568,7 +568,7 @@ class StockBFFull():
 		raw_data_full["netvol"] = selected_data_broker_nvol
 		
 		# Whale Volume Flow
-		raw_data_full["wvolflow"] = selected_data_broker_nvol.cumsum()
+		raw_data_full["volflow"] = selected_data_broker_nvol.cumsum()
 
 		# Whale Money Flow
 		raw_data_full['mf'] = selected_data_broker_nval.rolling(window=period_mf).sum()
@@ -578,11 +578,11 @@ class StockBFFull():
 			/ (raw_data_full['value'].rolling(window=period_prop).sum()*2)
 
 		# Whale Net Proportion
-		raw_data_full['wnetprop'] = selected_data_broker_nval.rolling(window=period_prop).sum() \
+		raw_data_full['netprop'] = selected_data_broker_nval.rolling(window=period_prop).sum() \
 			/ (raw_data_full['value'].rolling(window=period_prop).sum()*2)
 
 		# Whale correlation
-		raw_data_full['pricecorrel'] = raw_data_full["wvolflow"].rolling(window=period_pricecorrel).corr(raw_data_full['close'])
+		raw_data_full['pricecorrel'] = raw_data_full["volflow"].rolling(window=period_pricecorrel).corr(raw_data_full['close'])
 
 		# Whale MA correlation
 		raw_data_full['mapricecorrel'] = raw_data_full['pricecorrel'].rolling(window=period_mapricecorrel).mean()
@@ -613,16 +613,17 @@ class StockBFFull():
 
 	async def chart(self,media_type: str | None = None):
 		assert self.stockcode is not None
-		
-		fig = await genchart.broker_chart(
-			self.stockcode,self.bf_indicators,
-			self.selected_broker,
-			self.optimum_n_selected_cluster,
-			self.optimum_corr,
-			self.period_prop,
-			self.period_pricecorrel,
-			self.period_mapricecorrel,
-			self.period_vwap,
+		fig = await genchart.quantist_stock_chart(
+			stockcode=self.stockcode,
+			wf_indicators=self.bf_indicators,
+			analysis_method=dp.AnalysisMethod.broker,
+			period_prop=self.period_prop,
+			period_pricecorrel=self.period_pricecorrel,
+			period_mapricecorrel=self.period_mapricecorrel,
+			period_vwap=self.period_vwap,
+			selected_broker=self.selected_broker,
+			optimum_n_selected_cluster=self.optimum_n_selected_cluster,
+			optimum_corr=self.optimum_corr,
 			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)

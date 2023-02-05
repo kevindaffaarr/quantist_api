@@ -241,7 +241,7 @@ class StockFFFull():
 		raw_data['netval'] = raw_data['fbval']-raw_data['fsval']
 		
 		# FF
-		raw_data['fvolflow'] = raw_data['netvol'].cumsum()
+		raw_data['volflow'] = raw_data['netvol'].cumsum()
 
 		# MF
 		raw_data['mf'] = raw_data['netval'].rolling(window=period_mf).sum()
@@ -251,12 +251,12 @@ class StockFFFull():
 			/(raw_data['value'].rolling(window=period_prop).sum()*2)
 
 		# FNetProp
-		raw_data['fnetprop'] = abs(raw_data['netval']).rolling(window=period_prop).sum()\
+		raw_data['netprop'] = abs(raw_data['netval']).rolling(window=period_prop).sum()\
 			/(raw_data['value'].rolling(window=period_prop).sum()*2)
 
 		# pricecorrel
 		raw_data['pricecorrel'] = raw_data['close'].rolling(window=period_pricecorrel)\
-			.corr(raw_data['fvolflow'])
+			.corr(raw_data['volflow'])
 		
 		# MAPriceCorrel
 		raw_data['mapricecorrel'] = raw_data['pricecorrel'].rolling(window=period_mapricecorrel).mean()
@@ -288,7 +288,15 @@ class StockFFFull():
 	
 	async def chart(self,media_type:str | None = None):
 		assert self.stockcode is not None
-		fig = await genchart.foreign_chart(self.stockcode,self.ff_indicators)
+		fig = await genchart.quantist_stock_chart(
+			stockcode=self.stockcode,
+			wf_indicators=self.ff_indicators,
+			analysis_method=dp.AnalysisMethod.foreign,
+			period_prop=self.period_prop,
+			period_pricecorrel=self.period_pricecorrel,
+			period_mapricecorrel=self.period_mapricecorrel,
+			period_vwap=self.period_vwap,
+			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)
 		elif media_type == "json":
