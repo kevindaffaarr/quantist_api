@@ -22,7 +22,7 @@ h11==0.14.0
 httptools==0.5.0
 idna==3.4
 joblib==1.2.0
-kaleido==0.1.0.post1
+kaleido==0.2.1.post1
 nest-asyncio==1.5.6
 numpy==1.24.1
 packaging==23.0
