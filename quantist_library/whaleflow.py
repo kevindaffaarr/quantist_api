@@ -93,7 +93,7 @@ class WhaleFlow():
 		else:
 			return fig
 
-class ForeignFlow(WhaleFlow):
+class ForeignFlow(WhaleFlow, ff.StockFFFull):
 	def __init__(self,
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
@@ -131,7 +131,7 @@ class ForeignFlow(WhaleFlow):
 	
 	async def __get_wf_obj(self) -> ForeignFlow:
 		# ForeignFlow
-		wf_obj = ff.StockFFFull(
+		ff.StockFFFull(
 			stockcode = self.stockcode,
 			startdate = self.startdate,
 			enddate = self.enddate,
@@ -148,14 +148,15 @@ class ForeignFlow(WhaleFlow):
 			pow_medium_mapricecorrel = self.pow_medium_mapricecorrel,
 			dbs = self.dbs,
 		)
-		wf_obj = await wf_obj.fit()
+		await ff.StockFFFull.fit(self)
 		# Update Attribute of ForeignFlow from wf_obj
-		self.__dict__.update(vars(wf_obj))
+		# self.__dict__.update(vars(wf_obj))
 		return self
 
-	async def fit(self):
+	async def fit(self) -> ForeignFlow:
 		await self.__get_wf_obj()
 		await WhaleFlow._full_data_processing(self)
+		return self
 	
 	async def chart(self, media_type: dp.ListMediaType | None = None):
 		return await WhaleFlow._gen_full_chart(self,
@@ -164,7 +165,7 @@ class ForeignFlow(WhaleFlow):
 			)
 
 
-class BrokerFlow(WhaleFlow):
+class BrokerFlow(WhaleFlow, bf.StockBFFull):
 	def __init__(self,
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
@@ -218,7 +219,7 @@ class BrokerFlow(WhaleFlow):
 	
 	async def __get_wf_obj(self) -> BrokerFlow:
 		# BrokerFlow
-		wf_obj = bf.StockBFFull(
+		bf.StockBFFull(
 			stockcode = self.stockcode,
 			startdate = self.startdate,
 			enddate = self.enddate,
@@ -243,14 +244,15 @@ class BrokerFlow(WhaleFlow):
 			stepup_n_cluster_threshold = self.stepup_n_cluster_threshold,
 			dbs = self.dbs,
 		)
-		wf_obj = await wf_obj.fit()
+		await bf.StockBFFull.fit(self)
 		# Update Attribute of ForeignFlow from wf_obj
-		self.__dict__.update(vars(wf_obj))
+		# self.__dict__.update(vars(wf_obj))
 		return self
 	
-	async def fit(self):
+	async def fit(self) -> BrokerFlow:
 		await self.__get_wf_obj()
 		await WhaleFlow._full_data_processing(self)
+		return self
 
 	async def chart(self, media_type: dp.ListMediaType | None = None):
 		return await WhaleFlow._gen_full_chart(self,

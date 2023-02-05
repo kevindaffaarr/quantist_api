@@ -12,6 +12,7 @@ from lib import timeit
 
 from quantist_library import foreignflow as ff
 from quantist_library import brokerflow as bf
+from quantist_library import whaleflow as wf
 
 # ==========
 # Router Initiation
@@ -70,7 +71,7 @@ async def get_foreign_chart(
 		media_type = dp.ListMediaType.json
 	
 	try:
-		stock_ff_full = ff.StockFFFull(
+		wf_obj = wf.ForeignFlow(
 			stockcode=stockcode,
 			startdate=startdate,
 			enddate=enddate,
@@ -86,8 +87,8 @@ async def get_foreign_chart(
 			pow_medium_pricecorrel=pow_medium_pricecorrel,
 			pow_medium_mapricecorrel=pow_medium_mapricecorrel,
 			)
-		stock_ff_full = await stock_ff_full.fit()
-		chart = await stock_ff_full.chart(media_type=media_type)
+		wf_obj = await wf_obj.fit()
+		chart = await wf_obj.chart(media_type=media_type)
 
 	except KeyError as err:
 		raise HTTPException(status.HTTP_404_NOT_FOUND,detail=err.args[0]) from err
@@ -99,14 +100,14 @@ async def get_foreign_chart(
 		# Define the responses from Quantist: headers, content, and media_type
 		# Define Headers
 		headers = {
-			"stockcode": stock_ff_full.stockcode,
-			"last_date": stock_ff_full.wf_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
-			"last_mf": stock_ff_full.wf_indicators['mf'][-1].astype(str),
-			"last_prop": stock_ff_full.wf_indicators['prop'][-1].astype(str),
-			"last_pricecorrel": stock_ff_full.wf_indicators['pricecorrel'][-1].astype(str),
-			"last_mapricecorrel": stock_ff_full.wf_indicators['mapricecorrel'][-1].astype(str),
-			"last_vwap": stock_ff_full.wf_indicators['vwap'][-1].astype(str),
-			"last_close": stock_ff_full.wf_indicators['close'][-1].astype(str),
+			"stockcode": wf_obj.stockcode,
+			"last_date": wf_obj.wf_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
+			"last_mf": wf_obj.wf_indicators['mf'][-1].astype(str),
+			"last_prop": wf_obj.wf_indicators['prop'][-1].astype(str),
+			"last_pricecorrel": wf_obj.wf_indicators['pricecorrel'][-1].astype(str),
+			"last_mapricecorrel": wf_obj.wf_indicators['mapricecorrel'][-1].astype(str),
+			"last_vwap": wf_obj.wf_indicators['vwap'][-1].astype(str),
+			"last_close": wf_obj.wf_indicators['close'][-1].astype(str),
 		}
 		
 		# Define content
@@ -164,7 +165,7 @@ async def get_broker_chart(
 		media_type = dp.ListMediaType.json
 	
 	try:
-		stock_bf_full = bf.StockBFFull(
+		wf_obj = wf.BrokerFlow(
 			stockcode=stockcode,
 			startdate=startdate,
 			enddate=enddate,
@@ -188,14 +189,14 @@ async def get_broker_chart(
 			splitted_max_n_cluster=splitted_max_n_cluster,
 			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
 			)
-		stock_bf_full = await stock_bf_full.fit()
+		wf_obj = await wf_obj.fit()
 		if api_type == dp.ListBrokerApiType.brokerflow:
-			chart = await stock_bf_full.chart(media_type=media_type)
+			chart = await wf_obj.chart(media_type=media_type)
 		elif api_type == dp.ListBrokerApiType.brokercluster:
-			chart = await stock_bf_full.broker_cluster_chart(media_type=media_type)
+			chart = await wf_obj.broker_cluster_chart(media_type=media_type)
 		elif api_type == dp.ListBrokerApiType.all:
-			chart_flow = await stock_bf_full.chart(media_type=media_type)
-			chart_cluster = await stock_bf_full.broker_cluster_chart(media_type=media_type)
+			chart_flow = await wf_obj.chart(media_type=media_type)
+			chart_cluster = await wf_obj.broker_cluster_chart(media_type=media_type)
 			# Create zip file to be sent through API
 			chart_all = {
 				"flow": chart_flow,
@@ -220,14 +221,14 @@ async def get_broker_chart(
 		# Define the responses from Quantist: headers, content, and media_type
 		# Define Headers
 		headers = {
-			"stockcode": stock_bf_full.stockcode,
-			"last_date": stock_bf_full.wf_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
-			"last_mf": stock_bf_full.wf_indicators['mf'][-1].astype(str),
-			"last_prop": stock_bf_full.wf_indicators['prop'][-1].astype(str),
-			"last_pricecorrel": stock_bf_full.wf_indicators['pricecorrel'][-1].astype(str),
-			"last_mapricecorrel": stock_bf_full.wf_indicators['mapricecorrel'][-1].astype(str),
-			"last_vwap": stock_bf_full.wf_indicators['vwap'][-1].astype(str),
-			"last_close": stock_bf_full.wf_indicators['close'][-1].astype(str),
+			"stockcode": wf_obj.stockcode,
+			"last_date": wf_obj.wf_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
+			"last_mf": wf_obj.wf_indicators['mf'][-1].astype(str),
+			"last_prop": wf_obj.wf_indicators['prop'][-1].astype(str),
+			"last_pricecorrel": wf_obj.wf_indicators['pricecorrel'][-1].astype(str),
+			"last_mapricecorrel": wf_obj.wf_indicators['mapricecorrel'][-1].astype(str),
+			"last_vwap": wf_obj.wf_indicators['vwap'][-1].astype(str),
+			"last_close": wf_obj.wf_indicators['close'][-1].astype(str),
 		}
 
 		# Define content
