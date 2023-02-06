@@ -41,8 +41,8 @@ async def get_default_response():
 # ==========
 # CHART ROUTER
 # ==========
-@router.get("/chart", tags=[Tags.chart.name])
-@router.get("/chart/foreign", tags=[Tags.chart.name])
+@router.get("/chart", status_code=status.HTTP_200_OK, tags=[Tags.chart.name])
+@router.get("/chart/foreign", status_code=status.HTTP_200_OK, tags=[Tags.chart.name])
 @timeit
 async def get_foreign_chart(
 	media_type:dp.ListMediaType = dp.ListMediaType.json,
@@ -127,7 +127,7 @@ async def get_foreign_chart(
 
 		return Response(content=chart, media_type=mime_type, headers=headers)
 
-@router.get("/chart/broker", tags=[Tags.chart.name])
+@router.get("/chart/broker", status_code=status.HTTP_200_OK, tags=[Tags.chart.name])
 @timeit
 async def get_broker_chart(
 	media_type:dp.ListMediaType = dp.ListMediaType.json,
@@ -256,8 +256,8 @@ async def get_broker_chart(
 # ==========
 # RADAR ROUTER
 # ==========
-@router.get("/radar", tags=[Tags.radar.name])
-@router.get("/radar/foreign", tags=[Tags.radar.name])
+@router.get("/radar", status_code=status.HTTP_200_OK, tags=[Tags.radar.name])
+@router.get("/radar/foreign", status_code=status.HTTP_200_OK, tags=[Tags.radar.name])
 @timeit
 async def get_foreign_radar(
 	media_type:dp.ListMediaType = dp.ListMediaType.json,
@@ -331,7 +331,7 @@ async def get_foreign_radar(
 		
 		return Response(content=chart, media_type=mime_type, headers=headers)
 
-@router.get("/radar/broker", tags=[Tags.radar.name])
+@router.get("/radar/broker", status_code=status.HTTP_200_OK, tags=[Tags.radar.name])
 @timeit
 async def get_broker_radar(
 	media_type:dp.ListMediaType = dp.ListMediaType.json,
@@ -428,8 +428,8 @@ async def get_broker_radar(
 # ==========
 # FULL DATA ROUTER
 # ==========
-@router.get("/full-data", tags=[Tags.full_data.name])
-@router.get("/full-data/foreign", tags=[Tags.full_data.name])
+@router.get("/full-data", status_code=status.HTTP_200_OK, tags=[Tags.full_data.name])
+@router.get("/full-data/foreign", status_code=status.HTTP_200_OK, tags=[Tags.full_data.name])
 @timeit
 async def get_foreign_data(
 	stockcode: str | None = None,
@@ -477,7 +477,7 @@ async def get_foreign_data(
 	else:
 		return full_data.to_dict(orient="index")
 
-@router.get("/full-data/broker", tags=[Tags.full_data.name])
+@router.get("/full-data/broker", status_code=status.HTTP_200_OK, tags=[Tags.full_data.name])
 @timeit
 async def get_broker_data(
 	api_type: dp.ListBrokerApiType = dp.ListBrokerApiType.brokerflow,
@@ -558,9 +558,9 @@ async def get_broker_data(
 # ==========
 # SCREENER ROUTER
 # ==========
-@router.get("/screener", tags=[Tags.screener.name])
-@router.get("/screener/foreign", tags=[Tags.screener.name])
-@router.get("/screener/foreign/top-money-flow", tags=[Tags.screener.name])
+@router.get("/screener", status_code=status.HTTP_200_OK, tags=[Tags.screener.name])
+@router.get("/screener/foreign", status_code=status.HTTP_200_OK, tags=[Tags.screener.name])
+@router.get("/screener/foreign/top-money-flow", status_code=status.HTTP_200_OK, tags=[Tags.screener.name])
 @timeit
 async def get_screener_foreign_moneyflow(
 	accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
@@ -613,7 +613,7 @@ async def get_screener_foreign_moneyflow(
 		"top_stockcodes":top_stockcodes.to_dict(orient="index")
 		}
 
-@router.get("/screener/broker/top-money-flow", tags=[Tags.screener.name])
+@router.get("/screener/broker/top-money-flow", status_code=status.HTTP_200_OK, tags=[Tags.screener.name])
 @timeit
 async def get_screener_broker_moneyflow(
 	accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
