@@ -46,6 +46,7 @@ app = FastAPI(
 	version="0.0.0",
 	contact={
 		"name": "Kevin Daffa Arrahman",
+		"url": "https://quantist.io",
 		"email": "kevindaffaarr@quantist.io"
 	},
 	openapi_tags=[dict(tag.value) for tag in Tags]
