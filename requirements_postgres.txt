@@ -6,7 +6,7 @@ greenlet==1.1.2
 h11==0.13.0
 httptools==0.4.0
 idna==3.4
-numpy==1.23.1
+numpy==1.24.2
 pandas==1.4.4
 plotly==5.11.0
 psycopg2==2.9.3
