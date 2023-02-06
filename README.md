@@ -7,3 +7,7 @@ Consists of high-end analysis tools based on data with top-down analysis:
 * Fundamental: business performance, corporate action
 * Transaction: foreign flow, broker summary clustering, done trade, 5% shares holder, share holder distribution
 * Behaviour: supply & demand, momentum, trend, time
+
+For more information, you can find us at:
+* [Website](https://quantist.io)
+* [Email](mailto:kevindaffaar@quantist.io)
