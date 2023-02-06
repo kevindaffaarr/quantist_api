@@ -253,10 +253,13 @@ class StockBFFull():
 		# Main Query Fetching
 		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
 			.reset_index(drop=True).set_index('date')
-		# Update self.startdate to available date in database
+
+		# Update self.startdate and self.enddate to available date in database
+		self.startdate = raw_data_main.index[0].date() # type: ignore
+		self.enddate = raw_data_main.index[-1].date() # type: ignore
 
 		# Pre-Data Query
-		startdate = raw_data_main.index[0].date() # type: ignore
+		startdate = self.startdate
 		qry_pre = qry.filter(db.StockData.date < startdate)\
 			.order_by(db.StockData.date.desc())\
 			.limit(preoffset_period_param)\
@@ -609,7 +612,7 @@ class StockBFFull():
 			)
 
 		# End of Method: Return Processed Raw Data to BF Indicators
-		return raw_data_full.drop(raw_data_full.index[:preoffset_period_param])
+		return raw_data_full.loc[self.startdate:self.enddate]
 
 	async def chart(self,media_type: str | None = None):
 		assert self.stockcode is not None
