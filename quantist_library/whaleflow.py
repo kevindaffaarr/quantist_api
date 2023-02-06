@@ -258,4 +258,7 @@ class BrokerFlow(WhaleFlow, bf.StockBFFull):
 		return await WhaleFlow._gen_full_chart(self,
 			wf_indicators=self.wf_indicators,
 			media_type=media_type,
+			selected_broker=self.selected_broker,
+			optimum_n_selected_cluster=self.optimum_n_selected_cluster,
+			optimum_corr=self.optimum_corr,
 			)

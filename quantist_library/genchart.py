@@ -155,7 +155,7 @@ async def quantist_stock_chart(
 	dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if not d in dt_obs]
 
 	fig.update_xaxes(title_text="Date", row=2, col=1, showgrid=True)
-	fig.update_xaxes(title_text="Scripless% | Date", row=1, col=2, showgrid=True, showticklabels=True)
+	fig.update_xaxes(title_text="Scripless % | Date", row=1, col=2, showgrid=True, showticklabels=True)
 	fig.update_xaxes(rangeslider={"autorange":True, "visible":False})
 	fig.update_xaxes(col=1, rangebreaks=[dict(values=dt_breaks)])
 	# fig.update_layout({"xaxis_range":[start_temp,end_temp+datetime.timedelta(days=round(len(wf_indicators)*0.1))]})
@@ -210,9 +210,9 @@ async def quantist_stock_chart(
 	)
 
 	if selected_broker is not None:
-		fig.add_annotation(xref="x domain",yref="paper",xanchor="right",yanchor="bottom",x=1,y=-0.15,
-			text=f"Clustering Info<br>N: {optimum_n_selected_cluster} | Corr: {'{:.2f}%'.format(optimum_corr*100)}<br>Selected Broker: {html_wrap(str(selected_broker),32,2)}",
-			font=dict(),align="right",
+		fig.add_annotation(xref="x2 domain",yref="paper",xanchor="right",yanchor="bottom",x=1,y=-0.05,
+			text=f"Clustering Info<br>N: {optimum_n_selected_cluster} | Corr: {'{:.2f}%'.format(optimum_corr*100)}<br>Selected Broker: {html_wrap(str(selected_broker),28,2)}",
+			align="right",
 			showarrow=False
 		)
 
@@ -221,7 +221,7 @@ async def quantist_stock_chart(
 	fig.update_layout(title={"text":f"<b>{STOCKCODE}</b>", "x":0.5})
 
 	# UPDATE_LAYOUT GLOBAL DEFAULT TEMPLATE
-	fig.update_layout(legend={"orientation":"h","y":-0.1, "traceorder":"normal"})
+	fig.update_layout(legend={"orientation":"h","y":-0.075, "traceorder":"normal"})
 	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
 	fig.update_layout(dragmode="pan")
 	fig.update_layout(margin=dict(l=0,r=0,b=50,t=75,pad=0))
