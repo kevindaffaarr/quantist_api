@@ -574,11 +574,11 @@ class StockBFFull():
 		raw_data_full['mf'] = selected_data_broker_nval.rolling(window=period_mf).sum()
 
 		# Whale Proportion
-		raw_data_full['prop'] = selected_data_broker_sumval.rolling(window=period_prop).sum() \
+		raw_data_full['prop'] = selected_data_broker_sumval.rolling(window=period_prop).sum().abs() \
 			/ (raw_data_full['value'].rolling(window=period_prop).sum()*2)
 
 		# Whale Net Proportion
-		raw_data_full['netprop'] = selected_data_broker_nval.rolling(window=period_prop).sum() \
+		raw_data_full['netprop'] = selected_data_broker_nval.rolling(window=period_prop).sum().abs() \
 			/ (raw_data_full['value'].rolling(window=period_prop).sum()*2)
 
 		# Whale correlation
