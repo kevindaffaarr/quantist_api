@@ -142,6 +142,10 @@ class StockFFFull():
 		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
 			.reset_index(drop=True).set_index("date")
 		
+		# Check how many row is returned
+		if raw_data_main.shape[0] == 0:
+			raise ValueError("No data available inside date range")
+		
 		# Update self.startdate and self.enddate to available date in database
 		self.startdate = raw_data_main.index[0].date() # type: ignore # Assign self.startdate to new defined startdate
 		self.enddate = raw_data_main.index[-1].date() # type: ignore # Assign self.enddate to new defined enddate
@@ -200,9 +204,16 @@ class StockFFFull():
 		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
 			.reset_index(drop=True).set_index('date')
 		
+		# Check how many row is returned
+		if raw_data_main.shape[0] == 0:
+			raise ValueError("No data available inside date range")
+		
+		# Update self.startdate and self.enddate to available date in database
+		self.startdate = raw_data_main.index[0].date() # type: ignore # Assign self.startdate to new defined startdate
+		self.enddate = raw_data_main.index[-1].date() # type: ignore # Assign self.enddate to new defined enddate
+		
 		# Pre-Data Query
-		startdate = raw_data_main.index[0].date() # type: ignore # Assign startdate to new defined startdate
-		self.startdate = raw_data_main.index[0].date() # type: ignore # Assign self.startdate
+		startdate = self.startdate
 		qry_pre = qry.filter(db.IndexData.date < startdate)\
 			.order_by(db.IndexData.date.desc())\
 			.limit(preoffset_period_param).subquery()
@@ -367,6 +378,10 @@ class ForeignRadar():
 			bar_range=bar_range,
 			dbs=self.dbs)
 
+		# Check how many row is returned
+		if stocks_raw_data.shape[0] == 0:
+			raise ValueError("No data available inside date range")
+		
 		# Set startdate and enddate based on data availability
 		self.startdate = stocks_raw_data['date'].min().date()
 		self.enddate = stocks_raw_data['date'].max().date()
@@ -462,9 +477,8 @@ class ForeignRadar():
 			.order_by(db.StockData.code.asc(),db.StockData.date.asc())
 			
 		# Query Fetching: stocks raw data
-		stocks_raw_data = pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"])\
+		return pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"])\
 			.reset_index(drop=True)
-		return stocks_raw_data
 	
 	async def __get_composite_raw_data(self,
 		startdate:datetime.date | None =None,
