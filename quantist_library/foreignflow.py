@@ -644,6 +644,11 @@ class ScreenerBase(ForeignRadar):
 		return self
 
 class ScreenerMoneyFlow(ScreenerBase):
+	"""
+	Get the most accumulated or distributed stock based on money flow
+	between startdate and enddate or within screener_period
+	output: n_stockcodes of stockcodes
+	"""
 	def __init__(self,
 		accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
 		n_stockcodes: int = 10,
@@ -673,7 +678,8 @@ class ScreenerMoneyFlow(ScreenerBase):
 		self.screener_period = screener_period
 	
 	async def screen(self) -> ScreenerMoneyFlow:
-		# get default param radar, defined startdate, and filtered_stockcodes that should be analyzed
+		# Get default param: self.period_mf, self.period_pricecorrel, self.screener_min_value, self.screener_min_frequency, self.screener_min_prop, self.bar_range
+		# Get processed self.startdate, self.filtered_stockcodes
 		await super()._fit_base()
 		
 		# get ranked, filtered, and pre-calculated indicator data of filtered_stockcodes
@@ -776,3 +782,136 @@ class ScreenerMoneyFlow(ScreenerBase):
 		self.enddate = raw_data.index.get_level_values('date').max()
 
 		return top_stockcodes
+
+class ScreenerVWAP(ScreenerBase):
+	"""
+	Get the top n stockcodes based on VWAP indicator:
+		- Rally (always close > vwap within n days)
+		- Around VWAP (close around x% of vwap)
+		- Breakout (t_x: close < vwap, t_y: close > vwap, within n days, and now close > vwap)
+		- Breakdown (t_x: close > vwap, t_y: close < vwap, within n days, and now close < vwap)
+	
+	General Rules:
+		- Money flow is on the suitable trend
+		- Value, Freq, Prop more than min_value, min_frequency, min_prop
+	"""
+	def __init__(self,
+		screener_vwap_criteria: Literal[
+			dp.ScreenerList.vwap_rally,
+			dp.ScreenerList.vwap_around,
+			dp.ScreenerList.vwap_breakout,
+			dp.ScreenerList.vwap_breakdown
+			] = dp.ScreenerList.vwap_rally,
+		n_stockcodes: int = 10,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = datetime.date.today(),
+		screener_period: int | None = None,
+		stockcode_excludes: set[str] = set(),
+		screener_min_value: int | None = None,
+		screener_min_frequency: int | None = None,
+		screener_min_prop:int | None = None,
+		period_vwap: int | None = None,
+		dbs: db.Session = next(db.get_dbs())
+		) -> None:
+		screener_vwap_criteria_list = [
+			dp.ScreenerList.vwap_rally,
+			dp.ScreenerList.vwap_around,
+			dp.ScreenerList.vwap_breakout,
+			dp.ScreenerList.vwap_breakdown
+		]
+		assert screener_vwap_criteria in screener_vwap_criteria_list, f'screener_vwap_criteria_list must be {screener_vwap_criteria_list}'
+
+		super().__init__(
+			startdate = startdate,
+			enddate = enddate,
+			stockcode_excludes = stockcode_excludes,
+			screener_min_value = screener_min_value,
+			screener_min_frequency = screener_min_frequency,
+			screener_min_prop = screener_min_prop,
+			dbs = dbs,
+		)
+
+		self.screener_vwap_criteria = screener_vwap_criteria
+		self.n_stockcodes = n_stockcodes
+		self.screener_period = screener_period
+		self.period_vwap = period_vwap
+
+	async def _vwap_prep(self, asc_or_desc:Literal["asc","desc"] = "desc") -> ScreenerVWAP:
+		# Get default period_vwap
+		if self.period_vwap is None:
+			qry = self.dbs.query(db.DataParam.param, db.DataParam.value)\
+				.filter(db.DataParam.param == 'default_ff_period_vwap')
+			self.period_vwap = int(qry.one().value)
+		
+		assert isinstance(self.period_vwap, int), f'period_vwap must be integer'
+
+		# Get main data from startdate to enddate
+		qry = self.dbs.query(
+			db.StockData.date,
+			db.StockData.code,
+			db.StockData.close,
+			db.StockData.foreignbuy,
+			db.StockData.foreignsell,
+		).filter(db.StockData.code.in_(self.filtered_stockcodes))\
+		.filter(db.StockData.code.notin_(self.stockcode_excludes))\
+		.filter(db.StockData.date.between(self.startdate,self.enddate))\
+		.order_by(db.StockData.code, db.StockData.date)
+		
+		# Main Query Fetching
+		self.raw_data = pd.read_sql(sql=qry.statement, con=self.dbs.bind, parse_dates=['date']).reset_index(drop=True)\
+			.sort_values(['code','date']).set_index(['code','date'])
+		# Update startdate and enddate based on self.raw_data
+		self.startdate = self.raw_data.index.get_level_values('date').min().date()
+		self.enddate = self.raw_data.index.get_level_values('date').max().date()
+
+		# Get pre-data startdate
+		qry = self.dbs.query(
+			db.StockData.date,
+		).filter(db.StockData.code == 'bbca')\
+		.filter(db.StockData.date < self.startdate)\
+		.order_by(db.StockData.date.desc())\
+		.limit(self.period_vwap)
+		fetch = pd.read_sql(sql=qry.statement, con=self.dbs.bind, parse_dates=['date']).reset_index(drop=True)
+		pre_startdate = fetch.iloc[:,0].min()
+		# Get pre-data for VWAP
+		qry = self.dbs.query(
+			db.StockData.date,
+			db.StockData.code,
+			db.StockData.close,
+			db.StockData.foreignbuy,
+			db.StockData.foreignsell,
+		).filter(db.StockData.code.in_(self.filtered_stockcodes))\
+		.filter(db.StockData.code.notin_(self.stockcode_excludes))\
+		.filter(db.StockData.date < self.startdate)\
+		.filter(db.StockData.date >= pre_startdate)\
+		.order_by(db.StockData.code, db.StockData.date)
+		pre_raw_data = pd.read_sql(sql=qry.statement, con=self.dbs.bind, parse_dates=['date']).reset_index(drop=True)\
+			.sort_values(['code','date']).set_index(['code','date'])
+		
+		# Concat data
+		self.raw_data = pd.concat([pre_raw_data, self.raw_data], axis=0)
+
+		# Calculate VWAP
+		self.raw_data['fbval'] = self.raw_data['close']*self.raw_data['foreignbuy']
+		self.raw_data['fsval'] = self.raw_data['close']*self.raw_data['foreignsell']
+		self.raw_data['netvol'] = self.raw_data['foreignbuy']-self.raw_data['foreignsell']
+		self.raw_data['netval'] = self.raw_data['fbval']-self.raw_data['fsval']
+		self.raw_data['volflow'] = self.raw_data['netvol'].cumsum()
+		self.raw_data['vwap'] = (self.raw_data['netval'].rolling(window=self.period_vwap).apply(lambda x: x[x>0].sum()))\
+			/(self.raw_data['netvol'].rolling(window=self.period_vwap).apply(lambda x: x[x>0].sum()))
+
+		# Filter only startdate to enddate
+		self.raw_data = self.raw_data.loc[
+			(self.raw_data.index.get_level_values('date') >= pd.Timestamp(self.startdate)) & \
+			(self.raw_data.index.get_level_values('date') <= pd.Timestamp(self.enddate))]
+
+		return self
+
+	async def screen(self) -> ScreenerVWAP:
+		# Get default param: self.period_mf, self.period_pricecorrel, self.screener_min_value, self.screener_min_frequency, self.screener_min_prop, self.bar_range
+		# Get processed self.startdate, self.filtered_stockcodes
+		await super()._fit_base()
+
+		await self._vwap_prep()
+
+		return self
