@@ -895,8 +895,8 @@ class ScreenerVWAP(ScreenerBase):
 		self.raw_data['fsval'] = self.raw_data['close']*self.raw_data['foreignsell']
 		self.raw_data['netvol'] = self.raw_data['foreignbuy']-self.raw_data['foreignsell']
 		self.raw_data['netval'] = self.raw_data['fbval']-self.raw_data['fsval']
-		self.raw_data['vwap'] = (self.raw_data['netval'].rolling(window=self.period_vwap).apply(lambda x: x[x>0].sum()))\
-			/(self.raw_data['netvol'].rolling(window=self.period_vwap).apply(lambda x: x[x>0].sum()))
+		self.raw_data['vwap'] = ((self.raw_data['netval'].groupby(level='code').rolling(window=self.period_vwap).apply(lambda x: x[x>0].sum()))\
+			/(self.raw_data['netvol'].groupby(level='code').rolling(window=self.period_vwap).apply(lambda x: x[x>0].sum()))).droplevel(0)
 
 		# Filter only startdate to enddate
 		self.raw_data = self.raw_data.loc[
@@ -918,6 +918,10 @@ class ScreenerVWAP(ScreenerBase):
 			stocklist = await self._get_vwap_rally()
 		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_around:
 			stocklist = await self._get_vwap_around()
+		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_breakout:
+			stocklist = await self._get_vwap_breakout()
+		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_breakdown:
+			stocklist = await self._get_vwap_breakdown()
 		else:
 			raise ValueError(f'Invalid screener_vwap_criteria: {self.screener_vwap_criteria}')
 		
@@ -959,5 +963,41 @@ class ScreenerVWAP(ScreenerBase):
 		# Get stockcodes with last self.raw_data['close'] around last self.raw_data['vwap'], within percentage_range
 		last_data = self.raw_data[['close','vwap']].groupby(level='code').last()
 		stocklist = last_data[(last_data['close'] >= last_data['vwap']*(1-self.percentage_range)) & (last_data['close'] <= last_data['vwap']*(1+self.percentage_range))].index.tolist()
+
+		return stocklist
+
+	async def _get_vwap_breakout(self) -> list:
+		"""Breakout (t_(x-1): close < vwap, t_(x): close > vwap, within n days, and now close > vwap)"""
+		# Get stockcodes with now close > vwap
+		last_data = self.raw_data[['close','vwap']].groupby(level='code').last()
+		stocklist = last_data[last_data['close'] >= last_data['vwap']].index.tolist()
+
+		# Define breakout
+		top_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(stocklist)]
+		top_data['close_morethan_vwap'] = top_data['close'] >= top_data['vwap']
+		top_data['breakout'] = top_data.groupby(level='code').rolling(window=2)['close_morethan_vwap']\
+			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0)
+		
+		# Get stockcodes with breakout
+		stocklist = top_data['breakout'].groupby(level='code').any()
+		stocklist = stocklist[stocklist].index.tolist()
+
+		return stocklist
+
+	async def _get_vwap_breakdown(self) -> list:
+		"""Breakdown (t_x: close > vwap, t_y: close < vwap, within n days, and now close < vwap)"""
+		# Get stockcodes with now close < vwap
+		last_data = self.raw_data[['close','vwap']].groupby(level='code').last()
+		stocklist = last_data[last_data['close'] <= last_data['vwap']].index.tolist()
+
+		# Define breakdown
+		top_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(stocklist)]
+		top_data['close_lessthan_vwap'] = top_data['close'] <= top_data['vwap']
+		top_data['breakdown'] = top_data.groupby(level='code').rolling(window=2)['close_lessthan_vwap']\
+			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0)
+		
+		# Get stockcodes with breakdown
+		stocklist = top_data['breakdown'].groupby(level='code').any()
+		stocklist = stocklist[stocklist].index.tolist()
 
 		return stocklist
