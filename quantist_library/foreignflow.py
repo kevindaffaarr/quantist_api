@@ -602,12 +602,12 @@ class ScreenerBase(ForeignRadar):
 
 	async def _fit_base(self) -> ScreenerBase:
 		# get default param radar
-		default_radar = await super()._get_default_radar()
-		self.period_mf = int(default_radar['default_radar_period_mf'])
-		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel'])
-		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
-		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
-		self.screener_min_prop = int(default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop
+		self.default_radar = await super()._get_default_radar()
+		self.period_mf = int(self.default_radar['default_radar_period_mf'])
+		self.period_pricecorrel = int(self.default_radar['default_radar_period_pricecorrel'])
+		self.screener_min_value = int(self.default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
+		self.screener_min_frequency = int(self.default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
+		self.screener_min_prop = int(self.default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop
 
 		# Define startdate
 		if self.startdate is None:
@@ -806,6 +806,7 @@ class ScreenerVWAP(ScreenerBase):
 		enddate: datetime.date = datetime.date.today(),
 		screener_period: int | None = None,
 		stockcode_excludes: set[str] = set(),
+		percentage_range: float | None = 0.05,
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
 		screener_min_prop:int | None = None,
@@ -833,14 +834,13 @@ class ScreenerVWAP(ScreenerBase):
 		self.screener_vwap_criteria = screener_vwap_criteria
 		self.n_stockcodes = n_stockcodes
 		self.screener_period = screener_period
+		self.percentage_range = percentage_range
 		self.period_vwap = period_vwap
 
 	async def _vwap_prep(self) -> ScreenerVWAP:
-		# Get default period_vwap
-		if self.period_vwap is None:
-			qry = self.dbs.query(db.DataParam.param, db.DataParam.value)\
-				.filter(db.DataParam.param == 'default_ff_period_vwap')
-			self.period_vwap = int(qry.one().value)
+		# Get default period_vwap, percentage_range
+		self.period_vwap = int(self.default_radar['default_screener_period_vwap']) if self.period_vwap is None else self.period_vwap
+		self.percentage_range = float(self.default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
 		
 		assert isinstance(self.period_vwap, int), f'period_vwap must be integer'
 
@@ -915,8 +915,15 @@ class ScreenerVWAP(ScreenerBase):
 
 		# Go to get top codes for each screener_vwap_criteria
 		if self.screener_vwap_criteria == dp.ScreenerList.vwap_rally:
-			await self._get_vwap_rally()
+			stocklist = await self._get_vwap_rally()
+		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_around:
+			stocklist = await self._get_vwap_around()
+		else:
+			raise ValueError(f'Invalid screener_vwap_criteria: {self.screener_vwap_criteria}')
 		
+		# Get data from stocklist
+		await self._get_data_from_stocklist(stocklist)
+
 		# Compile data for top_stockcodes from stocklist and top_data
 		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
 		self.top_stockcodes['netval'] = self.top_data['netval'].groupby(level='code').sum()
@@ -924,12 +931,7 @@ class ScreenerVWAP(ScreenerBase):
 		
 		return self
 
-	async def _get_vwap_rally(self) -> ScreenerVWAP:
-		"""Rally (always close > vwap within n days)"""
-		# Get stockcodes with self.raw_data['close'] always self.raw_data['vwap']
-		stocklist = (self.raw_data['close'] > self.raw_data['vwap']).groupby(level='code').all()
-		stocklist = stocklist[stocklist].index.tolist()
-
+	async def _get_data_from_stocklist(self, stocklist: list) -> ScreenerVWAP:
 		# Get data from stocklist
 		top_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(stocklist)]
 		# Sum netval for each code and get top n_stockcodes
@@ -940,4 +942,22 @@ class ScreenerVWAP(ScreenerBase):
 		
 		self.stocklist = stocklist
 		self.top_data = top_data
+
 		return self
+
+	async def _get_vwap_rally(self) -> list:
+		"""Rally (always close > vwap within n days)"""
+		# Get stockcodes with self.raw_data['close'] always self.raw_data['vwap']
+		stocklist = (self.raw_data['close'] >= self.raw_data['vwap']).groupby(level='code').all()
+		stocklist = stocklist[stocklist].index.tolist()
+
+		return stocklist
+
+	async def _get_vwap_around(self) -> list:
+		"""Around VWAP (close around x% of vwap)"""
+		assert self.percentage_range is not None
+		# Get stockcodes with last self.raw_data['close'] around last self.raw_data['vwap'], within percentage_range
+		last_data = self.raw_data[['close','vwap']].groupby(level='code').last()
+		stocklist = last_data[(last_data['close'] >= last_data['vwap']*(1-self.percentage_range)) & (last_data['close'] <= last_data['vwap']*(1+self.percentage_range))].index.tolist()
+
+		return stocklist
