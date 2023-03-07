@@ -510,7 +510,7 @@ class ForeignRadar():
 			db.IndexData.date,
 			db.IndexData.close,
 			(db.IndexTransactionCompositeForeign.foreignbuyval/db.IndexData.close).label('foreignbuy'), # type: ignore
- 			(db.IndexTransactionCompositeForeign.foreignsellval/db.IndexData.close).label('foreignsell') # type: ignore
+			(db.IndexTransactionCompositeForeign.foreignsellval/db.IndexData.close).label('foreignsell') # type: ignore
 			).\
 			filter(db.IndexData.code=="composite")\
 			.filter(db.IndexData.date.between(startdate,enddate))\
@@ -792,7 +792,6 @@ class ScreenerVWAP(ScreenerBase):
 		- Breakdown (t_x: close > vwap, t_y: close < vwap, within n days, and now close < vwap)
 	
 	General Rules:
-		- Money flow is on the suitable trend
 		- Value, Freq, Prop more than min_value, min_frequency, min_prop
 	"""
 	def __init__(self,
@@ -836,7 +835,7 @@ class ScreenerVWAP(ScreenerBase):
 		self.screener_period = screener_period
 		self.period_vwap = period_vwap
 
-	async def _vwap_prep(self, asc_or_desc:Literal["asc","desc"] = "desc") -> ScreenerVWAP:
+	async def _vwap_prep(self) -> ScreenerVWAP:
 		# Get default period_vwap
 		if self.period_vwap is None:
 			qry = self.dbs.query(db.DataParam.param, db.DataParam.value)\
@@ -896,7 +895,6 @@ class ScreenerVWAP(ScreenerBase):
 		self.raw_data['fsval'] = self.raw_data['close']*self.raw_data['foreignsell']
 		self.raw_data['netvol'] = self.raw_data['foreignbuy']-self.raw_data['foreignsell']
 		self.raw_data['netval'] = self.raw_data['fbval']-self.raw_data['fsval']
-		self.raw_data['volflow'] = self.raw_data['netvol'].cumsum()
 		self.raw_data['vwap'] = (self.raw_data['netval'].rolling(window=self.period_vwap).apply(lambda x: x[x>0].sum()))\
 			/(self.raw_data['netvol'].rolling(window=self.period_vwap).apply(lambda x: x[x>0].sum()))
 
@@ -912,6 +910,34 @@ class ScreenerVWAP(ScreenerBase):
 		# Get processed self.startdate, self.filtered_stockcodes
 		await super()._fit_base()
 
+		# Get self.raw_data, and update self.startdate, self.enddate
 		await self._vwap_prep()
 
+		# Go to get top codes for each screener_vwap_criteria
+		if self.screener_vwap_criteria == dp.ScreenerList.vwap_rally:
+			await self._get_vwap_rally()
+		
+		# Compile data for top_stockcodes from stocklist and top_data
+		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
+		self.top_stockcodes['netval'] = self.top_data['netval'].groupby(level='code').sum()
+		self.top_stockcodes = self.top_stockcodes.sort_values('netval', ascending=False)
+		
+		return self
+
+	async def _get_vwap_rally(self) -> ScreenerVWAP:
+		"""Rally (always close > vwap within n days)"""
+		# Get stockcodes with self.raw_data['close'] always self.raw_data['vwap']
+		stocklist = (self.raw_data['close'] > self.raw_data['vwap']).groupby(level='code').all()
+		stocklist = stocklist[stocklist].index.tolist()
+
+		# Get data from stocklist
+		top_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(stocklist)]
+		# Sum netval for each code and get top n_stockcodes
+		stocklist = top_data['netval'].groupby(level='code').sum().nlargest(self.n_stockcodes).index.tolist()
+
+		# Get data from stocklist
+		top_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(stocklist)]
+		
+		self.stocklist = stocklist
+		self.top_data = top_data
 		return self
