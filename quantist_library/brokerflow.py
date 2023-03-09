@@ -1467,16 +1467,16 @@ class ScreenerBase(WhaleRadar):
 			)
 		
 		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
-		# self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
-		# 	await self._get_filtered_stockcodes_by_corr(
-		# 		filter_opt_corr=self.filter_opt_corr,
-		# 		optimum_corr=self.optimum_corr,
-		# 		filtered_stockcodes=self.filtered_stockcodes,
-		# 		raw_data_full=raw_data_full,
-		# 		raw_data_broker_nvol=raw_data_broker_nvol,
-		# 		raw_data_broker_nval=raw_data_broker_nval,
-		# 		raw_data_broker_sumval=raw_data_broker_sumval,
-		# 	)
+		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+			await self._get_filtered_stockcodes_by_corr(
+				filter_opt_corr=self.filter_opt_corr,
+				optimum_corr=self.optimum_corr,
+				filtered_stockcodes=self.filtered_stockcodes,
+				raw_data_full=raw_data_full,
+				raw_data_broker_nvol=raw_data_broker_nvol,
+				raw_data_broker_nval=raw_data_broker_nval,
+				raw_data_broker_sumval=raw_data_broker_sumval,
+			)
 		
 		# Get radar period filtered stockdata
 		if self.startdate == self.enddate:
