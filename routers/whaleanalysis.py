@@ -686,3 +686,65 @@ async def get_screener_broker_moneyflow(
 		"screener_metadata":screener_metadata,
 		"top_stockcodes":top_stockcodes.to_dict(orient="index")
 		}
+
+@router.get("/screener/foreign/vwap", status_code=status.HTTP_200_OK, tags=[Tags.screener.name])
+@timeit
+async def get_screener_foreign_vwap(
+	screener_vwap_criteria: Literal[
+		dp.ScreenerList.vwap_rally,
+		dp.ScreenerList.vwap_around,
+		dp.ScreenerList.vwap_breakout,
+		dp.ScreenerList.vwap_breakdown
+		] = dp.ScreenerList.vwap_rally,
+	n_stockcodes: int = 10,
+	startdate: datetime.date | None = None,
+	enddate: datetime.date = datetime.date.today(),
+	screener_period: int | None = None,
+	stockcode_excludes: set[str] = Query(default=set()),
+	percentage_range: float | None = 0.05,
+	screener_min_value: int | None = None,
+	screener_min_frequency: int | None = None,
+	screener_min_prop:int | None = None,
+	period_vwap: int | None = None,
+	):
+	try:
+		screener_vwap_object = ff.ScreenerVWAP(
+			screener_vwap_criteria = screener_vwap_criteria,
+			n_stockcodes = n_stockcodes,
+			startdate = startdate,
+			enddate = enddate,
+			screener_period = screener_period,
+			stockcode_excludes = stockcode_excludes,
+			percentage_range = percentage_range,
+			screener_min_value = screener_min_value,
+			screener_min_frequency = screener_min_frequency,
+			screener_min_prop = screener_min_prop,
+			period_vwap = period_vwap,
+		)
+		screener_vwap_object = await screener_vwap_object.screen()
+
+		top_stockcodes = screener_vwap_object.top_stockcodes
+	
+	except ValueError as err:
+		raise HTTPException(status.HTTP_400_BAD_REQUEST,detail=err.args[0]) from err
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,detail=err.args[0]) from err
+	
+	else:
+		# Define screener_metadata
+		screener_metadata = {
+			"analysis_method": dp.AnalysisMethod.foreign,
+			"screener_method": screener_vwap_criteria,
+			"bar_range": screener_vwap_object.bar_range,
+			"enddate": screener_vwap_object.enddate.strftime("%Y-%m-%d"), # type: ignore
+		}
+		if isinstance(screener_vwap_object.startdate, datetime.date):
+			screener_metadata["startdate"] = screener_vwap_object.startdate.strftime("%Y-%m-%d")
+		else:
+			screener_metadata["startdate"] = None
+
+	# Return screener_metadata and top_stockcodes
+	return {
+		"screener_metadata":screener_metadata,
+		"top_stockcodes":top_stockcodes.to_dict(orient="index")
+		}
