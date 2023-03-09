@@ -254,6 +254,10 @@ class StockBFFull():
 		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
 			.reset_index(drop=True).set_index('date')
 
+		# Check how many row is returned
+		if raw_data_main.shape[0] == 0:
+			raise ValueError("No data available inside date range")
+		
 		# Update self.startdate and self.enddate to available date in database
 		self.startdate = raw_data_main.index[0].date() # type: ignore
 		self.enddate = raw_data_main.index[-1].date() # type: ignore
@@ -913,7 +917,7 @@ class WhaleRadar():
 
 			# Check how many row is returned
 			if raw_data.shape[0] == 0:
-				raise ValueError("No data available in date range")
+				raise ValueError("No data available inside date range")
 
 		start_date = enddate - relativedelta(months=default_months_range)
 
@@ -1463,16 +1467,16 @@ class ScreenerBase(WhaleRadar):
 			)
 		
 		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
-		# self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
-		# 	await self._get_filtered_stockcodes_by_corr(
-		# 		filter_opt_corr=self.filter_opt_corr,
-		# 		optimum_corr=self.optimum_corr,
-		# 		filtered_stockcodes=self.filtered_stockcodes,
-		# 		raw_data_full=raw_data_full,
-		# 		raw_data_broker_nvol=raw_data_broker_nvol,
-		# 		raw_data_broker_nval=raw_data_broker_nval,
-		# 		raw_data_broker_sumval=raw_data_broker_sumval,
-		# 	)
+		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+			await self._get_filtered_stockcodes_by_corr(
+				filter_opt_corr=self.filter_opt_corr,
+				optimum_corr=self.optimum_corr,
+				filtered_stockcodes=self.filtered_stockcodes,
+				raw_data_full=raw_data_full,
+				raw_data_broker_nvol=raw_data_broker_nvol,
+				raw_data_broker_nval=raw_data_broker_nval,
+				raw_data_broker_sumval=raw_data_broker_sumval,
+			)
 		
 		# Get radar period filtered stockdata
 		if self.startdate == self.enddate:

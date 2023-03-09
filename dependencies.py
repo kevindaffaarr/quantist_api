@@ -90,17 +90,16 @@ class AnalysisMethod(str, Enum):
 class ScreenerList(str, Enum):
 	most_accumulated = "most_accumulated"
 	most_distributed = "most_distributed"
+	vwap_rally = "vwap_rally"
+	vwap_around = "vwap_around"
+	vwap_breakout = "vwap_breakout"
+	vwap_breakdown = "vwap_breakdown"
 	highprop_inflow = "highprop_inflow"
 	highcorr_inflow = "highcorr_inflow"
 	rebound_flow = "rebound_flow"
 	drop_flow = "drop_flow"
 	inflow_pricestay = "inflow_pricestay"
 	neutral_downprice = "neutral_downprice"
-	rally_flow = "rally_flow"
-	crossup_vwap = "crossup_vwap"
-	crossdown_vwap = "crossdown_vwap"
-	price_around_vwap = "price_around_vwap"
-	price_around_vwap_inflow = "price_around_vwap_inflow"
 	peaking_transaction = "peaking_transaction"
 
 class HoldingSectors(str, Enum):
