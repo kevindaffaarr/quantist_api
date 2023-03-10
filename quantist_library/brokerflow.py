@@ -1423,9 +1423,10 @@ class ScreenerBase(WhaleRadar):
 			dbs=dbs,
 		)
 	
-	async def _fit_base(self) -> ScreenerBase:
+	async def _fit_base(self, predata: str | None = None) -> ScreenerBase:
 		# Get default bf params
-		await super()._get_default_radar(dbs=self.dbs)
+		self.default_radar = await super()._get_default_radar(dbs=self.dbs)
+		assert self.radar_period is not None
 		assert self.screener_min_value is not None
 		assert self.screener_min_frequency is not None
 		assert self.default_months_range is not None
@@ -1434,6 +1435,10 @@ class ScreenerBase(WhaleRadar):
 		assert self.splitted_min_n_cluster is not None
 		assert self.splitted_max_n_cluster is not None
 		assert self.filter_opt_corr is not None
+		self.period_vwap = int(self.default_radar['default_screener_period_vwap']) if self.period_vwap is None else self.period_vwap
+		self.percentage_range = float(self.default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
+		if predata == "vwap":
+			self.radar_period = self.radar_period + self.period_vwap
 
 		# Get  filtered_stock that should be analyzed
 		self.filtered_stockcodes = await self._get_stockcodes(
@@ -1480,7 +1485,6 @@ class ScreenerBase(WhaleRadar):
 		
 		# Get radar period filtered stockdata
 		if self.startdate == self.enddate:
-			assert self.radar_period is not None
 			self.raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 				await self._special_screener_get_radar_period_filtered_stock_data(
 					radar_period = self.radar_period,
@@ -1636,3 +1640,93 @@ class ScreenerMoneyFlow(ScreenerBase):
 				]['close'])
 
 		return top_stockcodes
+
+class ScreenerVWAP(ScreenerBase):
+	"""
+	Get the top n stockcodes based on VWAP indicator:
+		- Rally (always close > vwap within n days)
+		- Around VWAP (close around x% of vwap)
+		- Breakout (t_x: close < vwap, t_y: close > vwap, within n days, and now close > vwap)
+		- Breakdown (t_x: close > vwap, t_y: close < vwap, within n days, and now close < vwap)
+	
+	General Rules:
+		- Value, Freq, Prop more than min_value, min_frequency, min_prop
+	"""
+	def __init__(self,
+		screener_vwap_criteria: Literal[dp.ScreenerList.vwap_rally,dp.ScreenerList.vwap_around,dp.ScreenerList.vwap_breakout,dp.ScreenerList.vwap_breakdown] = dp.ScreenerList.vwap_rally,
+		n_stockcodes: int = 10,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = datetime.date.today(),
+		screener_period: int | None = None,
+		percentage_range: float | None = 0.05,
+		period_vwap: int | None = None,
+		stockcode_excludes: set[str] = set(),
+		screener_min_value: int | None = None,
+		screener_min_frequency: int | None = None,
+		n_selected_cluster:int | None = None,
+		period_mf: int | None = None,
+		period_pricecorrel: int | None = None,
+		default_months_range: int | None = None,
+		training_start_index: float | None = None,
+		training_end_index: float | None = None,
+		min_n_cluster: int | None = None,
+		max_n_cluster: int | None = None,
+		splitted_min_n_cluster: int | None = None,
+		splitted_max_n_cluster: int | None = None,
+		stepup_n_cluster_threshold: int | None = None,
+		filter_opt_corr: int | None = None,
+		dbs: db.Session = next(db.get_dbs())
+		) -> None:
+		screener_vwap_criteria_list = [
+			dp.ScreenerList.vwap_rally,
+			dp.ScreenerList.vwap_around,
+			dp.ScreenerList.vwap_breakout,
+			dp.ScreenerList.vwap_breakdown
+		]
+		assert screener_vwap_criteria in screener_vwap_criteria_list, f'screener_vwap_criteria_list must be {screener_vwap_criteria_list}'
+
+		super().__init__(
+			startdate=startdate,
+			enddate=enddate,
+			stockcode_excludes=stockcode_excludes,
+			screener_min_value=screener_min_value,
+			screener_min_frequency=screener_min_frequency,
+			n_selected_cluster=n_selected_cluster,
+			radar_period=screener_period,
+			period_mf=period_mf,
+			period_pricecorrel=period_pricecorrel,
+			default_months_range=default_months_range,
+			training_start_index=training_start_index,
+			training_end_index=training_end_index,
+			min_n_cluster=min_n_cluster,
+			max_n_cluster=max_n_cluster,
+			splitted_min_n_cluster=splitted_min_n_cluster,
+			splitted_max_n_cluster=splitted_max_n_cluster,
+			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
+			filter_opt_corr=filter_opt_corr,
+			dbs=dbs,
+		)
+
+		self.screener_vwap_criteria = screener_vwap_criteria
+		self.n_stockcodes = n_stockcodes
+		self.screener_period = screener_period
+		self.percentage_range = percentage_range
+		self.period_vwap = period_vwap
+	
+	async def _vwap_prepare(self) -> ScreenerVWAP:
+		# Get default period_vwap, percentage_range
+		assert isinstance(self.period_vwap, int), f'period_vwap must be integer'
+
+		return self
+	
+	async def screen(self) -> ScreenerVWAP:
+		# get default param radar, defined startdate,
+		# filtered_stockcodes should be analyzed
+		# selected_broker each stock, also optimum_n_selected_cluster, optimum_corr, broker_features
+		# raw_data_full, selected_broker_nvol, selected_broker_nval, selected_broker_sumval
+		await super()._fit_base(predata="vwap")
+
+		# combine raw_data_full, selected_broker_nval, selected_broker_nvol, selected_broker_sumval
+		self.raw_data_full = self.raw_data_full.join([self.selected_broker_nval, self.selected_broker_nvol, self.selected_broker_sumval], how='left')
+
+		return self
