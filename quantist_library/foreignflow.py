@@ -409,7 +409,7 @@ class ForeignRadar():
 		
 	async def _get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")))
+			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")) | (db.DataParam.param.like("default_ff_%")))
 		
 		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 		
@@ -839,7 +839,7 @@ class ScreenerVWAP(ScreenerBase):
 
 	async def _vwap_prep(self) -> ScreenerVWAP:
 		# Get default period_vwap, percentage_range
-		self.period_vwap = int(self.default_radar['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap
+		self.period_vwap = int(self.default_radar['default_ff_period_vwap']) if self.period_vwap is None else self.period_vwap
 		self.percentage_range = float(self.default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
 		
 		assert isinstance(self.period_vwap, int), f'period_vwap must be integer'
