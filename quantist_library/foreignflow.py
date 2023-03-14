@@ -839,7 +839,7 @@ class ScreenerVWAP(ScreenerBase):
 
 	async def _vwap_prep(self) -> ScreenerVWAP:
 		# Get default period_vwap, percentage_range
-		self.period_vwap = int(self.default_radar['default_screener_period_vwap']) if self.period_vwap is None else self.period_vwap
+		self.period_vwap = int(self.default_radar['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap
 		self.percentage_range = float(self.default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
 		
 		assert isinstance(self.period_vwap, int), f'period_vwap must be integer'
@@ -930,8 +930,8 @@ class ScreenerVWAP(ScreenerBase):
 
 		# Compile data for top_stockcodes from stocklist and top_data
 		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
-		self.top_stockcodes['netval'] = self.top_data['netval'].groupby(level='code').sum()
-		self.top_stockcodes = self.top_stockcodes.sort_values('netval', ascending=False)
+		self.top_stockcodes['mf'] = self.top_data['netval'].groupby(level='code').sum()
+		self.top_stockcodes = self.top_stockcodes.sort_values('mf', ascending=False)
 		
 		return self
 

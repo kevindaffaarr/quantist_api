@@ -1445,7 +1445,7 @@ class ScreenerBase(WhaleRadar):
 		assert self.splitted_min_n_cluster is not None
 		assert self.splitted_max_n_cluster is not None
 		assert self.filter_opt_corr is not None
-		self.period_vwap = int(self.default_radar['default_screener_period_vwap']) if self.period_vwap is None else self.period_vwap
+		self.period_vwap = int(self.default_radar['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap
 		self.percentage_range = float(self.default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
 		if predata == "vwap":
 			self.radar_period = self.radar_period + self.period_vwap
@@ -1769,8 +1769,8 @@ class ScreenerVWAP(ScreenerBase):
 
 		# Compile data for top_stockcodes from stocklist and top_data
 		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
-		self.top_stockcodes['broker_nval'] = self.top_data['broker_nval'].groupby(level='code').sum()
-		self.top_stockcodes = self.top_stockcodes.sort_values('broker_nval', ascending=False)
+		self.top_stockcodes['mf'] = self.top_data['broker_nval'].groupby(level='code').sum()
+		self.top_stockcodes = self.top_stockcodes.sort_values('mf', ascending=False)
 		
 		return self
 
