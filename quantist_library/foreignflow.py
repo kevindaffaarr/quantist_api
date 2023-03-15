@@ -322,6 +322,7 @@ class ForeignRadar():
 	def __init__(self,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
+		radar_period: int | None = None,
 		y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
 		stockcode_excludes: set[str] = set(),
 		include_composite: bool = False,
@@ -334,6 +335,7 @@ class ForeignRadar():
 		) -> None:
 		self.startdate = startdate
 		self.enddate = enddate
+		self.radar_period = radar_period
 		self.y_axis_type = y_axis_type
 		self.stockcode_excludes = stockcode_excludes
 		self.include_composite = include_composite
