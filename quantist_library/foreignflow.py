@@ -349,12 +349,9 @@ class ForeignRadar():
 	async def fit(self) -> ForeignRadar:
 		# Get default value of parameter
 		default_radar = await self._get_default_radar()
-
-		self.period_mf = int(default_radar['default_radar_period_mf']) if self.startdate is None else None
-		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.startdate is None else None
-		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
-		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
-		self.screener_min_prop = int(default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop
+		assert self.screener_min_value is not None
+		assert self.screener_min_frequency is not None
+		assert self.screener_min_prop is not None
 		
 		# Get filtered stockcodes
 		filtered_stockcodes = await self._get_stockcodes(
@@ -410,8 +407,17 @@ class ForeignRadar():
 	async def _get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
 		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
 			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")) | (db.DataParam.param.like("default_ff_%")))
+		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 		
-		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+		self.period_mf = int(default_radar['default_radar_period_mf']) if self.startdate is None else None
+		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.startdate is None else None
+		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
+		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
+		self.screener_min_prop = int(default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop
+		
+		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else self.radar_period
+
+		return default_radar
 		
 	
 	async def _get_stockcodes(self,
@@ -576,7 +582,7 @@ class ScreenerBase(ForeignRadar):
 	def __init__(self,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
-		screener_period: int | None = None,
+		radar_period: int | None = None,
 		stockcode_excludes: set[str] = set(),
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
@@ -598,39 +604,30 @@ class ScreenerBase(ForeignRadar):
 			dbs = dbs,
 		)
 
-		self.screener_period = screener_period
+		self.radar_period = radar_period
 
-	async def _fit_base(self) -> ScreenerBase:
+	async def _fit_base(self, predata: str | None = None) -> ScreenerBase:
 		# get default param radar
 		self.default_radar = await super()._get_default_radar()
-		self.period_mf = int(self.default_radar['default_radar_period_mf'])
-		self.period_pricecorrel = int(self.default_radar['default_radar_period_pricecorrel'])
-		self.screener_min_value = int(self.default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
-		self.screener_min_frequency = int(self.default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
-		self.screener_min_prop = int(self.default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop
-
+		assert self.screener_min_value is not None
+		assert self.screener_min_frequency is not None
+		assert self.screener_min_prop is not None
+		assert self.radar_period is not None
+		if predata == "vwap":
+			self.period_vwap = int(self.default_radar['default_ff_period_vwap']) if self.period_vwap is None else self.period_vwap
+			self.percentage_range = float(self.default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
+		
 		# Define startdate
 		if self.startdate is None:
-			assert self.period_mf is not None
-			assert self.period_pricecorrel is not None
-			if self.screener_period:
-				self.bar_range = self.screener_period
-			else:
-				self.bar_range = max(self.period_mf,self.period_pricecorrel)
-
 			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
 			sub_qry = self.dbs.query(db.StockData.date
 				).filter(db.StockData.code == 'bbca'
 				).filter(db.StockData.date <= self.enddate
 				).order_by(db.StockData.date.desc()
-				).limit(self.bar_range
+				).limit(self.radar_period
 				).subquery()
 			sub_qry = self.dbs.query(func.min(sub_qry.c.date)).scalar_subquery()
-
 			self.startdate = sub_qry
-		else:
-			self.bar_range = None
-			# self.startdate = self.startdate
 
 		# get list_stock that should be analyzed
 		self.filtered_stockcodes = await super()._get_stockcodes(
@@ -646,7 +643,7 @@ class ScreenerBase(ForeignRadar):
 class ScreenerMoneyFlow(ScreenerBase):
 	"""
 	Get the most accumulated or distributed stock based on money flow
-	between startdate and enddate or within screener_period
+	between startdate and enddate or within radar_period
 	output: n_stockcodes of stockcodes
 	"""
 	def __init__(self,
@@ -654,7 +651,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		n_stockcodes: int = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
-		screener_period: int | None = None,
+		radar_period: int | None = None,
 		stockcode_excludes: set[str] = set(),
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
@@ -675,7 +672,6 @@ class ScreenerMoneyFlow(ScreenerBase):
 
 		self.accum_or_distri = accum_or_distri
 		self.n_stockcodes = n_stockcodes
-		self.screener_period = screener_period
 	
 	async def screen(self) -> ScreenerMoneyFlow:
 		# Get default param: self.period_mf, self.period_pricecorrel, self.screener_min_value, self.screener_min_frequency, self.screener_min_prop, self.bar_range
@@ -683,12 +679,13 @@ class ScreenerMoneyFlow(ScreenerBase):
 		await super()._fit_base()
 		
 		# get ranked, filtered, and pre-calculated indicator data of filtered_stockcodes
-		self.top_stockcodes = await self._get_mf_top_stockcodes(
+		self.top_stockcodes, self.startdate, self.enddate, self.bar_range = await self._get_mf_top_stockcodes(
 			accum_or_distri = self.accum_or_distri,
 			n_stockcodes = self.n_stockcodes,
 			startdate = self.startdate,
 			enddate = self.enddate,
-			screener_period=self.screener_period,
+			radar_period=self.radar_period,
+			period_pricecorrel = self.period_pricecorrel,
 			filtered_stockcodes = self.filtered_stockcodes,
 			stockcode_excludes = self.stockcode_excludes,
 			dbs = self.dbs,
@@ -699,13 +696,14 @@ class ScreenerMoneyFlow(ScreenerBase):
 	async def _get_mf_top_stockcodes(self,
 		accum_or_distri: dp.ScreenerList = dp.ScreenerList.most_accumulated,
 		n_stockcodes: int = 10,
-		startdate: datetime.date | None = None,
-		enddate: datetime.date = datetime.date.today(),
-		screener_period: int | None = None,
+		startdate: datetime.date = ...,
+		enddate: datetime.date = ...,
+		radar_period: int | None = None,
+		period_pricecorrel: int | None = None,
 		filtered_stockcodes: pd.Series = ...,
 		stockcode_excludes: set[str] = ...,
 		dbs: db.Session = next(db.get_dbs())
-		) -> pd.DataFrame:
+		) -> tuple[pd.DataFrame, datetime.date, datetime.date, int]:
 		
 		# Get the top code
 		sub_qry_1 = dbs.query(
@@ -730,14 +728,14 @@ class ScreenerMoneyFlow(ScreenerBase):
 			db.StockData.value,
 		).join(sub_qry_1, sub_qry_1.c.code == db.StockData.code)
 
-		if (startdate == enddate) or (screener_period == 1):
-			# Sub Query for pricecorrel with date from enddate to n rows based on self.period_pricecorrel
+		if (startdate == enddate) or (radar_period == 1):
+			# Sub Query for pricecorrel with date from enddate to n rows based on period_pricecorrel
 			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
-			startdate_pricecorrel = self.dbs.query(db.StockData.date
+			startdate_pricecorrel = dbs.query(db.StockData.date
 				).filter(db.StockData.code == 'bbca'
-				).filter(db.StockData.date <= self.enddate
+				).filter(db.StockData.date <= enddate
 				).order_by(db.StockData.date.desc()
-				).limit(self.period_pricecorrel
+				).limit(period_pricecorrel
 				).subquery()
 			startdate_pricecorrel = dbs.query(func.min(startdate_pricecorrel.c.date)).scalar_subquery()
 			qry = qry.filter(db.StockData.date.between(startdate_pricecorrel,enddate))
@@ -757,9 +755,9 @@ class ScreenerMoneyFlow(ScreenerBase):
 		
 		# Only get raw_data between startdate and enddate
 		if not isinstance(startdate, datetime.date):
-			# If screener_period is not None, get n last rows of raw_data for each code group based on screener_period
-			if screener_period is not None:
-				raw_data = raw_data.groupby("code").tail(screener_period)
+			# If radar_period is not None, get n last rows of raw_data for each code group based on radar_period
+			if radar_period is not None:
+				raw_data = raw_data.groupby("code").tail(radar_period)
 			else:
 				# Update startdate if startdate not datetime.date to the first date of the raw_data
 				startdate = raw_data.index.get_level_values('date').min()
@@ -778,10 +776,11 @@ class ScreenerMoneyFlow(ScreenerBase):
 			top_stockcodes = top_stockcodes.sort_values(by='mf', ascending=False)
 		
 		# Update startdate and enddate based on raw_data
-		self.startdate = raw_data.index.get_level_values('date').min()
-		self.enddate = raw_data.index.get_level_values('date').max()
+		startdate = raw_data.index.get_level_values('date').min()
+		enddate = raw_data.index.get_level_values('date').max()
+		bar_range = int(raw_data.groupby(level='code').size().max())
 
-		return top_stockcodes
+		return top_stockcodes, startdate, enddate, bar_range
 
 class ScreenerVWAP(ScreenerBase):
 	"""
@@ -804,7 +803,7 @@ class ScreenerVWAP(ScreenerBase):
 		n_stockcodes: int = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
-		screener_period: int | None = None,
+		radar_period: int | None = None,
 		stockcode_excludes: set[str] = set(),
 		percentage_range: float | None = 0.05,
 		screener_min_value: int | None = None,
@@ -824,6 +823,7 @@ class ScreenerVWAP(ScreenerBase):
 		super().__init__(
 			startdate = startdate,
 			enddate = enddate,
+			radar_period = radar_period,
 			stockcode_excludes = stockcode_excludes,
 			screener_min_value = screener_min_value,
 			screener_min_frequency = screener_min_frequency,
@@ -833,100 +833,40 @@ class ScreenerVWAP(ScreenerBase):
 
 		self.screener_vwap_criteria = screener_vwap_criteria
 		self.n_stockcodes = n_stockcodes
-		self.screener_period = screener_period
 		self.percentage_range = percentage_range
 		self.period_vwap = period_vwap
-
-	async def _vwap_prep(self) -> ScreenerVWAP:
-		# Get default period_vwap, percentage_range
-		self.period_vwap = int(self.default_radar['default_ff_period_vwap']) if self.period_vwap is None else self.period_vwap
-		self.percentage_range = float(self.default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
-		
-		assert isinstance(self.period_vwap, int), f'period_vwap must be integer'
-
-		# Get main data from startdate to enddate
-		qry = self.dbs.query(
-			db.StockData.date,
-			db.StockData.code,
-			db.StockData.close,
-			db.StockData.foreignbuy,
-			db.StockData.foreignsell,
-		).filter(db.StockData.code.in_(self.filtered_stockcodes))\
-		.filter(db.StockData.code.notin_(self.stockcode_excludes))\
-		.filter(db.StockData.date.between(self.startdate,self.enddate))\
-		.order_by(db.StockData.code, db.StockData.date)
-		
-		# Main Query Fetching
-		self.raw_data = pd.read_sql(sql=qry.statement, con=self.dbs.bind, parse_dates=['date']).reset_index(drop=True)\
-			.sort_values(['code','date']).set_index(['code','date'])
-		# Update startdate and enddate based on self.raw_data
-		self.startdate = self.raw_data.index.get_level_values('date').min().date()
-		self.enddate = self.raw_data.index.get_level_values('date').max().date()
-
-		# Get pre-data startdate
-		qry = self.dbs.query(
-			db.StockData.date,
-		).filter(db.StockData.code == 'bbca')\
-		.filter(db.StockData.date < self.startdate)\
-		.order_by(db.StockData.date.desc())\
-		.limit(self.period_vwap)
-		fetch = pd.read_sql(sql=qry.statement, con=self.dbs.bind, parse_dates=['date']).reset_index(drop=True)
-		pre_startdate = fetch.iloc[:,0].min()
-		# Get pre-data for VWAP
-		qry = self.dbs.query(
-			db.StockData.date,
-			db.StockData.code,
-			db.StockData.close,
-			db.StockData.foreignbuy,
-			db.StockData.foreignsell,
-		).filter(db.StockData.code.in_(self.filtered_stockcodes))\
-		.filter(db.StockData.code.notin_(self.stockcode_excludes))\
-		.filter(db.StockData.date < self.startdate)\
-		.filter(db.StockData.date >= pre_startdate)\
-		.order_by(db.StockData.code, db.StockData.date)
-		pre_raw_data = pd.read_sql(sql=qry.statement, con=self.dbs.bind, parse_dates=['date']).reset_index(drop=True)\
-			.sort_values(['code','date']).set_index(['code','date'])
-		
-		# Concat data
-		self.raw_data = pd.concat([pre_raw_data, self.raw_data], axis=0)
-
-		# Calculate VWAP
-		self.raw_data['fbval'] = self.raw_data['close']*self.raw_data['foreignbuy']
-		self.raw_data['fsval'] = self.raw_data['close']*self.raw_data['foreignsell']
-		self.raw_data['netvol'] = self.raw_data['foreignbuy']-self.raw_data['foreignsell']
-		self.raw_data['netval'] = self.raw_data['fbval']-self.raw_data['fsval']
-		self.raw_data['vwap'] = ((self.raw_data['netval'].groupby(level='code').rolling(window=self.period_vwap).apply(lambda x: x[x>0].sum()))\
-			/(self.raw_data['netvol'].groupby(level='code').rolling(window=self.period_vwap).apply(lambda x: x[x>0].sum()))).droplevel(0)
-
-		# Filter only startdate to enddate
-		self.raw_data = self.raw_data.loc[
-			(self.raw_data.index.get_level_values('date') >= pd.Timestamp(self.startdate)) & \
-			(self.raw_data.index.get_level_values('date') <= pd.Timestamp(self.enddate))]
-
-		return self
 
 	async def screen(self) -> ScreenerVWAP:
 		# Get default param: self.period_mf, self.period_pricecorrel, self.screener_min_value, self.screener_min_frequency, self.screener_min_prop, self.bar_range
 		# Get processed self.startdate, self.filtered_stockcodes
-		await super()._fit_base()
+		await super()._fit_base(predata='vwap')
+		assert isinstance(self.period_vwap, int), 'period_vwap must be int'
+		assert isinstance(self.percentage_range, float), f'percentage_range must be float'
 
 		# Get self.raw_data, and update self.startdate, self.enddate
-		await self._vwap_prep()
+		self.startdate, self.enddate, self.bar_range, self.raw_data = await self._vwap_prep(
+			startdate=self.startdate,
+			enddate=self.enddate,
+			period_vwap=self.period_vwap,
+			filtered_stockcodes=self.filtered_stockcodes,
+			stockcode_excludes=self.stockcode_excludes,
+			dbs=self.dbs)
 
 		# Go to get top codes for each screener_vwap_criteria
 		if self.screener_vwap_criteria == dp.ScreenerList.vwap_rally:
-			stocklist = await self._get_vwap_rally()
+			stocklist = await self._get_vwap_rally(raw_data=self.raw_data)
 		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_around:
-			stocklist = await self._get_vwap_around()
+			stocklist = await self._get_vwap_around(raw_data=self.raw_data, percentage_range=self.percentage_range)
 		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_breakout:
-			stocklist = await self._get_vwap_breakout()
+			stocklist = await self._get_vwap_breakout(raw_data=self.raw_data)
 		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_breakdown:
-			stocklist = await self._get_vwap_breakdown()
+			stocklist = await self._get_vwap_breakdown(raw_data=self.raw_data)
 		else:
 			raise ValueError(f'Invalid screener_vwap_criteria: {self.screener_vwap_criteria}')
 		
 		# Get data from stocklist
-		await self._get_data_from_stocklist(stocklist)
+		self.stocklist, self.top_data = await self._get_data_from_stocklist(
+			raw_data=self.raw_data, stocklist=stocklist, n_stockcodes=self.n_stockcodes)
 
 		# Compile data for top_stockcodes from stocklist and top_data
 		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
@@ -935,45 +875,120 @@ class ScreenerVWAP(ScreenerBase):
 		
 		return self
 
-	async def _get_data_from_stocklist(self, stocklist: list) -> ScreenerVWAP:
-		# Get data from stocklist
-		top_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(stocklist)]
-		# Sum netval for each code and get top n_stockcodes
-		stocklist = top_data['netval'].groupby(level='code').sum().nlargest(self.n_stockcodes).index.tolist()
 
-		# Get data from stocklist
-		top_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(stocklist)]
+	async def _vwap_prep(self,
+		startdate: datetime.date = ...,
+		enddate: datetime.date = ...,
+		period_vwap: int = ...,
+		filtered_stockcodes: pd.Series = ...,
+		stockcode_excludes: set[str] = ...,
+		dbs: db.Session = next(db.get_dbs())
+		) -> tuple[datetime.date, datetime.date, int, pd.DataFrame]:
+		# Get main data from startdate to enddate
+		qry = dbs.query(
+			db.StockData.date,
+			db.StockData.code,
+			db.StockData.close,
+			db.StockData.foreignbuy,
+			db.StockData.foreignsell,
+		).filter(db.StockData.code.in_(filtered_stockcodes))\
+		.filter(db.StockData.code.notin_(stockcode_excludes))\
+		.filter(db.StockData.date.between(startdate,enddate))\
+		.order_by(db.StockData.code, db.StockData.date)
 		
-		self.stocklist = stocklist
-		self.top_data = top_data
+		# Main Query Fetching
+		raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True)\
+			.sort_values(['code','date']).set_index(['code','date'])
+		# Update startdate and enddate based on raw_data
+		startdate = raw_data.index.get_level_values('date').min().date()
+		enddate = raw_data.index.get_level_values('date').max().date()
 
-		return self
+		# Get pre-data startdate
+		qry = dbs.query(
+			db.StockData.date,
+		).filter(db.StockData.code == 'bbca')\
+		.filter(db.StockData.date < startdate)\
+		.order_by(db.StockData.date.desc())\
+		.limit(period_vwap)
+		fetch = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True)
+		pre_startdate = fetch.iloc[:,0].min()
+		# Get pre-data for VWAP
+		qry = dbs.query(
+			db.StockData.date,
+			db.StockData.code,
+			db.StockData.close,
+			db.StockData.foreignbuy,
+			db.StockData.foreignsell,
+		).filter(db.StockData.code.in_(filtered_stockcodes))\
+		.filter(db.StockData.code.notin_(stockcode_excludes))\
+		.filter(db.StockData.date < startdate)\
+		.filter(db.StockData.date >= pre_startdate)\
+		.order_by(db.StockData.code, db.StockData.date)
+		pre_raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True)\
+			.sort_values(['code','date']).set_index(['code','date'])
+		
+		# Concat data
+		raw_data = pd.concat([pre_raw_data, raw_data], axis=0)
 
-	async def _get_vwap_rally(self) -> list:
+		# Calculate VWAP
+		raw_data['fbval'] = raw_data['close']*raw_data['foreignbuy']
+		raw_data['fsval'] = raw_data['close']*raw_data['foreignsell']
+		raw_data['netvol'] = raw_data['foreignbuy']-raw_data['foreignsell']
+		raw_data['netval'] = raw_data['fbval']-raw_data['fsval']
+		raw_data['vwap'] = ((raw_data['netval'].groupby(level='code').rolling(window=period_vwap).apply(lambda x: x[x>0].sum()))\
+			/(raw_data['netvol'].groupby(level='code').rolling(window=period_vwap).apply(lambda x: x[x>0].sum()))).droplevel(0)
+
+		# Filter only startdate to enddate
+		raw_data = raw_data.loc[
+			(raw_data.index.get_level_values('date') >= pd.Timestamp(startdate)) & \
+			(raw_data.index.get_level_values('date') <= pd.Timestamp(enddate))]
+
+		bar_range = int(raw_data.groupby(level='code').size().max())
+
+		return startdate, enddate, bar_range, raw_data
+
+	async def _get_data_from_stocklist(self, 
+		raw_data: pd.DataFrame,
+		stocklist: list,
+		n_stockcodes: int
+		) -> tuple[list, pd.DataFrame]:
+		# Get data from stocklist
+		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
+		# Sum netval for each code and get top n_stockcodes
+		stocklist = top_data['netval'].groupby(level='code').sum().nlargest(n_stockcodes).index.tolist()
+
+		# Get data from stocklist
+		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
+		
+		stocklist = stocklist
+		top_data = top_data
+
+		return stocklist, top_data
+
+	async def _get_vwap_rally(self, raw_data: pd.DataFrame) -> list:
 		"""Rally (always close > vwap within n days)"""
-		# Get stockcodes with self.raw_data['close'] always self.raw_data['vwap']
-		stocklist = (self.raw_data['close'] >= self.raw_data['vwap']).groupby(level='code').all()
+		# Get stockcodes with raw_data['close'] always raw_data['vwap']
+		stocklist = (raw_data['close'] >= raw_data['vwap']).groupby(level='code').all()
 		stocklist = stocklist[stocklist].index.tolist()
 
 		return stocklist
 
-	async def _get_vwap_around(self) -> list:
+	async def _get_vwap_around(self, raw_data: pd.DataFrame, percentage_range: float) -> list:
 		"""Around VWAP (close around x% of vwap)"""
-		assert self.percentage_range is not None
-		# Get stockcodes with last self.raw_data['close'] around last self.raw_data['vwap'], within percentage_range
-		last_data = self.raw_data[['close','vwap']].groupby(level='code').last()
-		stocklist = last_data[(last_data['close'] >= last_data['vwap']*(1-self.percentage_range)) & (last_data['close'] <= last_data['vwap']*(1+self.percentage_range))].index.tolist()
+		# Get stockcodes with last raw_data['close'] around last raw_data['vwap'], within percentage_range
+		last_data = raw_data[['close','vwap']].groupby(level='code').last()
+		stocklist = last_data[(last_data['close'] >= last_data['vwap']*(1-percentage_range)) & (last_data['close'] <= last_data['vwap']*(1+percentage_range))].index.tolist()
 
 		return stocklist
 
-	async def _get_vwap_breakout(self) -> list:
+	async def _get_vwap_breakout(self, raw_data: pd.DataFrame) -> list:
 		"""Breakout (t_(x-1): close < vwap, t_(x): close > vwap, within n days, and now close > vwap)"""
 		# Get stockcodes with now close > vwap
-		last_data = self.raw_data[['close','vwap']].groupby(level='code').last()
+		last_data = raw_data[['close','vwap']].groupby(level='code').last()
 		stocklist = last_data[last_data['close'] >= last_data['vwap']].index.tolist()
 
 		# Define breakout
-		top_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(stocklist)]
+		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
 		top_data['close_morethan_vwap'] = top_data['close'] >= top_data['vwap']
 		top_data['breakout'] = top_data.groupby(level='code').rolling(window=2)['close_morethan_vwap']\
 			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0)
@@ -984,14 +999,14 @@ class ScreenerVWAP(ScreenerBase):
 
 		return stocklist
 
-	async def _get_vwap_breakdown(self) -> list:
+	async def _get_vwap_breakdown(self, raw_data: pd.DataFrame) -> list:
 		"""Breakdown (t_x: close > vwap, t_y: close < vwap, within n days, and now close < vwap)"""
 		# Get stockcodes with now close < vwap
-		last_data = self.raw_data[['close','vwap']].groupby(level='code').last()
+		last_data = raw_data[['close','vwap']].groupby(level='code').last()
 		stocklist = last_data[last_data['close'] <= last_data['vwap']].index.tolist()
 
 		# Define breakdown
-		top_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(stocklist)]
+		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
 		top_data['close_lessthan_vwap'] = top_data['close'] <= top_data['vwap']
 		top_data['breakdown'] = top_data.groupby(level='code').rolling(window=2)['close_lessthan_vwap']\
 			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0)
