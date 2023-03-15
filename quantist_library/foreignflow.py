@@ -911,7 +911,7 @@ class ScreenerVWAP(ScreenerBase):
 		.order_by(db.StockData.date.desc())\
 		.limit(period_vwap)
 		fetch = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True)
-		pre_startdate = fetch.iloc[:,0].min()
+		pre_startdate = fetch.iloc[:,0].min().date()
 		# Get pre-data for VWAP
 		qry = dbs.query(
 			db.StockData.date,
