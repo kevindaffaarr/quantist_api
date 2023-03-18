@@ -166,18 +166,6 @@ class StockTransaction(Base):
 	svol: Column = Column(Numeric)
 	index: Column = Column(Integer, primary_key=True, autoincrement=True, index=True, nullable=False)
 
-class ScreenerResult(Base):
-	__tablename__: str = "screener_result"
-	date: Column = Column(Date, index=True, nullable=False)
-	screener_method: Column = Column(String, index=True, nullable=False)
-	code: Column = Column(String, index=True, nullable=False)
-	close: Column = Column(Numeric)
-	money_flow: Column = Column(Numeric)
-	proportion: Column = Column(Numeric)
-	correlation: Column = Column(Numeric)
-	vwap: Column = Column(Numeric)
-	index: Column = Column(Integer, primary_key=True, autoincrement=True, index=True, nullable=False)
-
 class KseiKepemilikanEfek(Base):
 	__tablename__ = "ksei_kepemilikanefek"
 	date = Column(Date, index=True, nullable=False)

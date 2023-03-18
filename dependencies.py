@@ -94,13 +94,6 @@ class ScreenerList(str, Enum):
 	vwap_around = "vwap_around"
 	vwap_breakout = "vwap_breakout"
 	vwap_breakdown = "vwap_breakdown"
-	highprop_inflow = "highprop_inflow"
-	highcorr_inflow = "highcorr_inflow"
-	rebound_flow = "rebound_flow"
-	drop_flow = "drop_flow"
-	inflow_pricestay = "inflow_pricestay"
-	neutral_downprice = "neutral_downprice"
-	peaking_transaction = "peaking_transaction"
 
 class HoldingSectors(str, Enum):
 	# Dictionary:
