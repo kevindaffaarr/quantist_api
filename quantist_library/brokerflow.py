@@ -176,7 +176,7 @@ class StockBFFull():
 		self.pow_medium_prop = int(default_bf['default_bf_pow_medium_prop']) if self.pow_medium_prop is None else self.pow_medium_prop
 		self.pow_medium_pricecorrel = int(default_bf['default_bf_pow_medium_pricecorrel']) if self.pow_medium_pricecorrel is None else self.pow_medium_pricecorrel
 		self.pow_medium_mapricecorrel = int(default_bf['default_bf_pow_medium_mapricecorrel']) if self.pow_medium_mapricecorrel is None else self.pow_medium_mapricecorrel
-		self.preoffset_period_param = max(self.period_mf,self.period_prop,self.period_pricecorrel,(self.period_mapricecorrel+self.period_vwap))-1
+		self.preoffset_period_param = max(self.period_mf,self.period_prop,self.period_pricecorrel,(self.period_mapricecorrel+self.period_pricecorrel),self.period_vwap)-1
 
 		self.training_start_index = int(default_bf['default_bf_training_start_index'])/100 if self.training_start_index is None else self.training_start_index/100
 		self.training_end_index = int(default_bf['default_bf_training_end_index'])/100 if self.training_end_index is None else self.training_end_index/100
@@ -186,9 +186,7 @@ class StockBFFull():
 		self.splitted_max_n_cluster = int(default_bf['default_bf_splitted_max_n_cluster']) if self.splitted_max_n_cluster is None else self.splitted_max_n_cluster
 		self.stepup_n_cluster_threshold = int(default_bf['default_bf_stepup_n_cluster_threshold'])/100 if self.stepup_n_cluster_threshold is None else self.stepup_n_cluster_threshold/100
 
-		# TODO Revisit what is the effect of default_months_range and startdate
-		default_months_range = int(default_bf['default_months_range']) if self.startdate is None else 0
-		self.startdate = self.enddate - relativedelta(months=default_months_range) if self.startdate is None else self.startdate
+		self.startdate = self.enddate - relativedelta(months=int(default_bf['default_months_range'])) if self.startdate is None else self.startdate
 		
 		return default_bf
 	
@@ -210,16 +208,10 @@ class StockBFFull():
 
 	async def __get_full_broker_transaction(self,
 		stockcode: str,
-		preoffset_startdate: datetime.date | None = None,
+		preoffset_startdate: datetime.date = ...,
 		enddate: datetime.date = datetime.date.today(),
-		default_months_range: int = 12,
 		dbs: db.Session = next(db.get_dbs()),
 		):
-
-		# if startdate is none, set to 1 year before enddate
-		if preoffset_startdate is None:
-			preoffset_startdate = enddate - relativedelta(months=default_months_range)
-
 		# Query Definition
 		qry = dbs.query(
 			db.StockTransaction.date,
@@ -254,7 +246,7 @@ class StockBFFull():
 		preoffset_period_param: int = 50,
 		default_months_range: int = 12,
 		dbs: db.Session = next(db.get_dbs()),
-		) -> pd.DataFrame:
+		) -> tuple[pd.DataFrame, datetime.date]:
 
 		# Define startdate if None equal to last year of enddate
 		if startdate is None:
@@ -302,15 +294,15 @@ class StockBFFull():
 		raw_data_full = pd.concat([raw_data_pre,raw_data_main])
 		
 		if len(raw_data_pre) > 0:
-			self.preoffset_startdate = raw_data_pre.index[0].date() # type: ignore
+			preoffset_startdate = raw_data_pre.index[0].date() # type: ignore
 		else:
-			self.preoffset_startdate = startdate
+			preoffset_startdate = startdate
 
 		# Data Cleansing: zero openprice replace with previous
 		raw_data_full['openprice'] = raw_data_full['openprice'].mask(raw_data_full['openprice'].eq(0),raw_data_full['previous'])
 
 		# End of Method: Return or Assign Attribute
-		return raw_data_full
+		return raw_data_full, preoffset_startdate
 
 	async def __get_stock_raw_data(self,
 		stockcode: str = ...,
@@ -321,15 +313,17 @@ class StockBFFull():
 		dbs: db.Session = next(db.get_dbs()),
 		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		# Get Stockdata Full
-		raw_data_full = await self.__get_stock_price_data(
+		raw_data_full, self.preoffset_startdate = await self.__get_stock_price_data(
 			stockcode=stockcode,startdate=startdate,enddate=enddate,
 			preoffset_period_param=preoffset_period_param,
 			default_months_range=default_months_range,dbs=dbs)
 
 		# Get Raw Data Broker Full
 		raw_data_broker_full = await self.__get_full_broker_transaction(
-			stockcode=stockcode,preoffset_startdate=self.preoffset_startdate,enddate=enddate,
-			default_months_range=default_months_range,dbs=dbs)
+			stockcode=stockcode,
+			preoffset_startdate=self.preoffset_startdate,
+			enddate=enddate,
+			dbs=dbs)
 
 		# Transform Raw Data Broker
 		raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumvol, raw_data_broker_sumval = await self.__get_nvsv_broker_transaction(raw_data_broker_full=raw_data_broker_full)
@@ -491,6 +485,12 @@ class StockBFFull():
 		splitted_max_n_cluster: int = 5,
 		stepup_n_cluster_threshold: float = 0.05,
 		) -> tuple[list[str], int, float, pd.DataFrame]:
+
+		# Delete the first self.preoffset_period_param rows from raw_data
+		raw_data_close = raw_data_close.iloc[self.preoffset_period_param:]
+		raw_data_broker_nvol = raw_data_broker_nvol.iloc[self.preoffset_period_param:,:]
+		raw_data_broker_sumvol = raw_data_broker_sumvol.iloc[self.preoffset_period_param:,:]
+		raw_data_broker_sumval = raw_data_broker_sumval.iloc[self.preoffset_period_param:,:]
 
 		# Only get third quartile of raw_data so not over-fitting
 		length = len(raw_data_close)
@@ -753,7 +753,6 @@ class WhaleRadar():
 				startdate=self.startdate,
 				enddate=self.enddate,
 				default_months_range=self.default_months_range,
-				training_end_index=self.training_end_index,
 				dbs=self.dbs
 				)
 
@@ -825,9 +824,6 @@ class WhaleRadar():
 		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 		# Data Parameter
-		self.period_mf = int(default_radar['default_bf_period_mf']) if self.period_mf is None else None
-		self.period_pricecorrel = int(default_radar['default_bf_period_pricecorrel']) if self.period_pricecorrel is None else None
-		
 		self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100
 		self.training_end_index = (int(default_radar['default_bf_training_end_index'])-50)/(100/2) if self.training_end_index is None else self.training_end_index/100
 		self.min_n_cluster = int(default_radar['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster
@@ -841,17 +837,7 @@ class WhaleRadar():
 		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
 		self.filter_opt_corr = int(default_radar['default_radar_filter_opt_corr'])/100 if self.filter_opt_corr is None else self.filter_opt_corr/100
 		
-		# TODO Revisit what is the effect of default_months_range and startdate
-		self.default_months_range = int(default_radar['default_months_range']) if self.default_months_range is None else self.default_months_range
-		if self.startdate is None:
-			assert self.period_mf is not None
-			assert self.period_pricecorrel is not None
-			self.bar_range = max(self.period_mf,self.period_pricecorrel)
-			self.default_months_range = int((self.default_months_range/2) + int(self.bar_range/20) + (self.bar_range % 20 > 0))
-		else:
-			self.period_mf = None
-			self.period_pricecorrel = None
-			self.default_months_range = int((self.default_months_range/2) + int((self.enddate-self.startdate).days/20) + ((self.enddate-self.startdate).days % 20 >0))
+		self.default_months_range = int((int(default_radar['default_months_range'])/2) + int(self.radar_period/20)) if self.startdate is None else self.default_months_range
 		
 		return default_radar
 	
@@ -982,7 +968,6 @@ class WhaleRadar():
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
 		default_months_range: int = 6,
-		training_end_index: float = 0.75,
 		dbs: db.Session = next(db.get_dbs()),
 		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series]:
 		MINIMUM_TRAINING_SET: int = 5
@@ -1488,7 +1473,6 @@ class ScreenerBase(WhaleRadar):
 				startdate=self.startdate,
 				enddate=self.enddate,
 				default_months_range=self.default_months_range,
-				training_end_index=self.training_end_index,
 				dbs=self.dbs
 				)
 		
