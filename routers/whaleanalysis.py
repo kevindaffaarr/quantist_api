@@ -263,6 +263,7 @@ async def get_foreign_radar(
 	media_type:dp.ListMediaType = dp.ListMediaType.json,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date = datetime.date.today(),
+	radar_period: int | None = None,
 	y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
 	stockcode_excludes: set[str] = Query(default=set()),
 	include_composite: bool = False,
@@ -285,6 +286,7 @@ async def get_foreign_radar(
 		whale_radar_object = ff.ForeignRadar(
 			startdate=startdate,
 			enddate=enddate,
+			radar_period=radar_period,
 			y_axis_type=y_axis_type,
 			stockcode_excludes=stockcode_excludes,
 			include_composite=include_composite,
