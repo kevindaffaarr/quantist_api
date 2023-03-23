@@ -125,17 +125,16 @@ class StockBFFull():
 		
 		if self.clustering_method == dp.ClusteringMethod.timeseries:
 			# Get broker flow parameters using timeseries method
-			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr = \
+			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_cluster, self.broker_ncum = \
 				await self.__get_timeseries_bf_parameter(
 					raw_data_close=raw_data_full["close"],
 					raw_data_broker_nval=raw_data_broker_nval,
 					splitted_min_n_cluster=self.splitted_min_n_cluster,
 					splitted_max_n_cluster=self.splitted_max_n_cluster,
 					training_start_index=self.training_start_index,
-					training_end_index=self.training_end_index,	
+					training_end_index=self.training_end_index,
+					stepup_n_cluster_threshold=self.stepup_n_cluster_threshold,
 				)
-			# TODO: Define broker_features for timeseries method
-			self.broker_features = pd.DataFrame()
 		else:
 			# Get broker flow parameters using correlation method
 			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
@@ -618,20 +617,7 @@ class StockBFFull():
 		raw_data_close: pd.Series,
 		raw_data_broker_nval: pd.DataFrame,
 		df_cluster: pd.DataFrame,
-		training_start_index: float = 0.5,
-		training_end_index: float = 0.75,
 		):
-		# Delete the first self.preoffset_period_param rows from raw_data
-		raw_data_close = raw_data_close.iloc[self.preoffset_period_param:]
-		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
-
-		# Only get third quartile of raw_data so not over-fitting
-		# length = len(raw_data_close)
-		# start_index = int(length*training_start_index)
-		# end_index = int(length*training_end_index)
-		# raw_data_close = raw_data_close.iloc[start_index:end_index]
-		# raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
-
 		# Get number of clusters from df_cluster['cluster']
 		n_cluster = df_cluster['cluster'].max() + 1
 
@@ -646,7 +632,8 @@ class StockBFFull():
 			broker_ncum_corr = broker_ncum.corr(raw_data_close)
 			cluster_corr = pd.concat([cluster_corr, pd.DataFrame(
 				{'cluster':i, 'corr':broker_ncum_corr}, index=[0])], axis=0)
-		
+		# fillna with 0
+		cluster_corr = cluster_corr.fillna(0)
 		return cluster_corr
 	
 	async def __optimize_timeseries_selected_cluster(self,
@@ -654,21 +641,8 @@ class StockBFFull():
 		raw_data_broker_nval: pd.DataFrame,
 		cluster_corr: pd.DataFrame,
 		df_cluster: pd.DataFrame,
-		training_start_index: float = 0.5,
-		training_end_index: float = 0.75,
 		stepup_n_cluster_threshold: float = 0.05,
 		) -> tuple[list[str], int, float]:
-		# Delete the first self.preoffset_period_param rows from raw_data
-		raw_data_close = raw_data_close.iloc[self.preoffset_period_param:]
-		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
-
-		# Only get third quartile of raw_data so not over-fitting
-		# length = len(raw_data_close)
-		# start_index = int(length*training_start_index)
-		# end_index = int(length*training_end_index)
-		# raw_data_close = raw_data_close.iloc[start_index:end_index]
-		# raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
-
 		# Get only positive correlation from cluster_corr
 		cluster_corr = cluster_corr[cluster_corr['corr']>0]
 
@@ -704,7 +678,19 @@ class StockBFFull():
 		splitted_max_n_cluster: int = 10,
 		training_start_index: float = 0.5,
 		training_end_index: float = 0.75,
-		) -> tuple[list[str], int, float]:
+		stepup_n_cluster_threshold: float = 0.05,
+		) -> tuple[list[str], int, float, pd.DataFrame, pd.DataFrame]:
+		# Delete the first self.preoffset_period_param rows from raw_data
+		raw_data_close = raw_data_close.iloc[self.preoffset_period_param:]
+		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
+
+		# Only get third quartile of raw_data so not over-fitting
+		# length = len(raw_data_close)
+		# start_index = int(length*training_start_index)
+		# end_index = int(length*training_end_index)
+		# raw_data_close = raw_data_close.iloc[start_index:end_index]
+		# raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
+
 		# Get timeseries cluster
 		broker_ncum = raw_data_broker_nval.cumsum(axis=0)
 		df_cluster, centroids_cluster = await self.get_timeseries_cluster(
@@ -715,10 +701,11 @@ class StockBFFull():
 			raw_data_close = raw_data_close,
 			raw_data_broker_nval = raw_data_broker_nval,
 			df_cluster = df_cluster,
-			training_start_index = training_start_index,
-			training_end_index = training_end_index
 			)
 		
+		# Join cluster_corr to df_cluster on cluster
+		df_cluster = df_cluster.join(cluster_corr.set_index('cluster'), on='cluster')
+
 		# Sort cluster_corr by correlation
 		cluster_corr = cluster_corr.sort_values(by='corr', ascending=False).reset_index(drop=True)
 
@@ -727,11 +714,10 @@ class StockBFFull():
 			raw_data_broker_nval = raw_data_broker_nval,
 			cluster_corr = cluster_corr,
 			df_cluster = df_cluster,
-			training_start_index = training_start_index,
-			training_end_index = training_end_index
+			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
 			)
 		
-		return selected_broker, optimum_n_selected_cluster, optimum_corr
+		return selected_broker, optimum_n_selected_cluster, optimum_corr, df_cluster, broker_ncum
 
 	async def calc_wf_indicators(self,
 		raw_data_full: pd.DataFrame,
@@ -831,10 +817,23 @@ class StockBFFull():
 	async def broker_cluster_chart(self,media_type: str | None = None):
 		assert self.stockcode is not None
 
-		fig = await genchart.broker_cluster_chart(
-			broker_features=self.broker_features,
-			code=self.stockcode,
-		)
+		if self.clustering_method == dp.ClusteringMethod.timeseries:
+			scaler = MinMaxScaler()
+			broker_ncum_scaled = scaler.fit_transform(self.broker_ncum)
+			broker_ncum_scaled = pd.DataFrame(broker_ncum_scaled,
+					columns=self.broker_ncum.columns, index=self.broker_ncum.index)
+			
+			fig = await genchart.broker_cluster_timeseries_chart(
+				broker_cluster=self.broker_cluster,
+				broker_ncum=broker_ncum_scaled,
+				raw_data_close=self.wf_indicators["close"],
+				code=self.stockcode,
+			)
+		else:
+			fig = await genchart.broker_cluster_chart(
+				broker_features=self.broker_features,
+				code=self.stockcode,
+			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)
 		elif media_type == "json":
