@@ -27,6 +27,7 @@ class StockBFFull():
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
+		clustering_method: dp.ClusteringMethod = dp.ClusteringMethod.correlation,
 		n_selected_cluster:int | None = None,
 		period_mf: int | None = None,
 		period_prop: int | None = None,
@@ -52,6 +53,7 @@ class StockBFFull():
 		self.stockcode = stockcode
 		self.startdate = startdate
 		self.enddate = enddate
+		self.clustering_method = clustering_method
 		self.n_selected_cluster = n_selected_cluster
 		self.period_mf = period_mf
 		self.period_prop = period_prop
@@ -121,31 +123,33 @@ class StockBFFull():
 				dbs=self.dbs
 				)
 		
-		# # Get broker flow parameters using timeseris method
-		# self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr = \
-		# 	await self.__get_timeseries_bf_parameter(
-		# 		raw_data_close=raw_data_full["close"],
-		# 		raw_data_broker_nval=raw_data_broker_nval,
-		# 		splitted_min_n_cluster=self.splitted_min_n_cluster,
-		# 		splitted_max_n_cluster=self.splitted_max_n_cluster,
-		# 		training_start_index=self.training_start_index,
-		# 		training_end_index=self.training_end_index,	
-		# 	)
-		# self.broker_features = pd.DataFrame()
-
-		# Get broker flow parameters using correlation method
-		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
-			await self.__get_bf_parameters(
-				raw_data_close=raw_data_full["close"],
-				raw_data_broker_nval=raw_data_broker_nval,
-				raw_data_broker_sumval=raw_data_broker_sumval,
-				n_selected_cluster=self.n_selected_cluster,
-				training_start_index=self.training_start_index,
-				training_end_index=self.training_end_index,
-				splitted_min_n_cluster=self.splitted_min_n_cluster,
-				splitted_max_n_cluster=self.splitted_max_n_cluster,
-				stepup_n_cluster_threshold=self.stepup_n_cluster_threshold,
-			)
+		if self.clustering_method == dp.ClusteringMethod.timeseries:
+			# Get broker flow parameters using timeseries method
+			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr = \
+				await self.__get_timeseries_bf_parameter(
+					raw_data_close=raw_data_full["close"],
+					raw_data_broker_nval=raw_data_broker_nval,
+					splitted_min_n_cluster=self.splitted_min_n_cluster,
+					splitted_max_n_cluster=self.splitted_max_n_cluster,
+					training_start_index=self.training_start_index,
+					training_end_index=self.training_end_index,	
+				)
+			# TODO: Define broker_features for timeseries method
+			self.broker_features = pd.DataFrame()
+		else:
+			# Get broker flow parameters using correlation method
+			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
+				await self.__get_bf_parameters(
+					raw_data_close=raw_data_full["close"],
+					raw_data_broker_nval=raw_data_broker_nval,
+					raw_data_broker_sumval=raw_data_broker_sumval,
+					n_selected_cluster=self.n_selected_cluster,
+					training_start_index=self.training_start_index,
+					training_end_index=self.training_end_index,
+					splitted_min_n_cluster=self.splitted_min_n_cluster,
+					splitted_max_n_cluster=self.splitted_max_n_cluster,
+					stepup_n_cluster_threshold=self.stepup_n_cluster_threshold,
+				)
 
 		# Calc broker flow indicators
 		self.wf_indicators = await self.calc_wf_indicators(
@@ -508,12 +512,12 @@ class StockBFFull():
 		raw_data_broker_sumval = raw_data_broker_sumval.iloc[self.preoffset_period_param:,:]
 
 		# Only get third quartile of raw_data so not over-fitting
-		length = len(raw_data_close)
-		start_index = int(length*training_start_index)
-		end_index = int(length*training_end_index)
-		raw_data_close = raw_data_close.iloc[start_index:end_index]
-		raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
-		raw_data_broker_sumval = raw_data_broker_sumval.iloc[start_index:end_index,:]
+		# length = len(raw_data_close)
+		# start_index = int(length*training_start_index)
+		# end_index = int(length*training_end_index)
+		# raw_data_close = raw_data_close.iloc[start_index:end_index]
+		# raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
+		# raw_data_broker_sumval = raw_data_broker_sumval.iloc[start_index:end_index,:]
 
 		if (raw_data_broker_nval == 0).all().all() or (raw_data_broker_sumval == 0).all().all():
 			raise ValueError("There is no transaction for the stockcode in the selected quantile")
@@ -622,11 +626,11 @@ class StockBFFull():
 		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
 
 		# Only get third quartile of raw_data so not over-fitting
-		length = len(raw_data_close)
-		start_index = int(length*training_start_index)
-		end_index = int(length*training_end_index)
-		raw_data_close = raw_data_close.iloc[start_index:end_index]
-		raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
+		# length = len(raw_data_close)
+		# start_index = int(length*training_start_index)
+		# end_index = int(length*training_end_index)
+		# raw_data_close = raw_data_close.iloc[start_index:end_index]
+		# raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
 
 		# Get number of clusters from df_cluster['cluster']
 		n_cluster = df_cluster['cluster'].max() + 1
@@ -659,11 +663,11 @@ class StockBFFull():
 		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
 
 		# Only get third quartile of raw_data so not over-fitting
-		length = len(raw_data_close)
-		start_index = int(length*training_start_index)
-		end_index = int(length*training_end_index)
-		raw_data_close = raw_data_close.iloc[start_index:end_index]
-		raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
+		# length = len(raw_data_close)
+		# start_index = int(length*training_start_index)
+		# end_index = int(length*training_end_index)
+		# raw_data_close = raw_data_close.iloc[start_index:end_index]
+		# raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
 
 		# Get only positive correlation from cluster_corr
 		cluster_corr = cluster_corr[cluster_corr['corr']>0]
@@ -701,10 +705,6 @@ class StockBFFull():
 		training_start_index: float = 0.5,
 		training_end_index: float = 0.75,
 		) -> tuple[list[str], int, float]:
-		# TODO: Define splitted_min_n_cluster and splitted_max_n_cluster
-		splitted_min_n_cluster = 2
-		splitted_max_n_cluster = 20
-
 		# Get timeseries cluster
 		broker_ncum = raw_data_broker_nval.cumsum(axis=0)
 		df_cluster, centroids_cluster = await self.get_timeseries_cluster(
@@ -1310,13 +1310,13 @@ class WhaleRadar():
 		) -> tuple[dict, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
 		# Only get third quartile of raw_data so not over-fitting
-		length = raw_data_close.groupby(by='code').size()
-		start_index = (length*training_start_index).astype('int')
-		end_index = (length*training_end_index).astype('int')
-		raw_data_close = raw_data_close.groupby(by='code', group_keys=False)\
-			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
-		raw_data_broker_nval = raw_data_broker_nval.groupby(by='code', group_keys=False)\
-			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
+		# length = raw_data_close.groupby(by='code').size()
+		# start_index = (length*training_start_index).astype('int')
+		# end_index = (length*training_end_index).astype('int')
+		# raw_data_close = raw_data_close.groupby(by='code', group_keys=False)\
+		# 	.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
+		# raw_data_broker_nval = raw_data_broker_nval.groupby(by='code', group_keys=False)\
+		# 	.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
 		
 		# Only get raw_data_broker_nval groupby level code that doesn' all zero
 		nval_true = raw_data_broker_nval.groupby(by='code', group_keys=False)\

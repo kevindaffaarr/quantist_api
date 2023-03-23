@@ -87,6 +87,10 @@ class AnalysisMethod(str, Enum):
 	foreign = "foreign"
 	broker = "broker"
 
+class ClusteringMethod(str, Enum):
+	correlation = "correlation"
+	timeseries = "timeseries"
+
 class ScreenerList(str, Enum):
 	most_accumulated = "most_accumulated"
 	most_distributed = "most_distributed"
