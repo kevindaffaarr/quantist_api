@@ -120,8 +120,7 @@ class StockBFFull():
 		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
 			await self.__get_bf_parameters(
 				raw_data_close=raw_data_full["close"],
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_sumvol=raw_data_broker_sumvol,
+				raw_data_broker_nval=raw_data_broker_nval,
 				raw_data_broker_sumval=raw_data_broker_sumval,
 				n_selected_cluster=self.n_selected_cluster,
 				training_start_index=self.training_start_index,
@@ -475,8 +474,7 @@ class StockBFFull():
 
 	async def __get_bf_parameters(self,
 		raw_data_close: pd.Series,
-		raw_data_broker_nvol: pd.DataFrame,
-		raw_data_broker_sumvol: pd.DataFrame,
+		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
 		n_selected_cluster: int | None = None,
 		training_start_index: float = 0.5,
@@ -488,8 +486,7 @@ class StockBFFull():
 
 		# Delete the first self.preoffset_period_param rows from raw_data
 		raw_data_close = raw_data_close.iloc[self.preoffset_period_param:]
-		raw_data_broker_nvol = raw_data_broker_nvol.iloc[self.preoffset_period_param:,:]
-		raw_data_broker_sumvol = raw_data_broker_sumvol.iloc[self.preoffset_period_param:,:]
+		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
 		raw_data_broker_sumval = raw_data_broker_sumval.iloc[self.preoffset_period_param:,:]
 
 		# Only get third quartile of raw_data so not over-fitting
@@ -497,15 +494,14 @@ class StockBFFull():
 		start_index = int(length*training_start_index)
 		end_index = int(length*training_end_index)
 		raw_data_close = raw_data_close.iloc[start_index:end_index]
-		raw_data_broker_nvol = raw_data_broker_nvol.iloc[start_index:end_index,:]
-		raw_data_broker_sumvol = raw_data_broker_sumvol.iloc[start_index:end_index,:]
+		raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
 		raw_data_broker_sumval = raw_data_broker_sumval.iloc[start_index:end_index,:]
 
-		if (raw_data_broker_nvol == 0).all().all() or (raw_data_broker_sumvol == 0).all().all():
+		if (raw_data_broker_nval == 0).all().all() or (raw_data_broker_sumval == 0).all().all():
 			raise ValueError("There is no transaction for the stockcode in the selected quantile")
 		
 		# Cumulate value for nvol
-		broker_ncum = raw_data_broker_nvol.cumsum(axis=0)
+		broker_ncum = raw_data_broker_nval.cumsum(axis=0)
 		# Get correlation between raw_data_ncum and close
 		broker_ncum_corr = broker_ncum.corrwith(raw_data_close,axis=0).rename("corr_ncum_close")
 
@@ -518,7 +514,7 @@ class StockBFFull():
 		broker_features.fillna(value=0, inplace=True)
 
 		# Delete variable for memory management
-		del raw_data_broker_nvol, raw_data_broker_sumvol, raw_data_broker_sumval, broker_ncum_corr, broker_sumval
+		del raw_data_broker_nval, raw_data_broker_sumval, broker_ncum_corr, broker_sumval
 		gc.collect()
 
 		# # Obsolete Method: General Clustering
@@ -598,10 +594,10 @@ class StockBFFull():
 		selected_data_broker_sumval = raw_data_broker_sumval[selected_broker].sum(axis=1)
 
 		# Net Value for Volume Profile
-		raw_data_full["netvol"] = selected_data_broker_nvol
+		raw_data_full["netval"] = selected_data_broker_nval
 		
 		# Whale Volume Flow
-		raw_data_full["volflow"] = selected_data_broker_nvol.cumsum()
+		raw_data_full["valflow"] = selected_data_broker_nval.cumsum()
 
 		# Whale Money Flow
 		raw_data_full['mf'] = selected_data_broker_nval.rolling(window=period_mf).sum()
@@ -615,7 +611,7 @@ class StockBFFull():
 			/ (raw_data_full['value'].rolling(window=period_prop).sum()*2)
 
 		# Whale correlation
-		raw_data_full['pricecorrel'] = raw_data_full["volflow"].rolling(window=period_pricecorrel).corr(raw_data_full['close'])
+		raw_data_full['pricecorrel'] = raw_data_full["valflow"].rolling(window=period_pricecorrel).corr(raw_data_full['close'])
 
 		# Whale MA correlation
 		raw_data_full['mapricecorrel'] = raw_data_full['pricecorrel'].rolling(window=period_mapricecorrel).mean()
@@ -760,8 +756,7 @@ class WhaleRadar():
 		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
 			await self._get_bf_parameters(
 				raw_data_close=raw_data_full["close"],
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_sumvol=raw_data_broker_sumvol,
+				raw_data_broker_nval=raw_data_broker_nval,
 				raw_data_broker_sumval=raw_data_broker_sumval,
 				n_selected_cluster=self.n_selected_cluster,
 				training_start_index=self.training_start_index,
@@ -806,7 +801,6 @@ class WhaleRadar():
 		# Get Whale Radar Indicators
 		self.radar_indicators = await self._calc_radar_indicators(
 			raw_data_full = raw_data_full,
-			selected_broker_nvol = selected_broker_nvol,
 			selected_broker_nval = selected_broker_nval,
 			y_axis_type=self.y_axis_type,
 			)
@@ -1138,8 +1132,7 @@ class WhaleRadar():
 
 	async def _get_bf_parameters(self,
 		raw_data_close: pd.Series,
-		raw_data_broker_nvol: pd.DataFrame,
-		raw_data_broker_sumvol: pd.DataFrame,
+		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
 		n_selected_cluster: int | None = None,
 		training_start_index: float = 0.5,
@@ -1155,23 +1148,21 @@ class WhaleRadar():
 		end_index = (length*training_end_index).astype('int')
 		raw_data_close = raw_data_close.groupby(by='code', group_keys=False)\
 			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
-		raw_data_broker_nvol = raw_data_broker_nvol.groupby(by='code', group_keys=False)\
-			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
-		raw_data_broker_sumvol = raw_data_broker_sumvol.groupby(by='code', group_keys=False)\
+		raw_data_broker_nval = raw_data_broker_nval.groupby(by='code', group_keys=False)\
 			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
 		
-		# Only get raw_data_broker_nvol groupby level code that doesn' all zero
-		nvol_true = raw_data_broker_nvol.groupby(by='code', group_keys=False)\
+		# Only get raw_data_broker_nval groupby level code that doesn' all zero
+		nval_true = raw_data_broker_nval.groupby(by='code', group_keys=False)\
 			.apply(lambda x: (x!=0).any().any())
-		sumvol_true = raw_data_broker_sumvol.groupby(by='code', group_keys=False)\
+		sumval_true = raw_data_broker_sumval.groupby(by='code', group_keys=False)\
 			.apply(lambda x: (x!=0).any().any())
-		transaction_true = nvol_true & sumvol_true
+		transaction_true = nval_true & sumval_true
 		raw_data_close = raw_data_close.loc[transaction_true.index[transaction_true]]
-		raw_data_broker_nvol = raw_data_broker_nvol.loc[transaction_true.index[transaction_true]]
-		raw_data_broker_sumvol = raw_data_broker_sumvol.loc[transaction_true.index[transaction_true]]
+		raw_data_broker_nval = raw_data_broker_nval.loc[transaction_true.index[transaction_true]]
+		raw_data_broker_sumval = raw_data_broker_sumval.loc[transaction_true.index[transaction_true]]
 
 		# Cumulate volume for nvol
-		broker_ncum = raw_data_broker_nvol.groupby(by='code').cumsum(axis=0)
+		broker_ncum = raw_data_broker_nval.groupby(by='code').cumsum(axis=0)
 		# Get correlation between raw_data_ncum and close
 		corr_ncum_close = broker_ncum.groupby(by='code').corrwith(raw_data_close,axis=0) # type: ignore
 
@@ -1188,7 +1179,7 @@ class WhaleRadar():
 		broker_features = pd.concat([corr_ncum_close, broker_sumval], axis=1)
 
 		# Delete variable for memory management
-		del raw_data_broker_nvol, raw_data_broker_sumvol, raw_data_broker_sumval, corr_ncum_close, broker_sumval
+		del raw_data_broker_nval, raw_data_broker_sumval, corr_ncum_close, broker_sumval
 		gc.collect()
 
 		# Standardize Features
@@ -1347,7 +1338,6 @@ class WhaleRadar():
 
 	async def _calc_radar_indicators(self,
 		raw_data_full: pd.DataFrame,
-		selected_broker_nvol: pd.DataFrame,
 		selected_broker_nval: pd.DataFrame,
 		y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
 		) -> pd.DataFrame:
@@ -1359,8 +1349,8 @@ class WhaleRadar():
 
 		# X Axis:
 		if y_axis_type == dp.ListRadarType.correlation:
-			selected_broker_nvol_cumsum = selected_broker_nvol.groupby(level='code').cumsum()
-			radar_indicators[y_axis_type.value] = selected_broker_nvol_cumsum.groupby('code')\
+			selected_broker_nval_cumsum = selected_broker_nval.groupby(level='code').cumsum()
+			radar_indicators[y_axis_type.value] = selected_broker_nval_cumsum.groupby('code')\
 				.corrwith(raw_data_full['close'],axis=0) # type: ignore
 		elif y_axis_type == dp.ListRadarType.changepercentage:
 			radar_indicators[y_axis_type.value] = \
@@ -1480,8 +1470,7 @@ class ScreenerBase(WhaleRadar):
 		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
 			await self._get_bf_parameters(
 				raw_data_close=raw_data_full["close"],
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_sumvol=raw_data_broker_sumvol,
+				raw_data_broker_nval=raw_data_broker_nval,
 				raw_data_broker_sumval=raw_data_broker_sumval,
 				n_selected_cluster=self.n_selected_cluster,
 				training_start_index=self.training_start_index,

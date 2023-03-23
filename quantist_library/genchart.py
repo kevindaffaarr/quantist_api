@@ -74,8 +74,8 @@ async def quantist_stock_chart(
 		row=1,col=1,secondary_y=True
 	)
 	# Whale Flow
-	fig.add_trace(go.Scatter(x=wf_indicators.index,y=wf_indicators["volflow"],
-		name=f"{abv} Vol Flow",marker_color="orange",
+	fig.add_trace(go.Scatter(x=wf_indicators.index,y=wf_indicators["valflow"],
+		name=f"{abv} Val Flow",marker_color="orange",
 		legendrank=3
 		),
 		row=1,col=1,secondary_y=False
@@ -117,22 +117,22 @@ async def quantist_stock_chart(
 			)
 		fig.update_layout(barmode='stack', xaxis2_tickangle=90)
 
-	# Whale Volume Profile
+	# Whale Value Profile
 	assert isinstance(fig.data, tuple)
-	vol_profile_index = len(fig.data)
+	val_profile_index = len(fig.data)
 	fig.add_trace(go.Histogram(
-		x=wf_indicators['netvol'],
+		x=wf_indicators['netval'],
 		y=wf_indicators['close'],
 		histfunc="sum",
-		name="Net Volume Profile",orientation="h",opacity=0.1,
+		name="Net Value Profile",orientation="h",opacity=0.1,
 		legendrank=8),
 		row=1,col=1,secondary_y=True)
-	bins=np.arange(fig.full_figure_for_development(warn=False).data[vol_profile_index].ybins.start, # type:ignore
-		fig.full_figure_for_development(warn=False).data[vol_profile_index].ybins.end, # type:ignore
-		fig.full_figure_for_development(warn=False).data[vol_profile_index].ybins.size) # type:ignore
+	bins=np.arange(fig.full_figure_for_development(warn=False).data[val_profile_index].ybins.start, # type:ignore
+		fig.full_figure_for_development(warn=False).data[val_profile_index].ybins.end, # type:ignore
+		fig.full_figure_for_development(warn=False).data[val_profile_index].ybins.size) # type:ignore
 	bins = pd.Series(bins)
-	hist_bar = wf_indicators.groupby(pd.cut(wf_indicators['close'].to_numpy(),bins=bins))['netvol'].sum() # type:ignore
-	fig.data[vol_profile_index].update(marker=dict(color=np.where(hist_bar<0,"tomato","cyan")),xaxis=f'x{vol_profile_index}') # type:ignore
+	hist_bar = wf_indicators.groupby(pd.cut(wf_indicators['close'].to_numpy(),bins=bins))['netval'].sum() # type:ignore
+	fig.data[val_profile_index].update(marker=dict(color=np.where(hist_bar<0,"tomato","cyan")),xaxis=f'x{val_profile_index}') # type:ignore
 
 	# UPDATE AXES
 	# Column 1
@@ -161,7 +161,7 @@ async def quantist_stock_chart(
 	# fig.update_layout({"xaxis_range":[start_temp,end_temp+datetime.timedelta(days=round(len(wf_indicators)*0.1))]})
 	# fig.update_layout({"xaxis2_range":None})
 
-	fig.update_layout({f"xaxis{vol_profile_index}":{'anchor': 'y', 'overlaying': 'x','showgrid':False,"visible":False}})
+	fig.update_layout({f"xaxis{val_profile_index}":{'anchor': 'y', 'overlaying': 'x','showgrid':False,"visible":False}})
 
 	# ANNOTATION
 	pricecorrel = wf_indicators.loc[end_temp,'pricecorrel'] # type:ignore

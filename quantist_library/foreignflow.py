@@ -255,7 +255,7 @@ class StockFFFull():
 		raw_data['netval'] = raw_data['fbval']-raw_data['fsval']
 		
 		# FF
-		raw_data['volflow'] = raw_data['netvol'].cumsum()
+		raw_data['valflow'] = raw_data['netval'].cumsum()
 
 		# MF
 		raw_data['mf'] = raw_data['netval'].rolling(window=period_mf).sum()
@@ -270,7 +270,7 @@ class StockFFFull():
 
 		# pricecorrel
 		raw_data['pricecorrel'] = raw_data['close'].rolling(window=period_pricecorrel)\
-			.corr(raw_data['volflow'])
+			.corr(raw_data['valflow'])
 		
 		# MAPriceCorrel
 		raw_data['mapricecorrel'] = raw_data['pricecorrel'].rolling(window=period_mapricecorrel).mean()
@@ -545,13 +545,11 @@ class ForeignRadar():
 
 		# X axis:
 		if y_axis_type == dp.ListRadarType.correlation:
-			# NetVol
-			stocks_raw_data['netvol'] = stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell']
 			# FF
-			stocks_raw_data['fvolflow'] = stocks_raw_data.groupby('code')['netvol'].cumsum()
+			stocks_raw_data['fvalflow'] = stocks_raw_data.groupby('code')['netval'].cumsum()
 			# pricecorrel
-			radar_indicators[y_axis_type] = stocks_raw_data.groupby('code')[['fvolflow','close']].corr(method='pearson').iloc[0::2,-1].droplevel(1)
-			# radar_indicators[y_axis_type] = stocks_raw_data.groupby(by='code')['fvolflow']\
+			radar_indicators[y_axis_type] = stocks_raw_data.groupby('code')[['fvalflow','close']].corr(method='pearson').iloc[0::2,-1].droplevel(1)
+			# radar_indicators[y_axis_type] = stocks_raw_data.groupby(by='code')['fvalflow']\
 			# 	.corr(stocks_raw_data['close'])
 				
 		elif y_axis_type == dp.ListRadarType.changepercentage:
