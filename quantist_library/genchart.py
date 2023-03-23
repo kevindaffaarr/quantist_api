@@ -314,9 +314,9 @@ async def broker_cluster_timeseries_chart(
 	n_clusters = broker_cluster['cluster'].nunique()
 
 	# Sort broker_cluster by correlation
-	broker_cluster = broker_cluster.sort_values(by='corr', ascending=False)
+	broker_cluster = broker_cluster.sort_values(by='corr_abs', ascending=False)
 	# Rank correlation (same value will have same rank)
-	broker_cluster['rank'] = broker_cluster['corr'].rank(method='dense', ascending=False)-1
+	broker_cluster['rank'] = broker_cluster['corr_abs'].rank(method='dense', ascending=False)-1
 
 	# Make subplots with max 3 columns with total n_clusters subplots with secondary_y
 	n_cols = 3

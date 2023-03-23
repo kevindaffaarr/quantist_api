@@ -135,6 +135,11 @@ class StockBFFull():
 					training_end_index=self.training_end_index,
 					stepup_n_cluster_threshold=self.stepup_n_cluster_threshold,
 				)
+			
+			# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+			raw_data_broker_nvol = await self.__adjust_plusmin_df(df=raw_data_broker_nvol, broker_cluster=self.broker_cluster)
+			raw_data_broker_nval = await self.__adjust_plusmin_df(df=raw_data_broker_nval, broker_cluster=self.broker_cluster)
+			raw_data_broker_sumval = await self.__adjust_plusmin_df(df=raw_data_broker_sumval, broker_cluster=self.broker_cluster)
 		else:
 			# Get broker flow parameters using correlation method
 			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
@@ -634,6 +639,13 @@ class StockBFFull():
 				{'cluster':i, 'corr':broker_ncum_corr}, index=[0])], axis=0)
 		# fillna with 0
 		cluster_corr = cluster_corr.fillna(0)
+		
+		# Add corr_abs column to cluster_corr
+		cluster_corr['corr_abs'] = cluster_corr['corr'].abs()
+
+		# Sort cluster_corr by correlation
+		cluster_corr = cluster_corr.sort_values(by='corr_abs', ascending=False).reset_index(drop=True)
+
 		return cluster_corr
 	
 	async def __optimize_timeseries_selected_cluster(self,
@@ -644,9 +656,12 @@ class StockBFFull():
 		stepup_n_cluster_threshold: float = 0.05,
 		) -> tuple[list[str], int, float]:
 		# Get only positive correlation from cluster_corr
-		cluster_corr = cluster_corr[cluster_corr['corr']>0]
+		# cluster_corr = cluster_corr[cluster_corr['corr']>0]
+		
+		# Sort cluster_corr by correlation absolute value
+		cluster_corr = cluster_corr.sort_values(by='corr_abs', ascending=False).reset_index(drop=True)
 
-		agg_cluster_corr = [cluster_corr['corr'].max()]
+		agg_cluster_corr = [cluster_corr['corr_abs'].max()]
 		for i in range(1,len(cluster_corr)):
 			clusters = cluster_corr.iloc[:i+1,0].values
 			brokers = df_cluster[df_cluster['cluster'].isin(clusters)].index
@@ -671,6 +686,18 @@ class StockBFFull():
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr
 
+	async def __adjust_plusmin_df(self,
+		df: pd.DataFrame,
+		broker_cluster: pd.DataFrame,
+		) -> pd.DataFrame:
+		# Get brokers from broker_cluster with negative corr
+		brokers = broker_cluster[broker_cluster['corr']<0].index.to_list()
+
+		# Adjust plusmin_df by multiplying -1 to brokers
+		df[brokers] = df[brokers].mul(-1)
+
+		return df
+	
 	async def __get_timeseries_bf_parameter(self,
 		raw_data_close: pd.Series,
 		raw_data_broker_nval: pd.DataFrame,
@@ -706,8 +733,8 @@ class StockBFFull():
 		# Join cluster_corr to df_cluster on cluster
 		df_cluster = df_cluster.join(cluster_corr.set_index('cluster'), on='cluster')
 
-		# Sort cluster_corr by correlation
-		cluster_corr = cluster_corr.sort_values(by='corr', ascending=False).reset_index(drop=True)
+		# Adjust plusmin raw_data_broker_nval
+		raw_data_broker_nval = await self.__adjust_plusmin_df(df = raw_data_broker_nval, broker_cluster = df_cluster)
 
 		selected_broker, optimum_n_selected_cluster, optimum_corr = await self.__optimize_timeseries_selected_cluster(
 			raw_data_close = raw_data_close,
