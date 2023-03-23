@@ -10,6 +10,9 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.decomposition import PCA
+
 from sqlalchemy.sql import func
 
 import database as db
@@ -42,7 +45,7 @@ class StockBFFull():
 		max_n_cluster: int | None = None,
 		splitted_min_n_cluster: int | None = None,
 		splitted_max_n_cluster: int | None = None,
-		stepup_n_cluster_threshold: int | None = None,
+		stepup_n_cluster_threshold: float | None = None,
 		dbs: db.Session = next(db.get_dbs()),
 		) -> None:
 
@@ -85,6 +88,7 @@ class StockBFFull():
 		assert isinstance(self.training_end_index, float), "training_end_index must be float"
 		assert isinstance(self.splitted_min_n_cluster, int), "splitted_min_n_cluster must be int"
 		assert isinstance(self.splitted_max_n_cluster, int), "splitted_max_n_cluster must be int"
+		assert isinstance(self.stepup_n_cluster_threshold, float), "stepup_n_cluster_threshold must be int"
 		assert isinstance(self.period_mf, int), "period_mf must be int"
 		assert isinstance(self.period_prop, int), "period_prop must be int"
 		assert isinstance(self.period_pricecorrel, int), "period_pricecorrel must be int"
@@ -116,7 +120,20 @@ class StockBFFull():
 				preoffset_period_param=self.preoffset_period_param,
 				dbs=self.dbs
 				)
-		# Get broker flow parameters
+		
+		# # Get broker flow parameters using timeseris method
+		# self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr = \
+		# 	await self.__get_timeseries_bf_parameter(
+		# 		raw_data_close=raw_data_full["close"],
+		# 		raw_data_broker_nval=raw_data_broker_nval,
+		# 		splitted_min_n_cluster=self.splitted_min_n_cluster,
+		# 		splitted_max_n_cluster=self.splitted_max_n_cluster,
+		# 		training_start_index=self.training_start_index,
+		# 		training_end_index=self.training_end_index,	
+		# 	)
+		# self.broker_features = pd.DataFrame()
+
+		# Get broker flow parameters using correlation method
 		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
 			await self.__get_bf_parameters(
 				raw_data_close=raw_data_full["close"],
@@ -127,6 +144,7 @@ class StockBFFull():
 				training_end_index=self.training_end_index,
 				splitted_min_n_cluster=self.splitted_min_n_cluster,
 				splitted_max_n_cluster=self.splitted_max_n_cluster,
+				stepup_n_cluster_threshold=self.stepup_n_cluster_threshold,
 			)
 
 		# Calc broker flow indicators
@@ -565,6 +583,155 @@ class StockBFFull():
 			)
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr, broker_features
+
+	async def get_timeseries_cluster(self,
+		df: pd.DataFrame,
+		splitted_min_n_cluster: int = 4,
+		splitted_max_n_cluster: int = 10
+		) -> tuple[pd.DataFrame, pd.DataFrame]:
+		# Scaling the dataframe for each column
+		scaler = MinMaxScaler()
+		df_scaled = scaler.fit_transform(df)
+		df_scaled = pd.DataFrame(df_scaled, columns=df.columns, index=df.index)
+		
+		# Dimensionality Reduction for each column
+		pca = PCA(n_components=2)
+		df_pca = pca.fit_transform(df_scaled.T)
+		df_pca = pd.DataFrame(df_pca, columns=['PC1','PC2'], index=df_scaled.T.index)
+
+		# KMeans Clustering
+		df_cluster, centroids_cluster = await self.__kmeans_clustering(
+			features=df_pca,
+			x='PC1',
+			y='PC2',
+			min_n_cluster=splitted_min_n_cluster,
+			max_n_cluster=splitted_max_n_cluster
+			)
+		
+		return df_cluster, centroids_cluster
+	
+	async def __get_timeseries_cluster_corr(self,
+		raw_data_close: pd.Series,
+		raw_data_broker_nval: pd.DataFrame,
+		df_cluster: pd.DataFrame,
+		training_start_index: float = 0.5,
+		training_end_index: float = 0.75,
+		):
+		# Delete the first self.preoffset_period_param rows from raw_data
+		raw_data_close = raw_data_close.iloc[self.preoffset_period_param:]
+		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
+
+		# Only get third quartile of raw_data so not over-fitting
+		length = len(raw_data_close)
+		start_index = int(length*training_start_index)
+		end_index = int(length*training_end_index)
+		raw_data_close = raw_data_close.iloc[start_index:end_index]
+		raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
+
+		# Get number of clusters from df_cluster['cluster']
+		n_cluster = df_cluster['cluster'].max() + 1
+
+		# Looping each cluster
+		# Get broker_ncum for each cluster from raw_data_broker_nval
+		# Get correlation between broker_ncum and raw_data_close
+		# Then append to cluster_corr dataframe
+		cluster_corr = pd.DataFrame()
+		for i in range(n_cluster):
+			brokers = df_cluster[df_cluster['cluster']==i].index
+			broker_ncum = raw_data_broker_nval[brokers].sum(axis=1).cumsum(axis=0)
+			broker_ncum_corr = broker_ncum.corr(raw_data_close)
+			cluster_corr = pd.concat([cluster_corr, pd.DataFrame(
+				{'cluster':i, 'corr':broker_ncum_corr}, index=[0])], axis=0)
+		
+		return cluster_corr
+	
+	async def __optimize_timeseries_selected_cluster(self,
+		raw_data_close: pd.Series,
+		raw_data_broker_nval: pd.DataFrame,
+		cluster_corr: pd.DataFrame,
+		df_cluster: pd.DataFrame,
+		training_start_index: float = 0.5,
+		training_end_index: float = 0.75,
+		stepup_n_cluster_threshold: float = 0.05,
+		) -> tuple[list[str], int, float]:
+		# Delete the first self.preoffset_period_param rows from raw_data
+		raw_data_close = raw_data_close.iloc[self.preoffset_period_param:]
+		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
+
+		# Only get third quartile of raw_data so not over-fitting
+		length = len(raw_data_close)
+		start_index = int(length*training_start_index)
+		end_index = int(length*training_end_index)
+		raw_data_close = raw_data_close.iloc[start_index:end_index]
+		raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
+
+		# Get only positive correlation from cluster_corr
+		cluster_corr = cluster_corr[cluster_corr['corr']>0]
+
+		agg_cluster_corr = [cluster_corr['corr'].max()]
+		for i in range(1,len(cluster_corr)):
+			clusters = cluster_corr.iloc[:i+1,0].values
+			brokers = df_cluster[df_cluster['cluster'].isin(clusters)].index
+			broker_ncum = raw_data_broker_nval[brokers].sum(axis=1).cumsum(axis=0)
+			broker_ncum_corr = broker_ncum.corr(raw_data_close)
+			agg_cluster_corr.append(broker_ncum_corr)
+
+		# Define optimum n_selected_cluster
+		max_corr: float = np.max(agg_cluster_corr)
+		index_max_corr: int = int(np.argmax(agg_cluster_corr))
+		optimum_corr: float = max_corr
+		optimum_n_selected_cluster: int = index_max_corr + 1
+
+		for i in range (index_max_corr):
+			if (max_corr-agg_cluster_corr[i]) < stepup_n_cluster_threshold:
+				optimum_n_selected_cluster = i+1
+				optimum_corr = agg_cluster_corr[i]
+				break
+
+		selected_cluster = cluster_corr.iloc[:optimum_n_selected_cluster,0].values
+		selected_broker = df_cluster[df_cluster['cluster'].isin(selected_cluster)].index.to_list()
+
+		return selected_broker, optimum_n_selected_cluster, optimum_corr
+
+	async def __get_timeseries_bf_parameter(self,
+		raw_data_close: pd.Series,
+		raw_data_broker_nval: pd.DataFrame,
+		splitted_min_n_cluster: int = 4,
+		splitted_max_n_cluster: int = 10,
+		training_start_index: float = 0.5,
+		training_end_index: float = 0.75,
+		) -> tuple[list[str], int, float]:
+		# TODO: Define splitted_min_n_cluster and splitted_max_n_cluster
+		splitted_min_n_cluster = 2
+		splitted_max_n_cluster = 20
+
+		# Get timeseries cluster
+		broker_ncum = raw_data_broker_nval.cumsum(axis=0)
+		df_cluster, centroids_cluster = await self.get_timeseries_cluster(
+			broker_ncum, splitted_min_n_cluster, splitted_max_n_cluster)
+
+		# Get correlation between broker_ncum each cluster and raw_data_close
+		cluster_corr = await self.__get_timeseries_cluster_corr(
+			raw_data_close = raw_data_close,
+			raw_data_broker_nval = raw_data_broker_nval,
+			df_cluster = df_cluster,
+			training_start_index = training_start_index,
+			training_end_index = training_end_index
+			)
+		
+		# Sort cluster_corr by correlation
+		cluster_corr = cluster_corr.sort_values(by='corr', ascending=False).reset_index(drop=True)
+
+		selected_broker, optimum_n_selected_cluster, optimum_corr = await self.__optimize_timeseries_selected_cluster(
+			raw_data_close = raw_data_close,
+			raw_data_broker_nval = raw_data_broker_nval,
+			cluster_corr = cluster_corr,
+			df_cluster = df_cluster,
+			training_start_index = training_start_index,
+			training_end_index = training_end_index
+			)
+		
+		return selected_broker, optimum_n_selected_cluster, optimum_corr
 
 	async def calc_wf_indicators(self,
 		raw_data_full: pd.DataFrame,
