@@ -74,8 +74,8 @@ async def quantist_stock_chart(
 		row=1,col=1,secondary_y=True
 	)
 	# Whale Flow
-	fig.add_trace(go.Scatter(x=wf_indicators.index,y=wf_indicators["volflow"],
-		name=f"{abv} Vol Flow",marker_color="orange",
+	fig.add_trace(go.Scatter(x=wf_indicators.index,y=wf_indicators["valflow"],
+		name=f"{abv} Val Flow",marker_color="orange",
 		legendrank=3
 		),
 		row=1,col=1,secondary_y=False
@@ -117,22 +117,22 @@ async def quantist_stock_chart(
 			)
 		fig.update_layout(barmode='stack', xaxis2_tickangle=90)
 
-	# Whale Volume Profile
+	# Whale Value Profile
 	assert isinstance(fig.data, tuple)
-	vol_profile_index = len(fig.data)
+	val_profile_index = len(fig.data)
 	fig.add_trace(go.Histogram(
-		x=wf_indicators['netvol'],
+		x=wf_indicators['netval'],
 		y=wf_indicators['close'],
 		histfunc="sum",
-		name="Net Volume Profile",orientation="h",opacity=0.1,
+		name="Net Value Profile",orientation="h",opacity=0.1,
 		legendrank=8),
 		row=1,col=1,secondary_y=True)
-	bins=np.arange(fig.full_figure_for_development(warn=False).data[vol_profile_index].ybins.start, # type:ignore
-		fig.full_figure_for_development(warn=False).data[vol_profile_index].ybins.end, # type:ignore
-		fig.full_figure_for_development(warn=False).data[vol_profile_index].ybins.size) # type:ignore
+	bins=np.arange(fig.full_figure_for_development(warn=False).data[val_profile_index].ybins.start, # type:ignore
+		fig.full_figure_for_development(warn=False).data[val_profile_index].ybins.end, # type:ignore
+		fig.full_figure_for_development(warn=False).data[val_profile_index].ybins.size) # type:ignore
 	bins = pd.Series(bins)
-	hist_bar = wf_indicators.groupby(pd.cut(wf_indicators['close'].to_numpy(),bins=bins))['netvol'].sum() # type:ignore
-	fig.data[vol_profile_index].update(marker=dict(color=np.where(hist_bar<0,"tomato","cyan")),xaxis=f'x{vol_profile_index}') # type:ignore
+	hist_bar = wf_indicators.groupby(pd.cut(wf_indicators['close'].to_numpy(),bins=bins))['netval'].sum() # type:ignore
+	fig.data[val_profile_index].update(marker=dict(color=np.where(hist_bar<0,"tomato","cyan")),xaxis=f'x{val_profile_index}') # type:ignore
 
 	# UPDATE AXES
 	# Column 1
@@ -161,7 +161,7 @@ async def quantist_stock_chart(
 	# fig.update_layout({"xaxis_range":[start_temp,end_temp+datetime.timedelta(days=round(len(wf_indicators)*0.1))]})
 	# fig.update_layout({"xaxis2_range":None})
 
-	fig.update_layout({f"xaxis{vol_profile_index}":{'anchor': 'y', 'overlaying': 'x','showgrid':False,"visible":False}})
+	fig.update_layout({f"xaxis{val_profile_index}":{'anchor': 'y', 'overlaying': 'x','showgrid':False,"visible":False}})
 
 	# ANNOTATION
 	pricecorrel = wf_indicators.loc[end_temp,'pricecorrel'] # type:ignore
@@ -301,6 +301,75 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, code:str):
 	# UPDATE_LAYOUT GLOBAL DEFAULT TEMPLATE
 	fig.update_layout(legend={"orientation":"h","y":-0.1})
 	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
+
+	return fig
+
+async def broker_cluster_timeseries_chart(
+	broker_cluster: pd.DataFrame,
+	broker_ncum: pd.DataFrame,
+	raw_data_close: pd.Series,
+	code: str,
+	) -> go.Figure:
+	# Count number of clusters
+	n_clusters = broker_cluster['cluster'].nunique()
+
+	# Sort broker_cluster by correlation
+	broker_cluster = broker_cluster.sort_values(by='corr', ascending=False)
+	# Rank correlation (same value will have same rank)
+	broker_cluster['rank'] = broker_cluster['corr'].rank(method='dense', ascending=False)-1
+
+	# Make subplots with max 3 columns with total n_clusters subplots with secondary_y
+	n_cols = 3
+	n_rows = n_clusters // n_cols
+	n_rows = n_rows + 1 if n_clusters % n_cols != 0 else n_rows
+	fig = make_subplots(rows=n_rows, cols=n_cols, shared_xaxes=True,
+		specs=[[{'secondary_y': True}]*n_cols]*n_rows,
+		subplot_titles=[f"Cluster {i} (corr:{round(broker_cluster[broker_cluster['rank'] == i]['corr'][0], 4)})" for i in range(n_clusters)],
+		vertical_spacing=0.1, horizontal_spacing=0.1)
+	# Add traces to subplots
+	for i in range(n_clusters):
+		# Get brokers from a cluster
+		incluster_brokers = broker_cluster[broker_cluster['rank'] == i].index
+		incluster_broker_ncum = broker_ncum[incluster_brokers]
+		# Plot line all column of incluster_broker_ncum to subplot
+		col_idx = 0
+		for col in incluster_broker_ncum.columns:
+			fig.add_trace(go.Scatter(
+				x=incluster_broker_ncum.index, y=incluster_broker_ncum[col], name=col, line=dict(color='gray'),
+				showlegend=False),
+				row=i//n_cols+1, col=i%n_cols+1, secondary_y=False)
+			# Plot line of mean of incluster_broker_ncum to subplot with yellow color
+			fig.add_trace(go.Scatter(
+				x=incluster_broker_ncum.index, y=incluster_broker_ncum.mean(axis=1), name='Mean Cluster Transaction', line=dict(color='yellow'),
+				showlegend=False if (i != 0 or col_idx != 0) else True),
+				row=i//n_cols+1, col=i%n_cols+1, secondary_y=False)
+			col_idx += 1
+		
+		# Plot line of raw_data_close to subplot with red color
+		fig.add_trace(go.Scatter(
+			x=raw_data_close.index, y=raw_data_close, name='Close Price', line=dict(color='red'),
+			showlegend=False if i != 0 else True),
+			row=i//n_cols+1, col=i%n_cols+1, secondary_y=True,
+			)
+		
+		# Set subplot title
+		fig.update_yaxes(title_text=f"Net Cum Trx", row=i//n_cols+1, col=i%n_cols+1, secondary_y=False)
+		fig.update_xaxes(title_text=f"Date", row=i//n_cols+1, col=i%n_cols+1)
+		fig.update_yaxes(title_text=f"Price", row=i//n_cols+1, col=i%n_cols+1, secondary_y=True)
+
+	# List the brokers in each cluster from broker_cluster index
+	cluster_brokers = [broker_cluster[broker_cluster['rank'] == i].index.tolist() for i in range(n_clusters)]
+	# List down the brokers in each cluster below the subplot
+	for i in range(n_clusters):
+		fig.add_annotation(xref="x domain",yref="y domain",x=0,y=0,
+			text=f"<b>{html_wrap(str(cluster_brokers[i]).upper(), width=60, n_lines=4)}</b>",showarrow=False,font=dict(color="white"),
+			row=i//n_cols+1, col=i%n_cols+1)
+
+	# Update layout
+	fig.update_layout(title=f"{code.upper()} - Broker Clustering Time Series")
+	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
+	fig.update_layout(dragmode="pan")
+	fig.update_layout(legend={"orientation":"h","y":-0.1})
 
 	return fig
 

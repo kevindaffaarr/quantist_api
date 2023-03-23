@@ -170,6 +170,7 @@ class BrokerFlow(WhaleFlow, bf.StockBFFull):
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
+		clustering_method: dp.ClusteringMethod = dp.ClusteringMethod.correlation,
 		n_selected_cluster:int | None = None,
 		period_mf: int | None = None,
 		period_prop: int | None = None,
@@ -208,6 +209,7 @@ class BrokerFlow(WhaleFlow, bf.StockBFFull):
 			pow_medium_pricecorrel=pow_medium_pricecorrel,
 			pow_medium_mapricecorrel=pow_medium_mapricecorrel,
 			dbs=dbs)
+		self.clustering_method = clustering_method
 		self.n_selected_cluster = n_selected_cluster
 		self.training_start_index = training_start_index
 		self.training_end_index = training_end_index
@@ -223,6 +225,7 @@ class BrokerFlow(WhaleFlow, bf.StockBFFull):
 			stockcode = self.stockcode,
 			startdate = self.startdate,
 			enddate = self.enddate,
+			clustering_method=self.clustering_method,
 			n_selected_cluster = self.n_selected_cluster,
 			period_mf = self.period_mf,
 			period_prop = self.period_prop,

@@ -10,6 +10,9 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.decomposition import PCA
+
 from sqlalchemy.sql import func
 
 import database as db
@@ -24,6 +27,7 @@ class StockBFFull():
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
+		clustering_method: dp.ClusteringMethod = dp.ClusteringMethod.correlation,
 		n_selected_cluster:int | None = None,
 		period_mf: int | None = None,
 		period_prop: int | None = None,
@@ -42,13 +46,14 @@ class StockBFFull():
 		max_n_cluster: int | None = None,
 		splitted_min_n_cluster: int | None = None,
 		splitted_max_n_cluster: int | None = None,
-		stepup_n_cluster_threshold: int | None = None,
+		stepup_n_cluster_threshold: float | None = None,
 		dbs: db.Session = next(db.get_dbs()),
 		) -> None:
 
 		self.stockcode = stockcode
 		self.startdate = startdate
 		self.enddate = enddate
+		self.clustering_method = clustering_method
 		self.n_selected_cluster = n_selected_cluster
 		self.period_mf = period_mf
 		self.period_prop = period_prop
@@ -85,6 +90,7 @@ class StockBFFull():
 		assert isinstance(self.training_end_index, float), "training_end_index must be float"
 		assert isinstance(self.splitted_min_n_cluster, int), "splitted_min_n_cluster must be int"
 		assert isinstance(self.splitted_max_n_cluster, int), "splitted_max_n_cluster must be int"
+		assert isinstance(self.stepup_n_cluster_threshold, float), "stepup_n_cluster_threshold must be int"
 		assert isinstance(self.period_mf, int), "period_mf must be int"
 		assert isinstance(self.period_prop, int), "period_prop must be int"
 		assert isinstance(self.period_pricecorrel, int), "period_pricecorrel must be int"
@@ -116,19 +122,33 @@ class StockBFFull():
 				preoffset_period_param=self.preoffset_period_param,
 				dbs=self.dbs
 				)
-		# Get broker flow parameters
-		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
-			await self.__get_bf_parameters(
-				raw_data_close=raw_data_full["close"],
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_sumvol=raw_data_broker_sumvol,
-				raw_data_broker_sumval=raw_data_broker_sumval,
-				n_selected_cluster=self.n_selected_cluster,
-				training_start_index=self.training_start_index,
-				training_end_index=self.training_end_index,
-				splitted_min_n_cluster=self.splitted_min_n_cluster,
-				splitted_max_n_cluster=self.splitted_max_n_cluster,
-			)
+		
+		if self.clustering_method == dp.ClusteringMethod.timeseries:
+			# Get broker flow parameters using timeseries method
+			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_cluster, self.broker_ncum = \
+				await self.__get_timeseries_bf_parameter(
+					raw_data_close=raw_data_full["close"],
+					raw_data_broker_nval=raw_data_broker_nval,
+					splitted_min_n_cluster=self.splitted_min_n_cluster,
+					splitted_max_n_cluster=self.splitted_max_n_cluster,
+					training_start_index=self.training_start_index,
+					training_end_index=self.training_end_index,
+					stepup_n_cluster_threshold=self.stepup_n_cluster_threshold,
+				)
+		else:
+			# Get broker flow parameters using correlation method
+			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
+				await self.__get_bf_parameters(
+					raw_data_close=raw_data_full["close"],
+					raw_data_broker_nval=raw_data_broker_nval,
+					raw_data_broker_sumval=raw_data_broker_sumval,
+					n_selected_cluster=self.n_selected_cluster,
+					training_start_index=self.training_start_index,
+					training_end_index=self.training_end_index,
+					splitted_min_n_cluster=self.splitted_min_n_cluster,
+					splitted_max_n_cluster=self.splitted_max_n_cluster,
+					stepup_n_cluster_threshold=self.stepup_n_cluster_threshold,
+				)
 
 		# Calc broker flow indicators
 		self.wf_indicators = await self.calc_wf_indicators(
@@ -475,8 +495,7 @@ class StockBFFull():
 
 	async def __get_bf_parameters(self,
 		raw_data_close: pd.Series,
-		raw_data_broker_nvol: pd.DataFrame,
-		raw_data_broker_sumvol: pd.DataFrame,
+		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
 		n_selected_cluster: int | None = None,
 		training_start_index: float = 0.5,
@@ -488,24 +507,22 @@ class StockBFFull():
 
 		# Delete the first self.preoffset_period_param rows from raw_data
 		raw_data_close = raw_data_close.iloc[self.preoffset_period_param:]
-		raw_data_broker_nvol = raw_data_broker_nvol.iloc[self.preoffset_period_param:,:]
-		raw_data_broker_sumvol = raw_data_broker_sumvol.iloc[self.preoffset_period_param:,:]
+		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
 		raw_data_broker_sumval = raw_data_broker_sumval.iloc[self.preoffset_period_param:,:]
 
 		# Only get third quartile of raw_data so not over-fitting
-		length = len(raw_data_close)
-		start_index = int(length*training_start_index)
-		end_index = int(length*training_end_index)
-		raw_data_close = raw_data_close.iloc[start_index:end_index]
-		raw_data_broker_nvol = raw_data_broker_nvol.iloc[start_index:end_index,:]
-		raw_data_broker_sumvol = raw_data_broker_sumvol.iloc[start_index:end_index,:]
-		raw_data_broker_sumval = raw_data_broker_sumval.iloc[start_index:end_index,:]
+		# length = len(raw_data_close)
+		# start_index = int(length*training_start_index)
+		# end_index = int(length*training_end_index)
+		# raw_data_close = raw_data_close.iloc[start_index:end_index]
+		# raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
+		# raw_data_broker_sumval = raw_data_broker_sumval.iloc[start_index:end_index,:]
 
-		if (raw_data_broker_nvol == 0).all().all() or (raw_data_broker_sumvol == 0).all().all():
+		if (raw_data_broker_nval == 0).all().all() or (raw_data_broker_sumval == 0).all().all():
 			raise ValueError("There is no transaction for the stockcode in the selected quantile")
 		
 		# Cumulate value for nvol
-		broker_ncum = raw_data_broker_nvol.cumsum(axis=0)
+		broker_ncum = raw_data_broker_nval.cumsum(axis=0)
 		# Get correlation between raw_data_ncum and close
 		broker_ncum_corr = broker_ncum.corrwith(raw_data_close,axis=0).rename("corr_ncum_close")
 
@@ -518,7 +535,7 @@ class StockBFFull():
 		broker_features.fillna(value=0, inplace=True)
 
 		# Delete variable for memory management
-		del raw_data_broker_nvol, raw_data_broker_sumvol, raw_data_broker_sumval, broker_ncum_corr, broker_sumval
+		del raw_data_broker_nval, raw_data_broker_sumval, broker_ncum_corr, broker_sumval
 		gc.collect()
 
 		# # Obsolete Method: General Clustering
@@ -570,6 +587,138 @@ class StockBFFull():
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr, broker_features
 
+	async def get_timeseries_cluster(self,
+		df: pd.DataFrame,
+		splitted_min_n_cluster: int = 4,
+		splitted_max_n_cluster: int = 10
+		) -> tuple[pd.DataFrame, pd.DataFrame]:
+		# Scaling the dataframe for each column
+		scaler = MinMaxScaler()
+		df_scaled = scaler.fit_transform(df)
+		df_scaled = pd.DataFrame(df_scaled, columns=df.columns, index=df.index)
+		
+		# Dimensionality Reduction for each column
+		pca = PCA(n_components=2)
+		df_pca = pca.fit_transform(df_scaled.T)
+		df_pca = pd.DataFrame(df_pca, columns=['PC1','PC2'], index=df_scaled.T.index)
+
+		# KMeans Clustering
+		df_cluster, centroids_cluster = await self.__kmeans_clustering(
+			features=df_pca,
+			x='PC1',
+			y='PC2',
+			min_n_cluster=splitted_min_n_cluster,
+			max_n_cluster=splitted_max_n_cluster
+			)
+		
+		return df_cluster, centroids_cluster
+	
+	async def __get_timeseries_cluster_corr(self,
+		raw_data_close: pd.Series,
+		raw_data_broker_nval: pd.DataFrame,
+		df_cluster: pd.DataFrame,
+		):
+		# Get number of clusters from df_cluster['cluster']
+		n_cluster = df_cluster['cluster'].max() + 1
+
+		# Looping each cluster
+		# Get broker_ncum for each cluster from raw_data_broker_nval
+		# Get correlation between broker_ncum and raw_data_close
+		# Then append to cluster_corr dataframe
+		cluster_corr = pd.DataFrame()
+		for i in range(n_cluster):
+			brokers = df_cluster[df_cluster['cluster']==i].index
+			broker_ncum = raw_data_broker_nval[brokers].sum(axis=1).cumsum(axis=0)
+			broker_ncum_corr = broker_ncum.corr(raw_data_close)
+			cluster_corr = pd.concat([cluster_corr, pd.DataFrame(
+				{'cluster':i, 'corr':broker_ncum_corr}, index=[0])], axis=0)
+		# fillna with 0
+		cluster_corr = cluster_corr.fillna(0)
+		return cluster_corr
+	
+	async def __optimize_timeseries_selected_cluster(self,
+		raw_data_close: pd.Series,
+		raw_data_broker_nval: pd.DataFrame,
+		cluster_corr: pd.DataFrame,
+		df_cluster: pd.DataFrame,
+		stepup_n_cluster_threshold: float = 0.05,
+		) -> tuple[list[str], int, float]:
+		# Get only positive correlation from cluster_corr
+		cluster_corr = cluster_corr[cluster_corr['corr']>0]
+
+		agg_cluster_corr = [cluster_corr['corr'].max()]
+		for i in range(1,len(cluster_corr)):
+			clusters = cluster_corr.iloc[:i+1,0].values
+			brokers = df_cluster[df_cluster['cluster'].isin(clusters)].index
+			broker_ncum = raw_data_broker_nval[brokers].sum(axis=1).cumsum(axis=0)
+			broker_ncum_corr = broker_ncum.corr(raw_data_close)
+			agg_cluster_corr.append(broker_ncum_corr)
+
+		# Define optimum n_selected_cluster
+		max_corr: float = np.max(agg_cluster_corr)
+		index_max_corr: int = int(np.argmax(agg_cluster_corr))
+		optimum_corr: float = max_corr
+		optimum_n_selected_cluster: int = index_max_corr + 1
+
+		for i in range (index_max_corr):
+			if (max_corr-agg_cluster_corr[i]) < stepup_n_cluster_threshold:
+				optimum_n_selected_cluster = i+1
+				optimum_corr = agg_cluster_corr[i]
+				break
+
+		selected_cluster = cluster_corr.iloc[:optimum_n_selected_cluster,0].values
+		selected_broker = df_cluster[df_cluster['cluster'].isin(selected_cluster)].index.to_list()
+
+		return selected_broker, optimum_n_selected_cluster, optimum_corr
+
+	async def __get_timeseries_bf_parameter(self,
+		raw_data_close: pd.Series,
+		raw_data_broker_nval: pd.DataFrame,
+		splitted_min_n_cluster: int = 4,
+		splitted_max_n_cluster: int = 10,
+		training_start_index: float = 0.5,
+		training_end_index: float = 0.75,
+		stepup_n_cluster_threshold: float = 0.05,
+		) -> tuple[list[str], int, float, pd.DataFrame, pd.DataFrame]:
+		# Delete the first self.preoffset_period_param rows from raw_data
+		raw_data_close = raw_data_close.iloc[self.preoffset_period_param:]
+		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
+
+		# Only get third quartile of raw_data so not over-fitting
+		# length = len(raw_data_close)
+		# start_index = int(length*training_start_index)
+		# end_index = int(length*training_end_index)
+		# raw_data_close = raw_data_close.iloc[start_index:end_index]
+		# raw_data_broker_nval = raw_data_broker_nval.iloc[start_index:end_index,:]
+
+		# Get timeseries cluster
+		broker_ncum = raw_data_broker_nval.cumsum(axis=0)
+		df_cluster, centroids_cluster = await self.get_timeseries_cluster(
+			broker_ncum, splitted_min_n_cluster, splitted_max_n_cluster)
+
+		# Get correlation between broker_ncum each cluster and raw_data_close
+		cluster_corr = await self.__get_timeseries_cluster_corr(
+			raw_data_close = raw_data_close,
+			raw_data_broker_nval = raw_data_broker_nval,
+			df_cluster = df_cluster,
+			)
+		
+		# Join cluster_corr to df_cluster on cluster
+		df_cluster = df_cluster.join(cluster_corr.set_index('cluster'), on='cluster')
+
+		# Sort cluster_corr by correlation
+		cluster_corr = cluster_corr.sort_values(by='corr', ascending=False).reset_index(drop=True)
+
+		selected_broker, optimum_n_selected_cluster, optimum_corr = await self.__optimize_timeseries_selected_cluster(
+			raw_data_close = raw_data_close,
+			raw_data_broker_nval = raw_data_broker_nval,
+			cluster_corr = cluster_corr,
+			df_cluster = df_cluster,
+			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
+			)
+		
+		return selected_broker, optimum_n_selected_cluster, optimum_corr, df_cluster, broker_ncum
+
 	async def calc_wf_indicators(self,
 		raw_data_full: pd.DataFrame,
 		raw_data_broker_nvol: pd.DataFrame,
@@ -598,10 +747,10 @@ class StockBFFull():
 		selected_data_broker_sumval = raw_data_broker_sumval[selected_broker].sum(axis=1)
 
 		# Net Value for Volume Profile
-		raw_data_full["netvol"] = selected_data_broker_nvol
+		raw_data_full["netval"] = selected_data_broker_nval
 		
 		# Whale Volume Flow
-		raw_data_full["volflow"] = selected_data_broker_nvol.cumsum()
+		raw_data_full["valflow"] = selected_data_broker_nval.cumsum()
 
 		# Whale Money Flow
 		raw_data_full['mf'] = selected_data_broker_nval.rolling(window=period_mf).sum()
@@ -615,7 +764,7 @@ class StockBFFull():
 			/ (raw_data_full['value'].rolling(window=period_prop).sum()*2)
 
 		# Whale correlation
-		raw_data_full['pricecorrel'] = raw_data_full["volflow"].rolling(window=period_pricecorrel).corr(raw_data_full['close'])
+		raw_data_full['pricecorrel'] = raw_data_full["valflow"].rolling(window=period_pricecorrel).corr(raw_data_full['close'])
 
 		# Whale MA correlation
 		raw_data_full['mapricecorrel'] = raw_data_full['pricecorrel'].rolling(window=period_mapricecorrel).mean()
@@ -668,10 +817,23 @@ class StockBFFull():
 	async def broker_cluster_chart(self,media_type: str | None = None):
 		assert self.stockcode is not None
 
-		fig = await genchart.broker_cluster_chart(
-			broker_features=self.broker_features,
-			code=self.stockcode,
-		)
+		if self.clustering_method == dp.ClusteringMethod.timeseries:
+			scaler = MinMaxScaler()
+			broker_ncum_scaled = scaler.fit_transform(self.broker_ncum)
+			broker_ncum_scaled = pd.DataFrame(broker_ncum_scaled,
+					columns=self.broker_ncum.columns, index=self.broker_ncum.index)
+			
+			fig = await genchart.broker_cluster_timeseries_chart(
+				broker_cluster=self.broker_cluster,
+				broker_ncum=broker_ncum_scaled,
+				raw_data_close=self.wf_indicators["close"],
+				code=self.stockcode,
+			)
+		else:
+			fig = await genchart.broker_cluster_chart(
+				broker_features=self.broker_features,
+				code=self.stockcode,
+			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)
 		elif media_type == "json":
@@ -760,8 +922,7 @@ class WhaleRadar():
 		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
 			await self._get_bf_parameters(
 				raw_data_close=raw_data_full["close"],
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_sumvol=raw_data_broker_sumvol,
+				raw_data_broker_nval=raw_data_broker_nval,
 				raw_data_broker_sumval=raw_data_broker_sumval,
 				n_selected_cluster=self.n_selected_cluster,
 				training_start_index=self.training_start_index,
@@ -806,7 +967,6 @@ class WhaleRadar():
 		# Get Whale Radar Indicators
 		self.radar_indicators = await self._calc_radar_indicators(
 			raw_data_full = raw_data_full,
-			selected_broker_nvol = selected_broker_nvol,
 			selected_broker_nval = selected_broker_nval,
 			y_axis_type=self.y_axis_type,
 			)
@@ -1138,8 +1298,7 @@ class WhaleRadar():
 
 	async def _get_bf_parameters(self,
 		raw_data_close: pd.Series,
-		raw_data_broker_nvol: pd.DataFrame,
-		raw_data_broker_sumvol: pd.DataFrame,
+		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
 		n_selected_cluster: int | None = None,
 		training_start_index: float = 0.5,
@@ -1150,28 +1309,26 @@ class WhaleRadar():
 		) -> tuple[dict, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
 		# Only get third quartile of raw_data so not over-fitting
-		length = raw_data_close.groupby(by='code').size()
-		start_index = (length*training_start_index).astype('int')
-		end_index = (length*training_end_index).astype('int')
-		raw_data_close = raw_data_close.groupby(by='code', group_keys=False)\
-			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
-		raw_data_broker_nvol = raw_data_broker_nvol.groupby(by='code', group_keys=False)\
-			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
-		raw_data_broker_sumvol = raw_data_broker_sumvol.groupby(by='code', group_keys=False)\
-			.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
+		# length = raw_data_close.groupby(by='code').size()
+		# start_index = (length*training_start_index).astype('int')
+		# end_index = (length*training_end_index).astype('int')
+		# raw_data_close = raw_data_close.groupby(by='code', group_keys=False)\
+		# 	.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
+		# raw_data_broker_nval = raw_data_broker_nval.groupby(by='code', group_keys=False)\
+		# 	.apply(lambda x: x.iloc[start_index.loc[x.name]:end_index.loc[x.name]])
 		
-		# Only get raw_data_broker_nvol groupby level code that doesn' all zero
-		nvol_true = raw_data_broker_nvol.groupby(by='code', group_keys=False)\
+		# Only get raw_data_broker_nval groupby level code that doesn' all zero
+		nval_true = raw_data_broker_nval.groupby(by='code', group_keys=False)\
 			.apply(lambda x: (x!=0).any().any())
-		sumvol_true = raw_data_broker_sumvol.groupby(by='code', group_keys=False)\
+		sumval_true = raw_data_broker_sumval.groupby(by='code', group_keys=False)\
 			.apply(lambda x: (x!=0).any().any())
-		transaction_true = nvol_true & sumvol_true
+		transaction_true = nval_true & sumval_true
 		raw_data_close = raw_data_close.loc[transaction_true.index[transaction_true]]
-		raw_data_broker_nvol = raw_data_broker_nvol.loc[transaction_true.index[transaction_true]]
-		raw_data_broker_sumvol = raw_data_broker_sumvol.loc[transaction_true.index[transaction_true]]
+		raw_data_broker_nval = raw_data_broker_nval.loc[transaction_true.index[transaction_true]]
+		raw_data_broker_sumval = raw_data_broker_sumval.loc[transaction_true.index[transaction_true]]
 
 		# Cumulate volume for nvol
-		broker_ncum = raw_data_broker_nvol.groupby(by='code').cumsum(axis=0)
+		broker_ncum = raw_data_broker_nval.groupby(by='code').cumsum(axis=0)
 		# Get correlation between raw_data_ncum and close
 		corr_ncum_close = broker_ncum.groupby(by='code').corrwith(raw_data_close,axis=0) # type: ignore
 
@@ -1188,7 +1345,7 @@ class WhaleRadar():
 		broker_features = pd.concat([corr_ncum_close, broker_sumval], axis=1)
 
 		# Delete variable for memory management
-		del raw_data_broker_nvol, raw_data_broker_sumvol, raw_data_broker_sumval, corr_ncum_close, broker_sumval
+		del raw_data_broker_nval, raw_data_broker_sumval, corr_ncum_close, broker_sumval
 		gc.collect()
 
 		# Standardize Features
@@ -1347,7 +1504,6 @@ class WhaleRadar():
 
 	async def _calc_radar_indicators(self,
 		raw_data_full: pd.DataFrame,
-		selected_broker_nvol: pd.DataFrame,
 		selected_broker_nval: pd.DataFrame,
 		y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
 		) -> pd.DataFrame:
@@ -1359,8 +1515,8 @@ class WhaleRadar():
 
 		# X Axis:
 		if y_axis_type == dp.ListRadarType.correlation:
-			selected_broker_nvol_cumsum = selected_broker_nvol.groupby(level='code').cumsum()
-			radar_indicators[y_axis_type.value] = selected_broker_nvol_cumsum.groupby('code')\
+			selected_broker_nval_cumsum = selected_broker_nval.groupby(level='code').cumsum()
+			radar_indicators[y_axis_type.value] = selected_broker_nval_cumsum.groupby('code')\
 				.corrwith(raw_data_full['close'],axis=0) # type: ignore
 		elif y_axis_type == dp.ListRadarType.changepercentage:
 			radar_indicators[y_axis_type.value] = \
@@ -1480,8 +1636,7 @@ class ScreenerBase(WhaleRadar):
 		self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
 			await self._get_bf_parameters(
 				raw_data_close=raw_data_full["close"],
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_sumvol=raw_data_broker_sumvol,
+				raw_data_broker_nval=raw_data_broker_nval,
 				raw_data_broker_sumval=raw_data_broker_sumval,
 				n_selected_cluster=self.n_selected_cluster,
 				training_start_index=self.training_start_index,
