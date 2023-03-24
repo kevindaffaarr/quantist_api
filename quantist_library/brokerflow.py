@@ -636,15 +636,15 @@ class StockBFFull():
 			broker_ncum = raw_data_broker_nval[brokers].sum(axis=1).cumsum(axis=0)
 			broker_ncum_corr = broker_ncum.corr(raw_data_close)
 			cluster_corr = pd.concat([cluster_corr, pd.DataFrame(
-				{'cluster':i, 'corr':broker_ncum_corr}, index=[0])], axis=0)
+				{'cluster':i, 'corr_ncum_close':broker_ncum_corr}, index=[0])], axis=0)
 		# fillna with 0
 		cluster_corr = cluster_corr.fillna(0)
 		
 		# Add corr_abs column to cluster_corr
-		cluster_corr['corr_abs'] = cluster_corr['corr'].abs()
+		cluster_corr['corr_ncum_close_abs'] = cluster_corr['corr_ncum_close'].abs()
 
 		# Sort cluster_corr by correlation
-		cluster_corr = cluster_corr.sort_values(by='corr_abs', ascending=False).reset_index(drop=True)
+		cluster_corr = cluster_corr.sort_values(by='corr_ncum_close_abs', ascending=False).reset_index(drop=True)
 
 		return cluster_corr
 	
@@ -656,12 +656,12 @@ class StockBFFull():
 		stepup_n_cluster_threshold: float = 0.05,
 		) -> tuple[list[str], int, float]:
 		# Get only positive correlation from cluster_corr
-		# cluster_corr = cluster_corr[cluster_corr['corr']>0]
+		# cluster_corr = cluster_corr[cluster_corr['corr_ncum_close']>0]
 		
 		# Sort cluster_corr by correlation absolute value
-		cluster_corr = cluster_corr.sort_values(by='corr_abs', ascending=False).reset_index(drop=True)
+		cluster_corr = cluster_corr.sort_values(by='corr_ncum_close_abs', ascending=False).reset_index(drop=True)
 
-		agg_cluster_corr = [cluster_corr['corr_abs'].max()]
+		agg_cluster_corr = [cluster_corr['corr_ncum_close_abs'].max()]
 		for i in range(1,len(cluster_corr)):
 			clusters = cluster_corr.iloc[:i+1,0].values
 			brokers = df_cluster[df_cluster['cluster'].isin(clusters)].index
@@ -691,10 +691,11 @@ class StockBFFull():
 		broker_cluster: pd.DataFrame,
 		) -> pd.DataFrame:
 		# Get brokers from broker_cluster with negative corr
-		brokers = broker_cluster[broker_cluster['corr']<0].index.to_list()
+		brokers = broker_cluster[broker_cluster['corr_ncum_close']<0].index.to_list()
 
 		# Adjust plusmin_df by multiplying -1 to brokers
-		df[brokers] = df[brokers].mul(-1)
+		df = df.copy()
+		df.loc[:, brokers] *= -1
 
 		return df
 	

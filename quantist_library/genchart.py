@@ -314,9 +314,9 @@ async def broker_cluster_timeseries_chart(
 	n_clusters = broker_cluster['cluster'].nunique()
 
 	# Sort broker_cluster by correlation
-	broker_cluster = broker_cluster.sort_values(by='corr_abs', ascending=False)
+	broker_cluster = broker_cluster.sort_values(by='corr_ncum_close_abs', ascending=False)
 	# Rank correlation (same value will have same rank)
-	broker_cluster['rank'] = broker_cluster['corr_abs'].rank(method='dense', ascending=False)-1
+	broker_cluster['rank'] = broker_cluster['corr_ncum_close_abs'].rank(method='dense', ascending=False)-1
 
 	# Make subplots with max 3 columns with total n_clusters subplots with secondary_y
 	n_cols = 3
@@ -324,7 +324,7 @@ async def broker_cluster_timeseries_chart(
 	n_rows = n_rows + 1 if n_clusters % n_cols != 0 else n_rows
 	fig = make_subplots(rows=n_rows, cols=n_cols, shared_xaxes=True,
 		specs=[[{'secondary_y': True}]*n_cols]*n_rows,
-		subplot_titles=[f"Cluster {i} (corr:{round(broker_cluster[broker_cluster['rank'] == i]['corr'][0], 4)})" for i in range(n_clusters)],
+		subplot_titles=[f"Cluster {i} (corr:{round(broker_cluster[broker_cluster['rank'] == i]['corr_ncum_close'][0], 4)})" for i in range(n_clusters)],
 		vertical_spacing=0.1, horizontal_spacing=0.1)
 	# Add traces to subplots
 	for i in range(n_clusters):
