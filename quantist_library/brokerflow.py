@@ -955,6 +955,12 @@ class WhaleRadar():
 				splitted_max_n_cluster=self.splitted_max_n_cluster,
 			)
 		
+		# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+		for code in self.broker_features.index.get_level_values('code').unique():
+			raw_data_broker_nvol.loc[code] = await self.__adjust_plusmin_df(df=raw_data_broker_nvol.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
+			raw_data_broker_nval.loc[code,:] = await self.__adjust_plusmin_df(df=raw_data_broker_nval.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
+			raw_data_broker_sumval.loc[code,:] = await self.__adjust_plusmin_df(df=raw_data_broker_sumval.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
+		
 		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
 		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self._get_filtered_stockcodes_by_corr(
@@ -1187,8 +1193,7 @@ class WhaleRadar():
 		) -> list[str]:
 
 		# Get index of max value in column 0 in centroid
-		selected_cluster = (centroids_cluster[0]).nlargest(n_selected_cluster).index.tolist()
-		# selected_cluster = (abs(centroids_cluster[0]*centroids_cluster[1])).nlargest(n_selected_cluster).index.tolist()
+		selected_cluster = (abs(centroids_cluster[0])).nlargest(n_selected_cluster).index.tolist()
 		
 		# Get sorted selected broker
 		selected_broker = clustered_features.loc[clustered_features["cluster"].isin(selected_cluster), :]\
@@ -1211,7 +1216,7 @@ class WhaleRadar():
 			)
 
 		# Get selected broker transaction by columns of net_stockdatatransaction, then sum each column to aggregate to date
-		selected_broker_ncum = broker_ncum[selected_broker].sum(axis=1)
+		selected_broker_ncum = broker_ncum[selected_broker].sum(axis=1).rename("selected_broker_ncum")
 
 		# Return correlation between close and selected_broker_ncum
 		return selected_broker_ncum.corr(raw_data_close)
@@ -1224,6 +1229,9 @@ class WhaleRadar():
 		stepup_n_cluster_threshold: float = 0.05,
 		n_selected_cluster: int | None = None,
 		) -> tuple[list[str], int, float]:
+		# Adjust Plus Min from broker_ncum
+		broker_ncum = await self.__adjust_plusmin_df(df=broker_ncum,broker_cluster=clustered_features)
+		
 		# Check does n_selected_cluster already defined
 		if n_selected_cluster is None:
 			# Define correlation param
@@ -1233,11 +1241,11 @@ class WhaleRadar():
 			for n_selected_cluster in range(1,len(centroids_cluster)):
 				# Get correlation between close and selected_broker_ncum
 				selected_broker_ncum_corr = await self.__get_corr_selected_broker_ncum(
-					clustered_features,
-					raw_data_close,
-					broker_ncum,
-					centroids_cluster,
-					n_selected_cluster
+					clustered_features=clustered_features,
+					raw_data_close=raw_data_close,
+					broker_ncum=broker_ncum,
+					centroids_cluster=centroids_cluster,
+					n_selected_cluster=n_selected_cluster
 					)
 				# Get correlation
 				corr_list.append(selected_broker_ncum_corr)
@@ -1274,6 +1282,19 @@ class WhaleRadar():
 			)
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr
+
+	async def __adjust_plusmin_df(self,
+		df: pd.DataFrame,
+		broker_cluster: pd.DataFrame,
+		) -> pd.DataFrame:
+		# Get brokers from broker_cluster with negative corr
+		brokers = broker_cluster[broker_cluster['corr_cluster']<0].index.to_list()
+
+		# Adjust plusmin_df by multiplying -1 to brokers
+		df = df.copy()
+		df.loc[:, brokers] *= -1
+
+		return df
 
 	async def __kmeans_clustering(self,
 		features: pd.DataFrame,
@@ -1411,9 +1432,14 @@ class WhaleRadar():
 		# Combine Positive and Negative Clustering
 		broker_features_cluster = pd.concat([broker_features_pos,broker_features_neg],axis=0)
 		broker_features_centroids = pd.concat([centroids_pos,centroids_neg],axis=0)
+		# Rename level 1 index of broker_features_centroids
+		broker_features_centroids.index.set_names('cluster', level=1, inplace=True)
 
 		# Get cluster label
 		broker_features["cluster"] = broker_features_cluster["cluster"].astype("int")
+		# Join broker_features on (index code and column cluster) with broker_features_centroids on (index code and index cluster_idx)
+		broker_features = broker_features.join(broker_features_centroids[0].rename('corr_cluster'), on=["code","cluster"])
+
 
 		# Delete variable for memory management
 		del broker_features_std_pos, broker_features_std_neg, \
