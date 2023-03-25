@@ -933,7 +933,7 @@ class WhaleRadar():
 			dbs=self.dbs)
 
 		# Get raw data
-		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumvol, raw_data_broker_sumval, self.filtered_stockcodes = \
+		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
 			await self._get_stock_raw_data(
 				filtered_stockcodes=self.filtered_stockcodes,
 				startdate=self.startdate,
@@ -1050,20 +1050,18 @@ class WhaleRadar():
 	# Get Net Val Sum Val Broker Transaction
 	async def __get_nvsv_broker_transaction(self,
 		raw_data_broker_full: pd.DataFrame
-		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		raw_data_broker_nvol = raw_data_broker_full.pivot(index=None,columns="broker",values="nvol")
 		raw_data_broker_nval = raw_data_broker_full.pivot(index=None,columns="broker",values="nval")
-		raw_data_broker_sumvol = raw_data_broker_full.pivot(index=None,columns="broker",values="sumvol")
 		raw_data_broker_sumval = raw_data_broker_full.pivot(index=None,columns="broker",values="sumval")
 
 		# Fill na
 		raw_data_broker_nvol.fillna(value=0, inplace=True)
 		raw_data_broker_nval.fillna(value=0, inplace=True)
-		raw_data_broker_sumvol.fillna(value=0, inplace=True)
 		raw_data_broker_sumval.fillna(value=0, inplace=True)
 
 		# Return
-		return raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumvol, raw_data_broker_sumval
+		return raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 
 	async def __get_full_broker_transaction(self,
 		filtered_stockcodes: pd.Series = ...,
@@ -1085,7 +1083,6 @@ class WhaleRadar():
 			db.StockTransaction.sval,
 			(db.StockTransaction.bvol - db.StockTransaction.svol).label("nvol"), # type: ignore
 			(db.StockTransaction.bval - db.StockTransaction.sval).label("nval"), # type: ignore
-			(db.StockTransaction.bvol + db.StockTransaction.svol).label("sumvol"), # type: ignore
 			(db.StockTransaction.bval + db.StockTransaction.sval).label("sumval") # type: ignore
 		).filter(db.StockTransaction.code.in_(filtered_stockcodes.to_list()))\
 		.filter(db.StockTransaction.date.between(start_date, enddate))\
@@ -1153,7 +1150,7 @@ class WhaleRadar():
 		enddate: datetime.date = ...,
 		default_months_range: int = 6,
 		dbs: db.Session = next(db.get_dbs()),
-		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series]:
+		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series]:
 		MINIMUM_TRAINING_SET: int = 5
 
 		# Get Stockdata Full
@@ -1178,10 +1175,10 @@ class WhaleRadar():
 			)
 		
 		# Transform Raw Data Broker
-		raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumvol, raw_data_broker_sumval = \
+		raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self.__get_nvsv_broker_transaction(raw_data_broker_full=raw_data_broker_full)
 
-		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumvol, raw_data_broker_sumval, filtered_stockcodes
+		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, filtered_stockcodes
 	
 	async def __get_selected_broker(self,
 		clustered_features: pd.DataFrame,
@@ -1637,7 +1634,7 @@ class ScreenerBase(WhaleRadar):
 			dbs=self.dbs)
 		
 		# Get raw data
-		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumvol, raw_data_broker_sumval, self.filtered_stockcodes = \
+		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
 			await self._get_stock_raw_data(
 				filtered_stockcodes=self.filtered_stockcodes,
 				startdate=self.startdate,
