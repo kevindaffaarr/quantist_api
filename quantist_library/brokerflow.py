@@ -374,16 +374,6 @@ class StockBFFull():
 
 		return selected_broker
 
-	async def __get_selected_broker_ncum(self,
-		selected_broker: list[str],
-		broker_ncum: pd.DataFrame,
-		) -> pd.Series:
-		# Get selected broker transaction by columns of net_stockdatatransaction, then sum each column to aggregate to date
-		selected_broker_ncum = broker_ncum[selected_broker].sum(axis=1)
-		# Get cumulative
-		selected_broker_ncum = selected_broker_ncum.cumsum().rename("selected_broker_ncum")
-		return selected_broker_ncum
-
 	async def __get_corr_selected_broker_ncum(self,
 		clustered_features: pd.DataFrame,
 		raw_data_close: pd.Series,
@@ -398,7 +388,7 @@ class StockBFFull():
 			)
 
 		# Get selected broker transaction by columns of net_stockdatatransaction, then sum each column to aggregate to date
-		selected_broker_ncum = await self.__get_selected_broker_ncum(selected_broker, broker_ncum)
+		selected_broker_ncum = broker_ncum[selected_broker].sum(axis=1).rename("selected_broker_ncum")
 
 		# Return correlation between close and selected_broker_ncum
 		return selected_broker_ncum.corr(raw_data_close)
@@ -1204,16 +1194,6 @@ class WhaleRadar():
 
 		return selected_broker
 
-	async def __get_selected_broker_ncum(self,
-		selected_broker: list[str],
-		broker_ncum: pd.DataFrame,
-		) -> pd.Series:
-		# Get selected broker transaction by columns of net_stockdatatransaction, then sum each column to aggregate to date
-		selected_broker_ncum = broker_ncum[selected_broker].sum(axis=1)
-		# Get cumulative
-		selected_broker_ncum = selected_broker_ncum.cumsum().rename("selected_broker_ncum")
-		return selected_broker_ncum
-
 	async def __get_corr_selected_broker_ncum(self,
 		clustered_features: pd.DataFrame,
 		raw_data_close: pd.Series,
@@ -1228,7 +1208,7 @@ class WhaleRadar():
 			)
 
 		# Get selected broker transaction by columns of net_stockdatatransaction, then sum each column to aggregate to date
-		selected_broker_ncum = await self.__get_selected_broker_ncum(selected_broker, broker_ncum)
+		selected_broker_ncum = broker_ncum[selected_broker].sum(axis=1)
 
 		# Return correlation between close and selected_broker_ncum
 		return selected_broker_ncum.corr(raw_data_close)
