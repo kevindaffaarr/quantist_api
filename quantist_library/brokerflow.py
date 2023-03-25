@@ -114,7 +114,7 @@ class StockBFFull():
 				raise KeyError("There is no such stock code in the database.")
 
 		# Get full stockdatatransaction
-		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumvol, raw_data_broker_sumval = \
+		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self.__get_stock_raw_data(
 				stockcode=self.stockcode,
 				startdate=self.startdate,
@@ -154,6 +154,11 @@ class StockBFFull():
 					splitted_max_n_cluster=self.splitted_max_n_cluster,
 					stepup_n_cluster_threshold=self.stepup_n_cluster_threshold,
 				)
+			
+			# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+			raw_data_broker_nvol = await self.__adjust_plusmin_df(df=raw_data_broker_nvol, broker_cluster=self.broker_features)
+			raw_data_broker_nval = await self.__adjust_plusmin_df(df=raw_data_broker_nval, broker_cluster=self.broker_features)
+			raw_data_broker_sumval = await self.__adjust_plusmin_df(df=raw_data_broker_sumval, broker_cluster=self.broker_features)
 
 		# Calc broker flow indicators
 		self.wf_indicators = await self.calc_wf_indicators(
@@ -216,11 +221,10 @@ class StockBFFull():
 		return default_bf
 	
 	# Get Net Val Sum Val Broker Transaction
-	async def __get_nvsv_broker_transaction(self,raw_data_broker_full: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+	async def __get_nvsv_broker_transaction(self,raw_data_broker_full: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		# Aggretate by broker then broker to column for each net and sum
 		raw_data_broker_nvol = raw_data_broker_full.pivot(index=None,columns="broker",values="nvol")
 		raw_data_broker_nval = raw_data_broker_full.pivot(index=None,columns="broker",values="nval")
-		raw_data_broker_sumvol = raw_data_broker_full.pivot(index=None,columns="broker",values="sumvol")
 		raw_data_broker_sumval = raw_data_broker_full.pivot(index=None,columns="broker",values="sumval")
 
 		# Fill na
@@ -229,7 +233,7 @@ class StockBFFull():
 		raw_data_broker_sumval.fillna(value=0, inplace=True)
 
 		# Return
-		return raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumvol, raw_data_broker_sumval
+		return raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 
 	async def __get_full_broker_transaction(self,
 		stockcode: str,
@@ -247,7 +251,6 @@ class StockBFFull():
 			db.StockTransaction.sval,
 			(db.StockTransaction.bvol - db.StockTransaction.svol).label("nvol"), # type: ignore
 			(db.StockTransaction.bval - db.StockTransaction.sval).label("nval"), # type: ignore
-			(db.StockTransaction.bvol + db.StockTransaction.svol).label("sumvol"), # type: ignore
 			(db.StockTransaction.bval + db.StockTransaction.sval).label("sumval") # type: ignore
 		).filter((db.StockTransaction.code == stockcode))
 
@@ -336,7 +339,7 @@ class StockBFFull():
 		default_months_range: int = 12,
 		preoffset_period_param: int = 50,
 		dbs: db.Session = next(db.get_dbs()),
-		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		# Get Stockdata Full
 		raw_data_full, self.preoffset_startdate = await self.__get_stock_price_data(
 			stockcode=stockcode,startdate=startdate,enddate=enddate,
@@ -351,9 +354,9 @@ class StockBFFull():
 			dbs=dbs)
 
 		# Transform Raw Data Broker
-		raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumvol, raw_data_broker_sumval = await self.__get_nvsv_broker_transaction(raw_data_broker_full=raw_data_broker_full)
+		raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = await self.__get_nvsv_broker_transaction(raw_data_broker_full=raw_data_broker_full)
 
-		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumvol, raw_data_broker_sumval
+		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 
 	#TODO get composite raw data def: __get_composite_raw_data ()
 
@@ -364,8 +367,7 @@ class StockBFFull():
 		) -> list[str]:
 
 		# Get index of max value in column 0 in centroid
-		selected_cluster = (centroids_cluster[0]).nlargest(n_selected_cluster).index.tolist()
-		# selected_cluster = (abs(centroids_cluster[0]*centroids_cluster[1])).nlargest(n_selected_cluster).index.tolist()
+		selected_cluster = (abs(centroids_cluster[0])).nlargest(n_selected_cluster).index.tolist()
 		
 		# Get sorted selected broker
 		selected_broker = clustered_features.loc[clustered_features["cluster"].isin(selected_cluster), :]\
@@ -386,7 +388,7 @@ class StockBFFull():
 			centroids_cluster=centroids_cluster,
 			n_selected_cluster=n_selected_cluster
 			)
-
+		
 		# Get selected broker transaction by columns of net_stockdatatransaction, then sum each column to aggregate to date
 		selected_broker_ncum = broker_ncum[selected_broker].sum(axis=1).rename("selected_broker_ncum")
 
@@ -401,6 +403,9 @@ class StockBFFull():
 		stepup_n_cluster_threshold: float = 0.05,
 		n_selected_cluster: int | None = None,
 		) -> tuple[list[str], int, float]:
+		# Adjust Plus Min from broker_ncum
+		broker_ncum = await self.__adjust_plusmin_df(df=broker_ncum,broker_cluster=clustered_features)
+		
 		# Check does n_selected_cluster already defined
 		if n_selected_cluster is None:
 			# Define correlation param
@@ -410,11 +415,11 @@ class StockBFFull():
 			for n_selected_cluster in range(1,len(centroids_cluster)):
 				# Get correlation between close and selected_broker_ncum
 				selected_broker_ncum_corr = await self.__get_corr_selected_broker_ncum(
-					clustered_features,
-					raw_data_close,
-					broker_ncum,
-					centroids_cluster,
-					n_selected_cluster
+					clustered_features=clustered_features,
+					raw_data_close=raw_data_close,
+					broker_ncum=broker_ncum,
+					centroids_cluster=centroids_cluster,
+					n_selected_cluster=n_selected_cluster
 					)
 				# Get correlation
 				corr_list.append(selected_broker_ncum_corr)
@@ -562,6 +567,7 @@ class StockBFFull():
 
 		# Get cluster label
 		broker_features["cluster"] = broker_features_cluster["cluster"].astype("int")
+		broker_features = broker_features.join(broker_features_centroids[0].rename('corr_cluster'), on='cluster')
 
 		# Delete variable for memory management
 		del broker_features_std_pos, broker_features_std_neg, \
@@ -626,15 +632,15 @@ class StockBFFull():
 			broker_ncum = raw_data_broker_nval[brokers].sum(axis=1).cumsum(axis=0)
 			broker_ncum_corr = broker_ncum.corr(raw_data_close)
 			cluster_corr = pd.concat([cluster_corr, pd.DataFrame(
-				{'cluster':i, 'corr_ncum_close':broker_ncum_corr}, index=[0])], axis=0)
+				{'cluster':i, 'corr_cluster':broker_ncum_corr}, index=[0])], axis=0)
 		# fillna with 0
 		cluster_corr = cluster_corr.fillna(0)
 		
 		# Add corr_abs column to cluster_corr
-		cluster_corr['corr_ncum_close_abs'] = cluster_corr['corr_ncum_close'].abs()
+		cluster_corr['corr_cluster_abs'] = cluster_corr['corr_cluster'].abs()
 
 		# Sort cluster_corr by correlation
-		cluster_corr = cluster_corr.sort_values(by='corr_ncum_close_abs', ascending=False).reset_index(drop=True)
+		cluster_corr = cluster_corr.sort_values(by='corr_cluster_abs', ascending=False).reset_index(drop=True)
 
 		return cluster_corr
 	
@@ -646,12 +652,12 @@ class StockBFFull():
 		stepup_n_cluster_threshold: float = 0.05,
 		) -> tuple[list[str], int, float]:
 		# Get only positive correlation from cluster_corr
-		# cluster_corr = cluster_corr[cluster_corr['corr_ncum_close']>0]
+		# cluster_corr = cluster_corr[cluster_corr['corr_cluster']>0]
 		
 		# Sort cluster_corr by correlation absolute value
-		cluster_corr = cluster_corr.sort_values(by='corr_ncum_close_abs', ascending=False).reset_index(drop=True)
+		cluster_corr = cluster_corr.sort_values(by='corr_cluster_abs', ascending=False).reset_index(drop=True)
 
-		agg_cluster_corr = [cluster_corr['corr_ncum_close_abs'].max()]
+		agg_cluster_corr = [cluster_corr['corr_cluster_abs'].max()]
 		for i in range(1,len(cluster_corr)):
 			clusters = cluster_corr.iloc[:i+1,0].values
 			brokers = df_cluster[df_cluster['cluster'].isin(clusters)].index
@@ -681,7 +687,7 @@ class StockBFFull():
 		broker_cluster: pd.DataFrame,
 		) -> pd.DataFrame:
 		# Get brokers from broker_cluster with negative corr
-		brokers = broker_cluster[broker_cluster['corr_ncum_close']<0].index.to_list()
+		brokers = broker_cluster[broker_cluster['corr_cluster']<0].index.to_list()
 
 		# Adjust plusmin_df by multiplying -1 to brokers
 		df = df.copy()
