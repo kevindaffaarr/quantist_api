@@ -11,3 +11,5 @@ Consists of high-end analysis tools based on data with top-down analysis:
 For more information, you can find us at:
 * [Website](https://quantist.io)
 * [Email](mailto:kevindaffaar@quantist.io)
+
+Copyright (c) 2023 Quantist.io. All rights reserved. This works, including all modifications made by any third party, is the property of Quantist.io and is protected by copyright law.
