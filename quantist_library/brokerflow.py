@@ -103,15 +103,11 @@ class StockBFFull():
 		assert isinstance(self.pow_medium_pricecorrel, int), "pow_medium_pricecorrel must be int"
 		assert isinstance(self.pow_medium_mapricecorrel, int), "pow_medium_mapricecorrel must be int"
 
-		# Check Does Stock Code is composite
-		if self.stockcode == 'composite':
-			raise ValueError("Broker Flow is not available yet for index")
 		# Check Does Stock Code is available in database
-		else:
-			qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
-			row = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
-			if len(row) == 0:
-				raise KeyError("There is no such stock code in the database.")
+		qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
+		row = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
+		if len(row) == 0:
+			raise KeyError("There is no such stock code in the database.")
 
 		# Get full stockdatatransaction
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
@@ -217,9 +213,12 @@ class StockBFFull():
 	# Get Net Val Sum Val Broker Transaction
 	async def __get_nvsv_broker_transaction(self,raw_data_broker_full: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		# Aggretate by broker then broker to column for each net and sum
-		raw_data_broker_nvol = raw_data_broker_full.pivot(index=None,columns="broker",values="nvol")
-		raw_data_broker_nval = raw_data_broker_full.pivot(index=None,columns="broker",values="nval")
-		raw_data_broker_sumval = raw_data_broker_full.pivot(index=None,columns="broker",values="sumval")
+		# Check does nvol column exists
+		raw_data_broker_nvol = pd.DataFrame()
+		if "nvol" in raw_data_broker_full.columns:
+			raw_data_broker_nvol = raw_data_broker_full.pivot(columns="broker",values="nvol")
+		raw_data_broker_nval = raw_data_broker_full.pivot(columns="broker",values="nval")
+		raw_data_broker_sumval = raw_data_broker_full.pivot(columns="broker",values="sumval")
 
 		# Fill na
 		raw_data_broker_nvol.fillna(value=0, inplace=True)
@@ -236,20 +235,29 @@ class StockBFFull():
 		dbs: db.Session = next(db.get_dbs()),
 		):
 		# Query Definition
-		qry = dbs.query(
-			db.StockTransaction.date,
-			db.StockTransaction.broker,
-			db.StockTransaction.bvol,
-			db.StockTransaction.svol,
-			db.StockTransaction.bval,
-			db.StockTransaction.sval,
-			(db.StockTransaction.bvol - db.StockTransaction.svol).label("nvol"), # type: ignore
-			(db.StockTransaction.bval - db.StockTransaction.sval).label("nval"), # type: ignore
-			(db.StockTransaction.bval + db.StockTransaction.sval).label("sumval") # type: ignore
-		).filter((db.StockTransaction.code == stockcode))
-
-		# Main Query
-		qry_main = qry.filter(db.StockTransaction.date.between(preoffset_startdate, enddate))\
+		if stockcode == "composite":
+			qry_main = dbs.query(
+				db.IndexTransactionCompositeBroker.date,
+				db.IndexTransactionCompositeBroker.broker,
+				db.IndexTransactionCompositeBroker.bval,
+				db.IndexTransactionCompositeBroker.sval,
+				(db.IndexTransactionCompositeBroker.bval - db.IndexTransactionCompositeBroker.sval).label("nval"), # type: ignore
+				(db.IndexTransactionCompositeBroker.bval + db.IndexTransactionCompositeBroker.sval).label("sumval") # type: ignore
+			).filter(db.IndexTransactionCompositeBroker.date.between(preoffset_startdate, enddate))\
+			.order_by(db.IndexTransactionCompositeBroker.date.asc(), db.IndexTransactionCompositeBroker.broker.asc())
+		else:
+			qry_main = dbs.query(
+				db.StockTransaction.date,
+				db.StockTransaction.broker,
+				db.StockTransaction.bvol,
+				db.StockTransaction.svol,
+				db.StockTransaction.bval,
+				db.StockTransaction.sval,
+				(db.StockTransaction.bvol - db.StockTransaction.svol).label("nvol"), # type: ignore
+				(db.StockTransaction.bval - db.StockTransaction.sval).label("nval"), # type: ignore
+				(db.StockTransaction.bval + db.StockTransaction.sval).label("sumval") # type: ignore
+			).filter((db.StockTransaction.code == stockcode))\
+			.filter(db.StockTransaction.date.between(preoffset_startdate, enddate))\
 			.order_by(db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
@@ -275,18 +283,30 @@ class StockBFFull():
 			startdate = enddate - relativedelta(months=default_months_range)
 
 		# Query Definition
-		qry = dbs.query(
-			db.StockData.date,
-			db.StockData.previous,
-			db.StockData.openprice,
-			db.StockData.high,
-			db.StockData.low,
-			db.StockData.close,
-			db.StockData.value,
-		).filter(db.StockData.code == stockcode)
+		if stockcode == "composite":
+			qry = dbs.query(
+				db.IndexData.date,
+				db.IndexData.previous,
+				db.IndexData.previous.label("openprice"),
+				db.IndexData.highest.label("high"),
+				db.IndexData.lowest.label("low"),
+				db.IndexData.close,
+				db.IndexData.value,
+			).filter(db.IndexData.code == stockcode)
 
-		# Main Query
-		qry_main = qry.filter(db.StockData.date.between(startdate, enddate)).order_by(db.StockData.date.asc())
+			qry_main = qry.filter(db.IndexData.date.between(startdate, enddate)).order_by(db.IndexData.date.asc())
+		else:
+			qry = dbs.query(
+				db.StockData.date,
+				db.StockData.previous,
+				db.StockData.openprice,
+				db.StockData.high,
+				db.StockData.low,
+				db.StockData.close,
+				db.StockData.value,
+			).filter(db.StockData.code == stockcode)
+
+			qry_main = qry.filter(db.StockData.date.between(startdate, enddate)).order_by(db.StockData.date.asc())
 
 		# Main Query Fetching
 		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
@@ -302,10 +322,16 @@ class StockBFFull():
 
 		# Pre-Data Query
 		startdate = self.startdate
-		qry_pre = qry.filter(db.StockData.date < startdate)\
-			.order_by(db.StockData.date.desc())\
-			.limit(preoffset_period_param)\
-			.subquery()
+		if stockcode == "composite":
+			qry_pre = qry.filter(db.IndexData.date < startdate)\
+				.order_by(db.IndexData.date.desc())\
+				.limit(preoffset_period_param)\
+				.subquery()
+		else:
+			qry_pre = qry.filter(db.StockData.date < startdate)\
+				.order_by(db.StockData.date.desc())\
+				.limit(preoffset_period_param)\
+				.subquery()
 		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc())
 
 		# Pre-Data Query Fetching
@@ -349,7 +375,13 @@ class StockBFFull():
 
 		# Transform Raw Data Broker
 		raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = await self.__get_nvsv_broker_transaction(raw_data_broker_full=raw_data_broker_full)
-
+		if raw_data_broker_nvol.shape[0] == 0:
+			# raw_data_broker_nvol = each column of dataframe raw_data_broker_nval divided by series raw_data_full['close']
+			raw_data_broker_nvol = raw_data_broker_nval.divide(raw_data_full['close'], axis=0)
+			raw_data_broker_nvol = raw_data_broker_nvol.fillna(0)
+			raw_data_broker_nvol = raw_data_broker_nvol.replace([np.inf, -np.inf], 0)
+			raw_data_broker_nvol = raw_data_broker_nvol.replace(np.nan, 0)
+			
 		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 
 	#TODO get composite raw data def: __get_composite_raw_data ()
@@ -540,7 +572,7 @@ class StockBFFull():
 		# broker_features_cluster, broker_features_centroids = await self.__kmeans_clustering(broker_features_std, "corr_ncum_close", "broker_sumval")
 		
 		# Standardize Features
-		# Using no standarization
+		broker_features = await self.__xy_standardize(broker_features)
 		broker_features_std_pos = broker_features[broker_features['corr_ncum_close']>0].copy()
 		broker_features_std_neg = broker_features[broker_features['corr_ncum_close']<=0].copy()
 
@@ -834,6 +866,8 @@ class StockBFFull():
 	
 	async def broker_cluster_chart(self,media_type: str | None = None):
 		assert self.stockcode is not None
+		assert isinstance(self.startdate, datetime.date)
+		assert isinstance(self.enddate, datetime.date)
 
 		if self.clustering_method == dp.ClusteringMethod.timeseries:
 			scaler = MinMaxScaler()
@@ -846,11 +880,15 @@ class StockBFFull():
 				broker_ncum=broker_ncum_scaled,
 				raw_data_close=self.wf_indicators["close"],
 				code=self.stockcode,
+				startdate=self.startdate,
+				enddate=self.enddate,
 			)
 		else:
 			fig = await genchart.broker_cluster_chart(
 				broker_features=self.broker_features,
 				code=self.stockcode,
+				startdate=self.startdate,
+				enddate=self.enddate,
 			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)
@@ -1064,9 +1102,9 @@ class WhaleRadar():
 	async def __get_nvsv_broker_transaction(self,
 		raw_data_broker_full: pd.DataFrame
 		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-		raw_data_broker_nvol = raw_data_broker_full.pivot(index=None,columns="broker",values="nvol")
-		raw_data_broker_nval = raw_data_broker_full.pivot(index=None,columns="broker",values="nval")
-		raw_data_broker_sumval = raw_data_broker_full.pivot(index=None,columns="broker",values="sumval")
+		raw_data_broker_nvol = raw_data_broker_full.pivot(columns="broker",values="nvol")
+		raw_data_broker_nval = raw_data_broker_full.pivot(columns="broker",values="nval")
+		raw_data_broker_sumval = raw_data_broker_full.pivot(columns="broker",values="sumval")
 
 		# Fill na
 		raw_data_broker_nvol.fillna(value=0, inplace=True)
@@ -1335,6 +1373,10 @@ class WhaleRadar():
 
 		return features, centroids_cluster
 
+	def __xy_standardize(self, df: pd.DataFrame) -> pd.DataFrame:
+		df_std = StandardScaler().fit_transform(df)
+		return pd.DataFrame(df_std, index=df.index, columns=df.columns)
+	
 	async def _get_bf_parameters(self,
 		raw_data_close: pd.Series,
 		raw_data_broker_nval: pd.DataFrame,
@@ -1387,8 +1429,8 @@ class WhaleRadar():
 		del raw_data_broker_nval, raw_data_broker_sumval, corr_ncum_close, broker_sumval
 		gc.collect()
 
-		# Standardize Features
-		# Using no standarization
+		# Standardize Features each group by code
+		broker_features = broker_features.groupby(by='code').apply(self.__xy_standardize)
 		# Get the column name from corr_ncum_close for each index that has correlation > 0
 		broker_features_std_pos = broker_features[broker_features['corr_ncum_close']>0]
 		broker_features_std_neg = broker_features[broker_features['corr_ncum_close']<=0]

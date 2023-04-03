@@ -286,12 +286,12 @@ async def radar_chart(
 	
 	return fig
 
-async def broker_cluster_chart(broker_features: pd.DataFrame, code:str):
+async def broker_cluster_chart(broker_features: pd.DataFrame, code:str, startdate: datetime.date, enddate: datetime.date):
 	fig = px.scatter(broker_features, 
 		x='corr_ncum_close', y='broker_sumval', 
 		labels={'x':'Price-Net Transaction Correlation', 'y':'Sum Transaction'},
 		color='cluster', symbol='cluster', text=broker_features.index,
-		title=f"{code.upper()} - Broker K Means Clustering",
+		title=f"{code.upper()} - Broker K Means Clustering - {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}", # type: ignore
 		color_continuous_scale=px.colors.qualitative.G10,
 		)
 	fig.update_traces(marker_size=20)
@@ -309,6 +309,8 @@ async def broker_cluster_timeseries_chart(
 	broker_ncum: pd.DataFrame,
 	raw_data_close: pd.Series,
 	code: str,
+	startdate: datetime.date,
+	enddate: datetime.date,
 	) -> go.Figure:
 	# Count number of clusters
 	n_clusters = broker_cluster['cluster'].nunique()
@@ -366,7 +368,7 @@ async def broker_cluster_timeseries_chart(
 			row=i//n_cols+1, col=i%n_cols+1)
 
 	# Update layout
-	fig.update_layout(title=f"{code.upper()} - Broker Clustering Time Series")
+	fig.update_layout(title=f"{code.upper()} - Broker Clustering Time Series - {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}")
 	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
 	fig.update_layout(dragmode="pan")
 	fig.update_layout(legend={"orientation":"h","y":-0.1})
