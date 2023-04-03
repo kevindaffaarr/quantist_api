@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 from dateutil.relativedelta import relativedelta
 import pandas as pd
+from sqlalchemy.sql import func
 
 import database as db
 import dependencies as dp
@@ -54,37 +55,38 @@ class HoldingComposition():
 		# Get the data from database
 		qry = dbs.query(
 				db.KseiKepemilikanEfek.date,
-				db.KseiKepemilikanEfek.code,
-				db.KseiKepemilikanEfek.local_is,
-				db.KseiKepemilikanEfek.local_cp,
-				db.KseiKepemilikanEfek.local_pf,
-				db.KseiKepemilikanEfek.local_ib,
-				db.KseiKepemilikanEfek.local_id,
-				db.KseiKepemilikanEfek.local_mf,
-				db.KseiKepemilikanEfek.local_sc,
-				db.KseiKepemilikanEfek.local_fd,
-				db.KseiKepemilikanEfek.local_ot,
-				db.KseiKepemilikanEfek.local_total,
-				db.KseiKepemilikanEfek.foreign_is,
-				db.KseiKepemilikanEfek.foreign_cp,
-				db.KseiKepemilikanEfek.foreign_pf,
-				db.KseiKepemilikanEfek.foreign_ib,
-				db.KseiKepemilikanEfek.foreign_id,
-				db.KseiKepemilikanEfek.foreign_mf,
-				db.KseiKepemilikanEfek.foreign_sc,
-				db.KseiKepemilikanEfek.foreign_fd,
-				db.KseiKepemilikanEfek.foreign_ot,
-				db.KseiKepemilikanEfek.foreign_total,
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.local_is).label('local_is'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.local_cp).label('local_cp'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.local_pf).label('local_pf'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.local_ib).label('local_ib'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.local_id).label('local_id'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.local_mf).label('local_mf'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.local_sc).label('local_sc'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.local_fd).label('local_fd'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.local_ot).label('local_ot'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.local_total).label('local_total'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_is).label('foreign_is'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_cp).label('foreign_cp'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_pf).label('foreign_pf'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_ib).label('foreign_ib'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_id).label('foreign_id'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_mf).label('foreign_mf'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_sc).label('foreign_sc'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_fd).label('foreign_fd'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_ot).label('foreign_ot'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_total).label('foreign_total'),
 			).distinct(db.KseiKepemilikanEfek.date)\
-			.filter(db.KseiKepemilikanEfek.code == self.stockcode)\
+			.group_by(db.KseiKepemilikanEfek.date)\
 			.filter(db.KseiKepemilikanEfek.sectype == 'equity')\
 			.filter(db.KseiKepemilikanEfek.date >= self.startdate)\
 			.filter(db.KseiKepemilikanEfek.date <= self.enddate)
-		
+		if self.stockcode != "composite":
+			qry = qry.filter(db.KseiKepemilikanEfek.code == self.stockcode)
+			
 		return pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).set_index("date").sort_index()
 	
 	async def __get_data_scripless(self, list_date:list, dbs:db.Session = next(db.get_dbs())) -> pd.DataFrame:
-		# Query table stockdata: tradebleshares divided by listedshares for self.stockcode each list_date
+		# Query table stockdata: tradebleshares divided by listedshares for filtercode each list_date
 		qry = dbs.query(db.StockData.date, db.StockData.tradebleshares, db.StockData.listedshares)\
 			.filter(db.StockData.code == self.stockcode)\
 			.filter(db.StockData.date.in_(list_date))
@@ -125,6 +127,7 @@ class HoldingComposition():
 
 		# Append data_scripless[scripless_ratio] column to holding_composition
 		holding_composition = holding_composition.join(data_scripless, how="left")
+		holding_composition['scripless_ratio'] = holding_composition['scripless_ratio'].fillna(0)
 
 		# Return the result
 		self.holding_composition = holding_composition

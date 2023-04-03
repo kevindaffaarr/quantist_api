@@ -385,8 +385,6 @@ class StockBFFull():
 			
 		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 
-	#TODO get composite raw data def: __get_composite_raw_data ()
-
 	async def __get_selected_broker(self,
 		clustered_features: pd.DataFrame,
 		centroids_cluster: pd.DataFrame,
