@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Literal
 import gc
 
-import datetime, time
+import datetime
 import pandas as pd
 import numpy as np
 from dateutil.relativedelta import relativedelta
@@ -125,7 +125,7 @@ class StockBFFull():
 		
 		if self.clustering_method == dp.ClusteringMethod.timeseries:
 			# Get broker flow parameters using timeseries method
-			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_cluster, self.broker_ncum = \
+			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features, self.broker_ncum = \
 				await self.__get_timeseries_bf_parameter(
 					raw_data_close=raw_data_full["close"],
 					raw_data_broker_nval=raw_data_broker_nval,
@@ -135,11 +135,6 @@ class StockBFFull():
 					training_end_index=self.training_end_index,
 					stepup_n_cluster_threshold=self.stepup_n_cluster_threshold,
 				)
-			
-			# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
-			raw_data_broker_nvol = await self.__adjust_plusmin_df(df=raw_data_broker_nvol, broker_cluster=self.broker_cluster)
-			raw_data_broker_nval = await self.__adjust_plusmin_df(df=raw_data_broker_nval, broker_cluster=self.broker_cluster)
-			raw_data_broker_sumval = await self.__adjust_plusmin_df(df=raw_data_broker_sumval, broker_cluster=self.broker_cluster)
 		else:
 			# Get broker flow parameters using correlation method
 			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
@@ -155,10 +150,9 @@ class StockBFFull():
 					stepup_n_cluster_threshold=self.stepup_n_cluster_threshold,
 				)
 			
-			# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
-			raw_data_broker_nvol = await self.__adjust_plusmin_df(df=raw_data_broker_nvol, broker_cluster=self.broker_features)
-			raw_data_broker_nval = await self.__adjust_plusmin_df(df=raw_data_broker_nval, broker_cluster=self.broker_features)
-			raw_data_broker_sumval = await self.__adjust_plusmin_df(df=raw_data_broker_sumval, broker_cluster=self.broker_features)
+		# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+		raw_data_broker_nvol = await self.__adjust_plusmin_df(df=raw_data_broker_nvol, broker_cluster=self.broker_features)
+		raw_data_broker_nval = await self.__adjust_plusmin_df(df=raw_data_broker_nval, broker_cluster=self.broker_features)
 
 		# Calc broker flow indicators
 		self.wf_indicators = await self.calc_wf_indicators(
@@ -848,7 +842,7 @@ class StockBFFull():
 					columns=self.broker_ncum.columns, index=self.broker_ncum.index)
 			
 			fig = await genchart.broker_cluster_timeseries_chart(
-				broker_cluster=self.broker_cluster,
+				broker_cluster=self.broker_features,
 				broker_ncum=broker_ncum_scaled,
 				raw_data_close=self.wf_indicators["close"],
 				code=self.stockcode,
@@ -966,15 +960,6 @@ class WhaleRadar():
 		).sort_index(axis=1)
 
 		raw_data_broker_nval = raw_data_broker_nval.groupby(level="code", group_keys=False).apply(
-			lambda x: pd.concat(
-				[
-					x.loc[:,self.broker_features.loc[x.name, self.broker_features['corr_cluster'] < 0, :].index.get_level_values('broker').to_list()].mul(-1, axis=1), # type: ignore
-					x.loc[:,self.broker_features.loc[x.name, self.broker_features['corr_cluster'] >= 0, :].index.get_level_values('broker').to_list()] # type: ignore
-				],axis=1
-			)
-		).sort_index(axis=1)
-
-		raw_data_broker_sumval = raw_data_broker_sumval.groupby(level="code", group_keys=False).apply(
 			lambda x: pd.concat(
 				[
 					x.loc[:,self.broker_features.loc[x.name, self.broker_features['corr_cluster'] < 0, :].index.get_level_values('broker').to_list()].mul(-1, axis=1), # type: ignore
@@ -1715,15 +1700,6 @@ class ScreenerBase(WhaleRadar):
 		).sort_index(axis=1)
 
 		raw_data_broker_nval = raw_data_broker_nval.groupby(level="code", group_keys=False).apply(
-			lambda x: pd.concat(
-				[
-					x.loc[:,self.broker_features.loc[x.name, self.broker_features['corr_cluster'] < 0, :].index.get_level_values('broker').to_list()].mul(-1, axis=1), # type: ignore
-					x.loc[:,self.broker_features.loc[x.name, self.broker_features['corr_cluster'] >= 0, :].index.get_level_values('broker').to_list()] # type: ignore
-				],axis=1
-			)
-		).sort_index(axis=1)
-
-		raw_data_broker_sumval = raw_data_broker_sumval.groupby(level="code", group_keys=False).apply(
 			lambda x: pd.concat(
 				[
 					x.loc[:,self.broker_features.loc[x.name, self.broker_features['corr_cluster'] < 0, :].index.get_level_values('broker').to_list()].mul(-1, axis=1), # type: ignore
