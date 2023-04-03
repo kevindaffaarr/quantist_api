@@ -957,9 +957,9 @@ class WhaleRadar():
 		
 		# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 		for code in self.broker_features.index.get_level_values('code').unique():
-			raw_data_broker_nvol.loc[code] = await self.__adjust_plusmin_df(df=raw_data_broker_nvol.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
-			raw_data_broker_nval.loc[code,:] = await self.__adjust_plusmin_df(df=raw_data_broker_nval.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
-			raw_data_broker_sumval.loc[code,:] = await self.__adjust_plusmin_df(df=raw_data_broker_sumval.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
+			raw_data_broker_nvol.loc[code] = await self._adjust_plusmin_df(df=raw_data_broker_nvol.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
+			raw_data_broker_nval.loc[code,:] = await self._adjust_plusmin_df(df=raw_data_broker_nval.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
+			raw_data_broker_sumval.loc[code,:] = await self._adjust_plusmin_df(df=raw_data_broker_sumval.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
 		
 		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
 		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
@@ -1230,7 +1230,7 @@ class WhaleRadar():
 		n_selected_cluster: int | None = None,
 		) -> tuple[list[str], int, float]:
 		# Adjust Plus Min from broker_ncum
-		broker_ncum = await self.__adjust_plusmin_df(df=broker_ncum,broker_cluster=clustered_features)
+		broker_ncum = await self._adjust_plusmin_df(df=broker_ncum,broker_cluster=clustered_features)
 		
 		# Check does n_selected_cluster already defined
 		if n_selected_cluster is None:
@@ -1283,7 +1283,7 @@ class WhaleRadar():
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr
 
-	async def __adjust_plusmin_df(self,
+	async def _adjust_plusmin_df(self,
 		df: pd.DataFrame,
 		broker_cluster: pd.DataFrame,
 		) -> pd.DataFrame:
@@ -1681,6 +1681,12 @@ class ScreenerBase(WhaleRadar):
 				splitted_min_n_cluster=self.splitted_min_n_cluster,
 				splitted_max_n_cluster=self.splitted_max_n_cluster,
 			)
+		
+		# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
+		for code in self.broker_features.index.get_level_values('code').unique():
+			raw_data_broker_nvol.loc[code] = await self._adjust_plusmin_df(df=raw_data_broker_nvol.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
+			raw_data_broker_nval.loc[code,:] = await self._adjust_plusmin_df(df=raw_data_broker_nval.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
+			raw_data_broker_sumval.loc[code,:] = await self._adjust_plusmin_df(df=raw_data_broker_sumval.loc[(code, slice(None)),:], broker_cluster=self.broker_features.loc[code,:])
 		
 		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
 		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
