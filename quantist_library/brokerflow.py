@@ -1456,10 +1456,10 @@ class WhaleRadar():
 			assert isinstance(code, str)
 			selected_broker_code, optimum_n_selected_cluster_code, optimum_corr_code = \
 				await self.__optimize_selected_cluster(
-					clustered_features=broker_features.loc[code,:],
+					clustered_features=broker_features.loc[code,:], # type: ignore
 					raw_data_close=raw_data_close.loc[code],
-					broker_ncum=broker_ncum.loc[code,:],
-					centroids_cluster=broker_features_centroids.loc[code,:],
+					broker_ncum=broker_ncum.loc[code,:], # type: ignore
+					centroids_cluster=broker_features_centroids.loc[code,:], # type: ignore
 					n_selected_cluster=n_selected_cluster,
 					stepup_n_cluster_threshold=stepup_n_cluster_threshold
 				)
