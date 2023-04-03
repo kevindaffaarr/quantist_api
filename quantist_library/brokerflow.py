@@ -103,11 +103,12 @@ class StockBFFull():
 		assert isinstance(self.pow_medium_pricecorrel, int), "pow_medium_pricecorrel must be int"
 		assert isinstance(self.pow_medium_mapricecorrel, int), "pow_medium_mapricecorrel must be int"
 
-		# Check Does Stock Code is available in database
-		qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
-		row = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
-		if len(row) == 0:
-			raise KeyError("There is no such stock code in the database.")
+		# Check Does Stock Code is available in database if self.stockcode is not "composite"
+		if self.stockcode != "composite":
+			qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
+			row = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
+			if len(row) == 0:
+				raise KeyError("There is no such stock code in the database.")
 
 		# Get full stockdatatransaction
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
