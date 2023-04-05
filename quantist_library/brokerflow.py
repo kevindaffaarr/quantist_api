@@ -1429,7 +1429,7 @@ class WhaleRadar():
 		gc.collect()
 
 		# Standardize Features each group by code
-		broker_features = broker_features.groupby(by='code').apply(self.__xy_standardize)
+		broker_features = broker_features.groupby(by='code', group_keys=False).apply(self.__xy_standardize)
 		# Get the column name from corr_ncum_close for each index that has correlation > 0
 		broker_features_std_pos = broker_features[broker_features['corr_ncum_close']>0]
 		broker_features_std_neg = broker_features[broker_features['corr_ncum_close']<=0]
