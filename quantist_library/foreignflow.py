@@ -269,8 +269,8 @@ class StockFFFull():
 			/(raw_data['value'].rolling(window=period_prop).sum()*2)
 
 		# pricecorrel
-		raw_data['pricecorrel'] = raw_data['close'].rolling(window=period_pricecorrel)\
-			.corr(raw_data['valflow'])
+		raw_data['pricecorrel'] = raw_data['close'].diff().rolling(window=period_pricecorrel)\
+			.corr(raw_data['valflow'].diff())
 		
 		# MAPriceCorrel
 		raw_data['mapricecorrel'] = raw_data['pricecorrel'].rolling(window=period_mapricecorrel).mean()
@@ -548,9 +548,9 @@ class ForeignRadar():
 			# FF
 			stocks_raw_data['fvalflow'] = stocks_raw_data.groupby('code')['netval'].cumsum()
 			# pricecorrel
-			radar_indicators[y_axis_type] = stocks_raw_data.groupby('code')[['fvalflow','close']].corr(method='pearson').iloc[0::2,-1].droplevel(1)
-			# radar_indicators[y_axis_type] = stocks_raw_data.groupby(by='code')['fvalflow']\
-			# 	.corr(stocks_raw_data['close'])
+			radar_indicators[y_axis_type] = stocks_raw_data.set_index(['code','date'])\
+				.groupby('code').diff().groupby('code')[['fvalflow','close']]\
+				.corr(method='pearson').iloc[0::2,-1].droplevel(1)
 				
 		elif y_axis_type == dp.ListRadarType.changepercentage:
 			radar_indicators[y_axis_type] = \
@@ -751,7 +751,9 @@ class ScreenerMoneyFlow(ScreenerBase):
 			raise ValueError(f'No data available between {startdate} and {enddate}')
 		
 		top_stockcodes = pd.DataFrame()
-		top_stockcodes['pricecorrel'] = raw_data.groupby("code")[["close","netvol"]].corr(method='pearson').iloc[0::2,-1].droplevel(1)
+		top_stockcodes['pricecorrel'] = raw_data\
+			.groupby('code').diff().groupby('code')[["close","netvol"]]\
+			.corr(method='pearson').iloc[0::2,-1].droplevel(1)
 		
 		# Only get raw_data between startdate and enddate
 		if not isinstance(startdate, datetime.date):

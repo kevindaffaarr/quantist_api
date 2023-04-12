@@ -418,7 +418,7 @@ class StockBFFull():
 		selected_broker_ncum = broker_ncum[selected_broker].sum(axis=1).rename("selected_broker_ncum")
 
 		# Return correlation between close and selected_broker_ncum
-		return selected_broker_ncum.corr(raw_data_close)
+		return selected_broker_ncum.diff().corr(raw_data_close.diff())
 
 	async def __optimize_selected_cluster(self,
 		clustered_features: pd.DataFrame,
@@ -549,7 +549,8 @@ class StockBFFull():
 		# Cumulate value for nvol
 		broker_ncum = raw_data_broker_nval.cumsum(axis=0)
 		# Get correlation between raw_data_ncum and close
-		broker_ncum_corr = broker_ncum.corrwith(raw_data_close,axis=0).rename("corr_ncum_close")
+		# broker_ncum_corr = broker_ncum.corrwith(raw_data_close,axis=0).rename("corr_ncum_close")
+		broker_ncum_corr = broker_ncum.diff().corrwith(raw_data_close.diff(),axis=0).rename("corr_ncum_close")
 
 		# Get each broker's sum of transaction value
 		broker_sumval = raw_data_broker_sumval.sum(axis=0).rename("broker_sumval")
@@ -655,7 +656,7 @@ class StockBFFull():
 		for i in range(n_cluster):
 			brokers = df_cluster[df_cluster['cluster']==i].index
 			broker_ncum = raw_data_broker_nval[brokers].sum(axis=1).cumsum(axis=0)
-			broker_ncum_corr = broker_ncum.corr(raw_data_close)
+			broker_ncum_corr = broker_ncum.diff().corr(raw_data_close.diff())
 			cluster_corr = pd.concat([cluster_corr, pd.DataFrame(
 				{'cluster':i, 'corr_cluster':broker_ncum_corr}, index=[0])], axis=0)
 		# fillna with 0
@@ -687,7 +688,7 @@ class StockBFFull():
 			clusters = cluster_corr.iloc[:i+1,0].values
 			brokers = df_cluster[df_cluster['cluster'].isin(clusters)].index
 			broker_ncum = raw_data_broker_nval[brokers].sum(axis=1).cumsum(axis=0)
-			broker_ncum_corr = broker_ncum.corr(raw_data_close)
+			broker_ncum_corr = broker_ncum.diff().corr(raw_data_close.diff())
 			agg_cluster_corr.append(broker_ncum_corr)
 
 		# Define optimum n_selected_cluster
@@ -813,7 +814,7 @@ class StockBFFull():
 			/ (raw_data_full['value'].rolling(window=period_prop).sum()*2)
 
 		# Whale correlation
-		raw_data_full['pricecorrel'] = raw_data_full["valflow"].rolling(window=period_pricecorrel).corr(raw_data_full['close'])
+		raw_data_full['pricecorrel'] = raw_data_full["valflow"].diff().rolling(window=period_pricecorrel).corr(raw_data_full['close'].diff())
 
 		# Whale MA correlation
 		raw_data_full['mapricecorrel'] = raw_data_full['pricecorrel'].rolling(window=period_mapricecorrel).mean()
@@ -1263,7 +1264,7 @@ class WhaleRadar():
 		selected_broker_ncum = broker_ncum[selected_broker].sum(axis=1).rename("selected_broker_ncum")
 
 		# Return correlation between close and selected_broker_ncum
-		return selected_broker_ncum.corr(raw_data_close)
+		return selected_broker_ncum.diff().corr(raw_data_close.diff())
 
 	async def __optimize_selected_cluster(self,
 		clustered_features: pd.DataFrame,
@@ -1410,7 +1411,7 @@ class WhaleRadar():
 		# Cumulate volume for nvol
 		broker_ncum = raw_data_broker_nval.groupby(by='code').cumsum(axis=0)
 		# Get correlation between raw_data_ncum and close
-		corr_ncum_close = broker_ncum.groupby(by='code').corrwith(raw_data_close,axis=0) # type: ignore
+		corr_ncum_close = broker_ncum.groupby(by='code').diff().groupby(by='code').corrwith(raw_data_close.groupby(by='code').diff(),axis=0) # type: ignore
 
 		# Get each broker's sum of transaction value
 		broker_sumval = raw_data_broker_sumval.groupby(by='code').sum()
@@ -1601,8 +1602,8 @@ class WhaleRadar():
 		# X Axis:
 		if y_axis_type == dp.ListRadarType.correlation:
 			selected_broker_nval_cumsum = selected_broker_nval.groupby(level='code').cumsum()
-			radar_indicators[y_axis_type.value] = selected_broker_nval_cumsum.groupby('code')\
-				.corrwith(raw_data_full['close'],axis=0) # type: ignore
+			radar_indicators[y_axis_type.value] = selected_broker_nval_cumsum.groupby('code').diff().groupby('code')\
+				.corrwith(raw_data_full['close'].groupby('code').diff(),axis=0) # type: ignore
 		elif y_axis_type == dp.ListRadarType.changepercentage:
 			radar_indicators[y_axis_type.value] = \
 				(raw_data_full.groupby('code')['close'].nth([-1]) \
@@ -1884,16 +1885,16 @@ class ScreenerMoneyFlow(ScreenerBase):
 		# Calculate top_stockcodes PriceCorrel
 		if (startdate == enddate) or (self.radar_period == 1):
 			wvalflow = self.selected_broker_nval['broker_nval'].groupby("code").cumsum()
-			top_stockcodes['pricecorrel'] = wvalflow.groupby("code").corr(self.raw_data_full['close']) # type: ignore
+			top_stockcodes['pricecorrel'] = wvalflow.groupby("code").diff().groupby('code').corr(self.raw_data_full['close'].groupby('code').diff()) # type: ignore
 		else:
 			wvalflow = self.selected_broker_nval.loc[
 				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
 				]['broker_nval'].groupby("code").cumsum()
 			
-			top_stockcodes['pricecorrel'] = wvalflow.groupby("code").corr( # type: ignore
+			top_stockcodes['pricecorrel'] = wvalflow.groupby("code").diff().groupby('code').corr( # type: ignore
 				self.raw_data_full.loc[
 					self.raw_data_full.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
-				]['close'])
+				]['close'].groupby('code').diff()) # type: ignore
 
 		return top_stockcodes
 
