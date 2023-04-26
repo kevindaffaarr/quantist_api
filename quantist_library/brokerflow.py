@@ -572,9 +572,10 @@ class StockBFFull():
 		# broker_features_cluster, broker_features_centroids = await self.__kmeans_clustering(broker_features_std, "corr_ncum_close", "broker_sumval")
 		
 		# Standardize Features
-		broker_features = await self.__xy_standardize(broker_features)
-		broker_features_std_pos = broker_features[broker_features['corr_ncum_close']>0].copy()
-		broker_features_std_neg = broker_features[broker_features['corr_ncum_close']<=0].copy()
+		broker_features_std = await self.__xy_standardize(broker_features)
+		
+		broker_features_std_pos = broker_features_std[broker_features_std['corr_ncum_close']>0].copy()
+		broker_features_std_neg = broker_features_std[broker_features_std['corr_ncum_close']<=0].copy()
 
 		# Positive Clustering
 		broker_features_pos, centroids_pos = await self.__kmeans_clustering(
