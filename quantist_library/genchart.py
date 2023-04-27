@@ -204,7 +204,7 @@ async def quantist_stock_chart(
 	)
 	
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="right",yanchor="bottom",x=1,y=1,
-		text=f"<b>Method: <span style='color:Fuchsia'>{method} Flow</span></b> | <b>🔦 Chart by Quantist.io</b>",
+		text=f"<b>Method: <span style='color:Fuchsia'>{method} Flow</span></b> | <b>Chart by Quantist.io</b>",
 		font=dict(),align="right",
 		showarrow=False
 	)
@@ -255,7 +255,7 @@ async def radar_chart(
 	
 	# ANNOTATION
 	fig.add_annotation(xref="paper",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
-		text=f"<b>🔦 Chart by Quantist.io</b> | <b>Method: <span style='color:#BB86FC'>{method} Flow</span></b> | Data date: {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}",
+		text=f"<b>Chart by Quantist.io</b> | <b>Method: <span style='color:#BB86FC'>{method} Flow</span></b> | Data date: {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}",
 		textangle=0,align="left",
 		showarrow=False
 	)
@@ -289,14 +289,29 @@ async def radar_chart(
 async def broker_cluster_chart(broker_features: pd.DataFrame, code:str, startdate: datetime.date, enddate: datetime.date):
 	fig = px.scatter(broker_features, 
 		x='corr_ncum_close', y='broker_sumval', 
-		labels={'x':'Price-Net Transaction Correlation', 'y':'Sum Transaction'},
 		color='cluster', symbol='cluster', text=broker_features.index,
-		title=f"{code.upper()} - Broker K Means Clustering - {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}", # type: ignore
 		color_continuous_scale=px.colors.qualitative.G10,
 		)
 	fig.update_traces(marker_size=20)
 	fig.update_layout(font_size=20)
 	fig.update_layout(coloraxis_showscale=False)
+	
+	fig.update_layout(
+		xaxis_title='Price-Transaction Movement Correlation',
+		yaxis_title='Total Transaction Value',
+		font=dict(size=20)
+	)
+	fig.update_layout(title={"text":f"<b>{code.upper()}</b>", "x":0.5})
+	fig.add_annotation(xref="x domain",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
+		text = f"<b>Broker K Means Clustering | {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}</b>",
+		font=dict(size=15),align="left",
+		showarrow=False
+	)
+	fig.add_annotation(xref="x domain",yref="paper",xanchor="right",yanchor="bottom",x=1,y=1,
+		text=f"<b>Chart by Quantist.io</b>",
+		font=dict(size=15),align="right",
+		showarrow=False
+	)
 
 	# UPDATE_LAYOUT GLOBAL DEFAULT TEMPLATE
 	fig.update_layout(legend={"orientation":"h","y":-0.1})
@@ -368,7 +383,18 @@ async def broker_cluster_timeseries_chart(
 			row=i//n_cols+1, col=i%n_cols+1)
 
 	# Update layout
-	fig.update_layout(title=f"{code.upper()} - Broker Clustering Time Series - {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}")
+	fig.update_layout(title=dict(text=f"<b>{code.upper()}</b>", x=0.5, y=0.97, font=dict(size=20)))
+	fig.add_annotation(xref="paper",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1.07,
+		text = f"<b>Broker Clustering Time Series | {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}</b>",
+		font=dict(size=15),align="left",
+		showarrow=False
+	)
+	fig.add_annotation(xref="paper",yref="paper",xanchor="right",yanchor="bottom",x=1,y=1.07,
+		text=f"<b>Chart by Quantist.io</b>",
+		font=dict(size=15),align="right",
+		showarrow=False
+	)
+	
 	fig.update_layout(template="plotly_dark",paper_bgcolor="#121212",plot_bgcolor="#121212")
 	fig.update_layout(dragmode="pan")
 	fig.update_layout(legend={"orientation":"h","y":-0.1})
