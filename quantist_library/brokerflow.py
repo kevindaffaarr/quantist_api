@@ -120,6 +120,9 @@ class StockBFFull():
 				dbs=self.dbs
 				)
 		
+		# Get last row of raw_data_broker_nval
+		self.broker_nval_last:pd.Series = raw_data_broker_nval.iloc[-1:].squeeze()
+		
 		if self.clustering_method == dp.ClusteringMethod.timeseries:
 			# Get broker flow parameters using timeseries method
 			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features, self.broker_ncum = \
@@ -887,6 +890,7 @@ class StockBFFull():
 		else:
 			fig = await genchart.broker_cluster_chart(
 				broker_features=self.broker_features,
+				broker_nval_last=self.broker_nval_last,
 				code=self.stockcode,
 				startdate=self.startdate,
 				enddate=self.enddate,

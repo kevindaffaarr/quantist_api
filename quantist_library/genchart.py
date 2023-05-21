@@ -286,30 +286,87 @@ async def radar_chart(
 	
 	return fig
 
-async def broker_cluster_chart(broker_features: pd.DataFrame, code:str, startdate: datetime.date, enddate: datetime.date):
-	fig = px.scatter(broker_features, 
-		x='corr_ncum_close', y='broker_sumval', 
-		color='cluster', symbol='cluster', text=broker_features.index,
-		color_continuous_scale=px.colors.qualitative.G10,
+async def broker_cluster_chart(broker_features: pd.DataFrame, broker_nval_last: pd.Series, code:str, startdate: datetime.date, enddate: datetime.date) -> go.Figure:
+	# Make subplots with 2 columns, 1 row. Left column is scatter (70%), right column for table (30%)
+	fig = make_subplots(
+		rows=1, cols=2, 
+		column_widths=[0.7, 0.3], horizontal_spacing=0.02,
+		specs=[[{"type": "scatter"}, {"type": "table"}]],
+		subplot_titles=(
+			f"<b>Broker K Means Clustering | {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}</b>",
+			"<b>Last Broker Summary</b>"
 		)
-	fig.update_traces(marker_size=20)
-	fig.update_layout(font_size=20)
-	fig.update_layout(coloraxis_showscale=False)
-	
-	fig.update_layout(
-		xaxis_title='Price-Transaction Movement Correlation',
-		yaxis_title='Total Transaction Value',
-		font=dict(size=20)
 	)
-	fig.update_layout(title={"text":f"<b>{code.upper()}</b>", "x":0.5})
-	fig.add_annotation(xref="x domain",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
-		text = f"<b>Broker K Means Clustering | {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}</b>",
-		font=dict(size=15),align="left",
-		showarrow=False
+	fig.update_annotations(font_size=20)
+
+	# Add scatter trace
+	fig.add_trace(
+		go.Scatter(
+			x=broker_features['corr_ncum_close'], y=broker_features['broker_sumval'],
+			text=broker_features.index,
+			mode='markers+text',
+			textposition='bottom center',
+			marker=dict(
+				size=20,
+				color=broker_features['cluster'],
+				colorscale=px.colors.qualitative.G10,
+				showscale=False,
+				line_width=1,
+				symbol=broker_features['cluster']
+			),
+			textfont=dict(size=20, color='white'),
+		),
+		row=1, col=1
 	)
+	# Update Axis Title
+	fig.update_xaxes(title_text="Price-Transaction Movement Correlation", row=1, col=1)
+	fig.update_yaxes(title_text="Total Transaction Value", row=1, col=1)
+
+	# Add table trace
+	# Get broker name set with maximum corr_cluster
+	list_max_broker = broker_features.loc[broker_features['corr_cluster'] == broker_features['corr_cluster'].max()].index.to_list()
+	# Sort broker_nval_last by positive and negative
+	pos_broker_nval_last = broker_nval_last[broker_nval_last > 0].sort_values(ascending=False)
+	neg_broker_nval_last = broker_nval_last[broker_nval_last < 0].sort_values(ascending=True).abs()
+	# Format broker_nval_last to B, M, K with 2 decimal places
+	pos_broker_nval_last = pos_broker_nval_last.apply(lambda x: f"{x/1000000000:.2f}B" if x >= 1000000000 else f"{x/1000000:.2f}M" if x >= 1000000 else f"{x/1000:.2f}K")
+	neg_broker_nval_last = neg_broker_nval_last.apply(lambda x: f"{x/1000000000:.2f}B" if x >= 1000000000 else f"{x/1000000:.2f}M" if x >= 1000000 else f"{x/1000:.2f}K")
+
+	# Fill Color is #00A08B for 1st and 2nd column, #AF0038 for 3rd and 4th column, and #9467BD specially if broker is in list_max_broker
+	fig.add_trace(
+		go.Table(
+			header=dict(
+				values=["<b>Broker</b>", "<b>Net Buy</b>", "<b>Broker</b>", "<b>Net Sell</b>"],
+				font=dict(size=20),
+				align="center"
+			),
+			cells=dict(
+				values=[
+					pos_broker_nval_last.index,
+					pos_broker_nval_last.values,
+					neg_broker_nval_last.index,
+					neg_broker_nval_last.values,
+				],
+				fill_color=[
+					["#9467BD" if x in list_max_broker else "#00A08B" for x in pos_broker_nval_last.index],
+					["#9467BD" if x in list_max_broker else "#00A08B" for x in pos_broker_nval_last.index],
+					["#9467BD" if x in list_max_broker else "#AF0038" for x in neg_broker_nval_last.index],
+					["#9467BD" if x in list_max_broker else "#AF0038" for x in neg_broker_nval_last.index],
+				],
+				line_color="darkslategray",
+				align="center",
+				font=dict(size=20, color="white"),
+				height=30
+			)
+		),
+		row=1, col=2
+	)
+
+	# Chart Annotation
+	fig.update_layout(title=dict(text=f"<b>{code.upper()}</b>", x=0.5), font=dict(size=20))
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="right",yanchor="bottom",x=1,y=1,
 		text=f"<b>Chart by Quantist.io</b>",
-		font=dict(size=15),align="right",
+		font=dict(size=20),align="right",
 		showarrow=False
 	)
 
