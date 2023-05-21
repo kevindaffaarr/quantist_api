@@ -293,11 +293,11 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, broker_nval_last: 
 		column_widths=[0.7, 0.3], horizontal_spacing=0.02,
 		specs=[[{"type": "scatter"}, {"type": "table"}]],
 		subplot_titles=(
-			f"<b>Broker K Means Clustering | {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}</b>",
+			"",
 			"<b>Last Broker Summary</b>"
 		)
 	)
-	fig.update_annotations(font_size=20)
+	fig.update_annotations(font_size=15, align="left")
 
 	# Add scatter trace
 	fig.add_trace(
@@ -307,7 +307,7 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, broker_nval_last: 
 			mode='markers+text',
 			textposition='bottom center',
 			marker=dict(
-				size=20,
+				size=15,
 				color=broker_features['cluster'],
 				colorscale=px.colors.qualitative.G10,
 				showscale=False,
@@ -319,8 +319,8 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, broker_nval_last: 
 		row=1, col=1
 	)
 	# Update Axis Title
-	fig.update_xaxes(title_text="Price-Transaction Movement Correlation", row=1, col=1)
-	fig.update_yaxes(title_text="Total Transaction Value", row=1, col=1)
+	fig.update_xaxes(title=dict(text="Price-Transaction Movement Correlation", font=dict(size=15)), tickfont=dict(size=15), row=1, col=1)
+	fig.update_yaxes(title=dict(text="Total Transaction Value", font=dict(size=15)), tickfont=dict(size=15), row=1, col=1)
 
 	# Add table trace
 	# Get broker name set with maximum corr_cluster
@@ -337,7 +337,7 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, broker_nval_last: 
 		go.Table(
 			header=dict(
 				values=["<b>Broker</b>", "<b>Net Buy</b>", "<b>Broker</b>", "<b>Net Sell</b>"],
-				font=dict(size=20),
+				font=dict(size=15),
 				align="center"
 			),
 			cells=dict(
@@ -355,7 +355,7 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, broker_nval_last: 
 				],
 				line_color="darkslategray",
 				align="center",
-				font=dict(size=20, color="white"),
+				font=dict(size=15, color="white"),
 				height=30
 			)
 		),
@@ -364,9 +364,14 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, broker_nval_last: 
 
 	# Chart Annotation
 	fig.update_layout(title=dict(text=f"<b>{code.upper()}</b>", x=0.5), font=dict(size=20))
+	fig.add_annotation(xref="x domain",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
+		text=f"<b>Broker K Means Clustering | {startdate.strftime('%Y-%m-%d')} - {enddate.strftime('%Y-%m-%d')}</b>",
+		font=dict(size=15),align="left",
+		showarrow=False
+	)
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="right",yanchor="bottom",x=1,y=1,
 		text=f"<b>Chart by Quantist.io</b>",
-		font=dict(size=20),align="right",
+		font=dict(size=15),align="right",
 		showarrow=False
 	)
 
