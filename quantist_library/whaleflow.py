@@ -27,22 +27,22 @@ class WhaleFlow():
 		pow_medium_mapricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
-		self.analysis_method = analysis_method
-		self.stockcode = stockcode
-		self.startdate = startdate
-		self.enddate = enddate
-		self.period_mf = period_mf
-		self.period_prop = period_prop
-		self.period_pricecorrel = period_pricecorrel
-		self.period_mapricecorrel = period_mapricecorrel
-		self.period_vwap = period_vwap
-		self.pow_high_prop = pow_high_prop
-		self.pow_high_pricecorrel = pow_high_pricecorrel
-		self.pow_high_mapricecorrel = pow_high_mapricecorrel
-		self.pow_medium_prop = pow_medium_prop
-		self.pow_medium_pricecorrel = pow_medium_pricecorrel
-		self.pow_medium_mapricecorrel = pow_medium_mapricecorrel
-		self.dbs = dbs
+		self.analysis_method: dp.AnalysisMethod = analysis_method
+		self.stockcode:str | None = stockcode
+		self.startdate: datetime.date | None = startdate
+		self.enddate: datetime.date = enddate
+		self.period_mf: int | None = period_mf
+		self.period_prop: int | None = period_prop
+		self.period_pricecorrel: int | None = period_pricecorrel
+		self.period_mapricecorrel: int | None = period_mapricecorrel
+		self.period_vwap: int | None = period_vwap
+		self.pow_high_prop: int | None = pow_high_prop
+		self.pow_high_pricecorrel: int | None = pow_high_pricecorrel
+		self.pow_high_mapricecorrel: int | None = pow_high_mapricecorrel
+		self.pow_medium_prop: int | None = pow_medium_prop
+		self.pow_medium_pricecorrel: int | None = pow_medium_pricecorrel
+		self.pow_medium_mapricecorrel: int | None = pow_medium_mapricecorrel
+		self.dbs: db.Session = dbs
 
 		self.wf_indicators = pd.DataFrame()
 
@@ -209,15 +209,15 @@ class BrokerFlow(WhaleFlow, bf.StockBFFull):
 			pow_medium_pricecorrel=pow_medium_pricecorrel,
 			pow_medium_mapricecorrel=pow_medium_mapricecorrel,
 			dbs=dbs)
-		self.clustering_method = clustering_method
-		self.n_selected_cluster = n_selected_cluster
-		self.training_start_index = training_start_index
-		self.training_end_index = training_end_index
-		self.min_n_cluster = min_n_cluster
-		self.max_n_cluster = max_n_cluster
-		self.splitted_min_n_cluster = splitted_min_n_cluster
-		self.splitted_max_n_cluster = splitted_max_n_cluster
-		self.stepup_n_cluster_threshold = stepup_n_cluster_threshold
+		self.clustering_method:dp.ClusteringMethod = clustering_method
+		self.n_selected_cluster: int | None = n_selected_cluster
+		self.training_start_index:float | None = training_start_index
+		self.training_end_index:float | None = training_end_index
+		self.min_n_cluster: int | None = min_n_cluster
+		self.max_n_cluster: int | None = max_n_cluster
+		self.splitted_min_n_cluster: int | None = splitted_min_n_cluster
+		self.splitted_max_n_cluster: int | None = splitted_max_n_cluster
+		self.stepup_n_cluster_threshold: int | None = stepup_n_cluster_threshold
 	
 	async def __get_wf_obj(self) -> BrokerFlow:
 		# BrokerFlow

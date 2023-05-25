@@ -32,10 +32,10 @@ class HoldingComposition():
 		assert isinstance(enddate, datetime.date)
 		assert isinstance(categorization, dp.HoldingSectorsCat)
 
-		self.stockcode = stockcode.lower()
-		self.startdate = startdate
-		self.enddate = enddate
-		self.categorization = categorization
+		self.stockcode: str = stockcode.lower()
+		self.startdate: datetime.date | None = startdate
+		self.enddate: datetime.date = enddate
+		self.categorization: dp.HoldingSectorsCat = categorization
 
 		# Validation startdate and enddate
 		if isinstance(self.startdate, datetime.date) and self.startdate < datetime.date(2015, 1, 1):

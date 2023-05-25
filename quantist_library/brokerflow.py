@@ -50,41 +50,43 @@ class StockBFFull():
 		dbs: db.Session = next(db.get_dbs()),
 		) -> None:
 
-		self.stockcode = stockcode
-		self.startdate = startdate
-		self.enddate = enddate
-		self.clustering_method = clustering_method
-		self.n_selected_cluster = n_selected_cluster
-		self.period_mf = period_mf
-		self.period_prop = period_prop
-		self.period_pricecorrel = period_pricecorrel
-		self.period_mapricecorrel = period_mapricecorrel
-		self.period_vwap = period_vwap
-		self.pow_high_prop = pow_high_prop
-		self.pow_high_pricecorrel = pow_high_pricecorrel
-		self.pow_high_mapricecorrel = pow_high_mapricecorrel
-		self.pow_medium_prop = pow_medium_prop
-		self.pow_medium_pricecorrel = pow_medium_pricecorrel
-		self.pow_medium_mapricecorrel = pow_medium_mapricecorrel
-		self.training_start_index = training_start_index
-		self.training_end_index = training_end_index
-		self.min_n_cluster = min_n_cluster
-		self.max_n_cluster = max_n_cluster
-		self.splitted_min_n_cluster = splitted_min_n_cluster
-		self.splitted_max_n_cluster = splitted_max_n_cluster
-		self.stepup_n_cluster_threshold = stepup_n_cluster_threshold
-		self.dbs = dbs
+		self.stockcode: str | None = stockcode
+		self.startdate: datetime.date | None = startdate
+		self.enddate: datetime.date = enddate
+		self.clustering_method: dp.ClusteringMethod = clustering_method
+		self.n_selected_cluster: int | None = n_selected_cluster
+		self.period_mf: int | None = period_mf
+		self.period_prop: int | None = period_prop
+		self.period_pricecorrel: int | None = period_pricecorrel
+		self.period_mapricecorrel: int | None = period_mapricecorrel
+		self.period_vwap: int | None = period_vwap
+		self.pow_high_prop: int | None = pow_high_prop
+		self.pow_high_pricecorrel: int | None = pow_high_pricecorrel
+		self.pow_high_mapricecorrel: int | None = pow_high_mapricecorrel
+		self.pow_medium_prop: int | None = pow_medium_prop
+		self.pow_medium_pricecorrel: int | None = pow_medium_pricecorrel
+		self.pow_medium_mapricecorrel: int | None = pow_medium_mapricecorrel
+		self.training_start_index: float | None = training_start_index
+		self.training_end_index: float | None = training_end_index
+		self.min_n_cluster: int | None = min_n_cluster
+		self.max_n_cluster: int | None = max_n_cluster
+		self.splitted_min_n_cluster: int | None = splitted_min_n_cluster
+		self.splitted_max_n_cluster: int | None = splitted_max_n_cluster
+		self.stepup_n_cluster_threshold: float | None = stepup_n_cluster_threshold
+		self.dbs: db.Session = dbs
 
-		self.preoffset_startdate = None
+		self.preoffset_startdate: datetime.date
 
-		self.selected_broker = None
-		self.optimum_n_selected_cluster = None
-		self.optimum_corr = None
-		self.wf_indicators:pd.DataFrame = pd.DataFrame()
+		self.selected_broker:list[str]
+		self.optimum_n_selected_cluster: int
+		self.optimum_corr: float
+		self.broker_features:pd.DataFrame
+		self.broker_ncum:pd.DataFrame
+		self.wf_indicators:pd.DataFrame
 
 	async def fit(self) -> StockBFFull:
 		# Get default bf params
-		default_bf = await self.__get_default_bf(dbs=self.dbs)
+		default_bf:pd.Series = await self.__get_default_bf(dbs=self.dbs)
 		assert isinstance(self.stockcode, str), "stockcode must be string"
 		assert isinstance(self.training_start_index, float), "training_start_index must be float"
 		assert isinstance(self.training_end_index, float), "training_end_index must be float"
@@ -106,11 +108,16 @@ class StockBFFull():
 		# Check Does Stock Code is available in database if self.stockcode is not "composite"
 		if self.stockcode != "composite":
 			qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
-			row = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
+			row:pd.DataFrame = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
 			if len(row) == 0:
 				raise KeyError("There is no such stock code in the database.")
 
 		# Get full stockdatatransaction
+		raw_data_full:pd.DataFrame
+		raw_data_broker_nvol:pd.DataFrame
+		raw_data_broker_nval:pd.DataFrame
+		raw_data_broker_sumval:pd.DataFrame
+		
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self.__get_stock_raw_data(
 				stockcode=self.stockcode,
@@ -189,28 +196,28 @@ class StockBFFull():
 		self.stockcode = (str(default_bf['default_stockcode']) if self.stockcode is None else self.stockcode).lower()
 		
 		# Data Parameter
-		self.period_mf = int(default_bf['default_bf_period_mf']) if self.period_mf is None else self.period_mf
-		self.period_prop = int(default_bf['default_bf_period_prop']) if self.period_prop is None else self.period_prop
-		self.period_pricecorrel = int(default_bf['default_bf_period_pricecorrel']) if self.period_pricecorrel is None else self.period_pricecorrel
-		self.period_mapricecorrel = int(default_bf['default_bf_period_mapricecorrel']) if self.period_mapricecorrel is None else self.period_mapricecorrel
-		self.period_vwap = int(default_bf['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap
-		self.pow_high_prop = int(default_bf['default_bf_pow_high_prop']) if self.pow_high_prop is None else self.pow_high_prop
-		self.pow_high_pricecorrel = int(default_bf['default_bf_pow_high_pricecorrel']) if self.pow_high_pricecorrel is None else self.pow_high_pricecorrel
-		self.pow_high_mapricecorrel = int(default_bf['default_bf_pow_high_mapricecorrel']) if self.pow_high_mapricecorrel is None else self.pow_high_mapricecorrel
-		self.pow_medium_prop = int(default_bf['default_bf_pow_medium_prop']) if self.pow_medium_prop is None else self.pow_medium_prop
-		self.pow_medium_pricecorrel = int(default_bf['default_bf_pow_medium_pricecorrel']) if self.pow_medium_pricecorrel is None else self.pow_medium_pricecorrel
-		self.pow_medium_mapricecorrel = int(default_bf['default_bf_pow_medium_mapricecorrel']) if self.pow_medium_mapricecorrel is None else self.pow_medium_mapricecorrel
-		self.preoffset_period_param = max(self.period_mf,self.period_prop,self.period_pricecorrel,(self.period_mapricecorrel+self.period_pricecorrel),self.period_vwap)-1
+		self.period_mf = int(default_bf['default_bf_period_mf']) if self.period_mf is None else self.period_mf # type: ignore
+		self.period_prop = int(default_bf['default_bf_period_prop']) if self.period_prop is None else self.period_prop # type: ignore
+		self.period_pricecorrel = int(default_bf['default_bf_period_pricecorrel']) if self.period_pricecorrel is None else self.period_pricecorrel # type: ignore
+		self.period_mapricecorrel = int(default_bf['default_bf_period_mapricecorrel']) if self.period_mapricecorrel is None else self.period_mapricecorrel # type: ignore
+		self.period_vwap = int(default_bf['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap # type: ignore
+		self.pow_high_prop = int(default_bf['default_bf_pow_high_prop']) if self.pow_high_prop is None else self.pow_high_prop # type: ignore
+		self.pow_high_pricecorrel = int(default_bf['default_bf_pow_high_pricecorrel']) if self.pow_high_pricecorrel is None else self.pow_high_pricecorrel # type: ignore
+		self.pow_high_mapricecorrel = int(default_bf['default_bf_pow_high_mapricecorrel']) if self.pow_high_mapricecorrel is None else self.pow_high_mapricecorrel # type: ignore
+		self.pow_medium_prop = int(default_bf['default_bf_pow_medium_prop']) if self.pow_medium_prop is None else self.pow_medium_prop # type: ignore
+		self.pow_medium_pricecorrel = int(default_bf['default_bf_pow_medium_pricecorrel']) if self.pow_medium_pricecorrel is None else self.pow_medium_pricecorrel # type: ignore
+		self.pow_medium_mapricecorrel = int(default_bf['default_bf_pow_medium_mapricecorrel']) if self.pow_medium_mapricecorrel is None else self.pow_medium_mapricecorrel # type: ignore
+		self.preoffset_period_param = max(self.period_mf,self.period_prop,self.period_pricecorrel,(self.period_mapricecorrel+self.period_pricecorrel),self.period_vwap)-1 # type: ignore
 
-		self.training_start_index = int(default_bf['default_bf_training_start_index'])/100 if self.training_start_index is None else self.training_start_index/100
-		self.training_end_index = int(default_bf['default_bf_training_end_index'])/100 if self.training_end_index is None else self.training_end_index/100
-		self.min_n_cluster = int(default_bf['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster
-		self.max_n_cluster = int(default_bf['default_bf_max_n_cluster']) if self.max_n_cluster is None else self.max_n_cluster
-		self.splitted_min_n_cluster = int(default_bf['default_bf_splitted_min_n_cluster']) if self.splitted_min_n_cluster is None else self.splitted_min_n_cluster
-		self.splitted_max_n_cluster = int(default_bf['default_bf_splitted_max_n_cluster']) if self.splitted_max_n_cluster is None else self.splitted_max_n_cluster
-		self.stepup_n_cluster_threshold = int(default_bf['default_bf_stepup_n_cluster_threshold'])/100 if self.stepup_n_cluster_threshold is None else self.stepup_n_cluster_threshold/100
+		self.training_start_index = int(default_bf['default_bf_training_start_index'])/100 if self.training_start_index is None else self.training_start_index/100 # type: ignore
+		self.training_end_index = int(default_bf['default_bf_training_end_index'])/100 if self.training_end_index is None else self.training_end_index/100 # type: ignore
+		self.min_n_cluster = int(default_bf['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster # type: ignore
+		self.max_n_cluster = int(default_bf['default_bf_max_n_cluster']) if self.max_n_cluster is None else self.max_n_cluster # type: ignore
+		self.splitted_min_n_cluster = int(default_bf['default_bf_splitted_min_n_cluster']) if self.splitted_min_n_cluster is None else self.splitted_min_n_cluster # type: ignore
+		self.splitted_max_n_cluster = int(default_bf['default_bf_splitted_max_n_cluster']) if self.splitted_max_n_cluster is None else self.splitted_max_n_cluster # type: ignore
+		self.stepup_n_cluster_threshold = int(default_bf['default_bf_stepup_n_cluster_threshold'])/100 if self.stepup_n_cluster_threshold is None else self.stepup_n_cluster_threshold/100 # type: ignore
 
-		self.startdate = self.enddate - relativedelta(months=int(default_bf['default_months_range'])) if self.startdate is None else self.startdate
+		self.startdate = self.enddate - relativedelta(months=int(default_bf['default_months_range'])) if self.startdate is None else self.startdate # type: ignore
 		
 		return default_bf
 	
@@ -502,14 +509,16 @@ class StockBFFull():
 		# Iterate optimum n_cluster
 		for n_cluster in range(min_n_cluster, max_n_cluster+1):
 			# Clustering
-			kmeans = KMeans(init="k-means++", n_init='auto', n_clusters=n_cluster, random_state=0).fit(X)
+			kmeans:KMeans = KMeans(init="k-means++", n_init='auto', n_clusters=n_cluster, random_state=0)
+			kmeans.fit(X)
 			score = silhouette_score(X, kmeans.labels_)
 			silhouette_coefficient.append(score)
 		# Define optimum n_cluster
 		optimum_n_cluster = int(np.argmax(silhouette_coefficient)) + min_n_cluster
 
 		# Clustering with optimum n cluster
-		kmeans = KMeans(init="k-means++", n_init='auto', n_clusters=optimum_n_cluster, random_state=0).fit(X)
+		kmeans:KMeans = KMeans(init="k-means++", n_init='auto', n_clusters=optimum_n_cluster, random_state=0)
+		kmeans.fit(X)
 		# Get cluster label
 		features["cluster"] = kmeans.labels_
 		# Get location of cluster center
@@ -926,29 +935,34 @@ class WhaleRadar():
 		filter_opt_corr: float | None = None,
 		dbs: db.Session = next(db.get_dbs()),
 		) -> None:
-		self.startdate = startdate
-		self.enddate = enddate
-		self.y_axis_type = y_axis_type
-		self.stockcode_excludes = stockcode_excludes
-		self.include_composite = include_composite
-		self.screener_min_value = screener_min_value
-		self.screener_min_frequency = screener_min_frequency
-		self.n_selected_cluster = n_selected_cluster
-		self.radar_period = radar_period
-		self.period_mf = period_mf
-		self.period_pricecorrel = period_pricecorrel
-		self.default_months_range = default_months_range
-		self.training_start_index = training_start_index
-		self.training_end_index = training_end_index
-		self.min_n_cluster = min_n_cluster
-		self.max_n_cluster = max_n_cluster
-		self.splitted_min_n_cluster = splitted_min_n_cluster
-		self.splitted_max_n_cluster = splitted_max_n_cluster
-		self.stepup_n_cluster_threshold = stepup_n_cluster_threshold
-		self.filter_opt_corr = filter_opt_corr
-		self.dbs = dbs
+		self.startdate: datetime.date | None = startdate
+		self.enddate: datetime.date = enddate
+		self.y_axis_type: dp.ListRadarType = y_axis_type
+		self.stockcode_excludes: set[str] = stockcode_excludes
+		self.include_composite: bool = include_composite
+		self.screener_min_value: int | None = screener_min_value
+		self.screener_min_frequency: int | None = screener_min_frequency
+		self.n_selected_cluster: int | None = n_selected_cluster
+		self.radar_period: int | None = radar_period
+		self.period_mf: int | None = period_mf
+		self.period_pricecorrel: int | None = period_pricecorrel
+		self.default_months_range: int | None = default_months_range
+		self.training_start_index: float | None = training_start_index
+		self.training_end_index: float | None = training_end_index
+		self.min_n_cluster: int | None = min_n_cluster
+		self.max_n_cluster: int | None = max_n_cluster
+		self.splitted_min_n_cluster: int | None = splitted_min_n_cluster
+		self.splitted_max_n_cluster: int | None = splitted_max_n_cluster
+		self.stepup_n_cluster_threshold: int | None = stepup_n_cluster_threshold
+		self.filter_opt_corr: float | None = filter_opt_corr
+		self.dbs: db.Session = dbs
 
 		self.radar_indicators:pd.DataFrame
+		self.filtered_stockcodes:pd.Series
+		self.selected_broker:dict
+		self.optimum_n_selected_cluster:pd.DataFrame
+		self.optimum_corr:pd.DataFrame
+		self.broker_features:pd.DataFrame
 	
 	async def fit (self) -> WhaleRadar:
 		# Get default bf params
@@ -970,6 +984,10 @@ class WhaleRadar():
 			dbs=self.dbs)
 
 		# Get raw data
+		raw_data_full: pd.DataFrame
+		raw_data_broker_nvol: pd.DataFrame
+		raw_data_broker_nval: pd.DataFrame
+		raw_data_broker_sumval: pd.DataFrame
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
 			await self._get_stock_raw_data(
 				filtered_stockcodes=self.filtered_stockcodes,
@@ -996,17 +1014,16 @@ class WhaleRadar():
 		raw_data_broker_nvol = raw_data_broker_nvol.groupby(level="code", group_keys=False).apply(
 			lambda x: pd.concat(
 				[
-					x.loc[:,self.broker_features.loc[x.name, self.broker_features['corr_cluster'] < 0, :].index.get_level_values('broker').to_list()].mul(-1, axis=1), # type: ignore
-					x.loc[:,self.broker_features.loc[x.name, self.broker_features['corr_cluster'] >= 0, :].index.get_level_values('broker').to_list()] # type: ignore
-				],axis=1
+					x.loc[:, self.broker_features.loc[self.broker_features['corr_cluster'] < 0].loc[x.name].index.get_level_values('broker').tolist()].mul(-1, axis=1),
+					x.loc[:, self.broker_features.loc[self.broker_features['corr_cluster'] >= 0].loc[x.name].index.get_level_values('broker').tolist()]
+				], axis=1
 			)
 		).sort_index(axis=1)
-
 		raw_data_broker_nval = raw_data_broker_nval.groupby(level="code", group_keys=False).apply(
 			lambda x: pd.concat(
 				[
-					x.loc[:,self.broker_features.loc[x.name, self.broker_features['corr_cluster'] < 0, :].index.get_level_values('broker').to_list()].mul(-1, axis=1), # type: ignore
-					x.loc[:,self.broker_features.loc[x.name, self.broker_features['corr_cluster'] >= 0, :].index.get_level_values('broker').to_list()] # type: ignore
+					x.loc[:,self.broker_features.loc[self.broker_features['corr_cluster'] < 0, :].loc[x.name].index.get_level_values('broker').to_list()].mul(-1, axis=1),
+					x.loc[:,self.broker_features.loc[self.broker_features['corr_cluster'] >= 0, :].loc[x.name].index.get_level_values('broker').to_list()]
 				],axis=1
 			)
 		).sort_index(axis=1)
@@ -1036,6 +1053,10 @@ class WhaleRadar():
 			)
 		
 		# Get sum of selected broker transaction for each stock
+		selected_broker_nvol: pd.DataFrame
+		selected_broker_nval: pd.DataFrame
+		selected_broker_sumval: pd.DataFrame
+		
 		selected_broker_nvol, selected_broker_nval, selected_broker_sumval = \
 			await self._sum_selected_broker_transaction(
 				raw_data_broker_nvol=raw_data_broker_nvol,
@@ -1064,20 +1085,20 @@ class WhaleRadar():
 		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 		# Data Parameter
-		self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100
-		self.training_end_index = (int(default_radar['default_bf_training_end_index'])-50)/(100/2) if self.training_end_index is None else self.training_end_index/100
-		self.min_n_cluster = int(default_radar['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster
-		self.max_n_cluster = int(default_radar['default_bf_max_n_cluster']) if self.max_n_cluster is None else self.max_n_cluster
-		self.splitted_min_n_cluster = int(default_radar['default_bf_splitted_min_n_cluster']) if self.splitted_min_n_cluster is None else self.splitted_min_n_cluster
-		self.splitted_max_n_cluster = int(default_radar['default_bf_splitted_max_n_cluster']) if self.splitted_max_n_cluster is None else self.splitted_max_n_cluster
-		self.stepup_n_cluster_threshold = int(default_radar['default_bf_stepup_n_cluster_threshold'])/100 if self.stepup_n_cluster_threshold is None else self.stepup_n_cluster_threshold/100
+		self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100  # type: ignore
+		self.training_end_index = (int(default_radar['default_bf_training_end_index'])-50)/(100/2) if self.training_end_index is None else self.training_end_index/100 # type: ignore
+		self.min_n_cluster = int(default_radar['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster # type: ignore
+		self.max_n_cluster = int(default_radar['default_bf_max_n_cluster']) if self.max_n_cluster is None else self.max_n_cluster # type: ignore
+		self.splitted_min_n_cluster = int(default_radar['default_bf_splitted_min_n_cluster']) if self.splitted_min_n_cluster is None else self.splitted_min_n_cluster # type: ignore
+		self.splitted_max_n_cluster = int(default_radar['default_bf_splitted_max_n_cluster']) if self.splitted_max_n_cluster is None else self.splitted_max_n_cluster # type: ignore
+		self.stepup_n_cluster_threshold = int(default_radar['default_bf_stepup_n_cluster_threshold'])/100 if self.stepup_n_cluster_threshold is None else self.stepup_n_cluster_threshold/100 # type: ignore
 		
-		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else self.radar_period
-		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
-		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
-		self.filter_opt_corr = int(default_radar['default_radar_filter_opt_corr'])/100 if self.filter_opt_corr is None else self.filter_opt_corr/100
+		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else self.radar_period  # type: ignore
+		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value # type: ignore
+		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency # type: ignore
+		self.filter_opt_corr = int(default_radar['default_radar_filter_opt_corr'])/100 if self.filter_opt_corr is None else self.filter_opt_corr/100 # type: ignore
 		
-		self.default_months_range = int((int(default_radar['default_months_range'])/2) + int(self.radar_period/20)) if self.startdate is None else self.default_months_range
+		self.default_months_range = int((int(default_radar['default_months_range'])/2) + int(self.radar_period/20)) if self.startdate is None else self.default_months_range # type: ignore
 		
 		return default_radar
 	
@@ -1700,9 +1721,9 @@ class ScreenerBase(WhaleRadar):
 		assert self.splitted_max_n_cluster is not None
 		assert self.filter_opt_corr is not None
 		if predata == "vwap":
-			self.period_vwap = int(default_radar['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap
-			self.percentage_range = float(default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
-			self.period_predata = self.radar_period + self.period_vwap
+			self.period_vwap:int = int(default_radar['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap
+			self.percentage_range:float = float(default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
+			self.period_predata:int = self.radar_period + self.period_vwap
 		else:
 			self.period_predata = 0
 
@@ -1837,8 +1858,8 @@ class ScreenerMoneyFlow(ScreenerBase):
 			dbs=dbs,
 		)
 
-		self.accum_or_distri = accum_or_distri
-		self.n_stockcodes = n_stockcodes
+		self.accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = accum_or_distri
+		self.n_stockcodes: int = n_stockcodes
 
 	async def screen(self) -> ScreenerMoneyFlow:
 		# get default param radar, defined startdate,
@@ -1969,11 +1990,11 @@ class ScreenerVWAP(ScreenerBase):
 			dbs=dbs,
 		)
 
-		self.screener_vwap_criteria = screener_vwap_criteria
-		self.n_stockcodes = n_stockcodes
-		self.radar_period = radar_period
-		self.percentage_range = percentage_range
-		self.period_vwap = period_vwap
+		self.screener_vwap_criteria: Literal[dp.ScreenerList.vwap_rally,dp.ScreenerList.vwap_around,dp.ScreenerList.vwap_breakout,dp.ScreenerList.vwap_breakdown] = screener_vwap_criteria
+		self.n_stockcodes: int = n_stockcodes
+		self.radar_period: int | None = radar_period
+		self.percentage_range: float | None = percentage_range
+		self.period_vwap: int | None = period_vwap
 	
 	async def screen(self) -> ScreenerVWAP:
 		# get default param radar, defined startdate,
@@ -1981,6 +2002,7 @@ class ScreenerVWAP(ScreenerBase):
 		# selected_broker each stock, also optimum_n_selected_cluster, optimum_corr, broker_features
 		# raw_data_full, selected_broker_nvol, selected_broker_nval, selected_broker_sumval
 		await super()._fit_base(predata="vwap")
+		assert isinstance(self.startdate, datetime.date), f'startdate must be datetime.date'
 		assert isinstance(self.period_vwap, int), f'period_vwap must be integer'
 		assert isinstance(self.percentage_range, float), f'percentage_range must be float'
 

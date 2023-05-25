@@ -319,8 +319,8 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, broker_nval_last: 
 		row=1, col=1
 	)
 	# Update Axis Title
-	fig.update_xaxes(title=dict(text="Price-Transaction Movement Correlation", font=dict(size=15)), tickfont=dict(size=15), row=1, col=1)
-	fig.update_yaxes(title=dict(text="Total Transaction Value", font=dict(size=15)), tickfont=dict(size=15), row=1, col=1)
+	fig.update_xaxes(title=dict(text="Price-Transaction Movement Correlation", font_size=15), tickfont=dict(size=15), row=1, col=1)
+	fig.update_yaxes(title=dict(text="Total Transaction Value", font_size=15), tickfont=dict(size=15), row=1, col=1)
 
 	# Add table trace
 	# Get broker name set with maximum corr_cluster
@@ -337,7 +337,7 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, broker_nval_last: 
 		go.Table(
 			header=dict(
 				values=["<b>Broker</b>", "<b>Net Buy</b>", "<b>Broker</b>", "<b>Net Sell</b>"],
-				font=dict(size=15),
+				font_size=15,
 				align="center"
 			),
 			cells=dict(

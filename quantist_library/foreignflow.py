@@ -27,24 +27,24 @@ class StockFFFull():
 		pow_medium_mapricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
-		self.stockcode = stockcode
-		self.startdate = startdate
-		self.enddate = enddate
-		self.period_mf = period_mf
-		self.period_prop = period_prop
-		self.period_pricecorrel = period_pricecorrel
-		self.period_mapricecorrel = period_mapricecorrel
-		self.period_vwap = period_vwap
-		self.pow_high_prop = pow_high_prop
-		self.pow_high_pricecorrel = pow_high_pricecorrel
-		self.pow_high_mapricecorrel = pow_high_mapricecorrel
-		self.pow_medium_prop = pow_medium_prop
-		self.pow_medium_pricecorrel = pow_medium_pricecorrel
-		self.pow_medium_mapricecorrel = pow_medium_mapricecorrel
-		self.dbs = dbs
+		self.stockcode: str | None = stockcode
+		self.startdate: datetime.date | None = startdate
+		self.enddate: datetime.date = enddate
+		self.period_mf: int | None = period_mf
+		self.period_prop: int | None = period_prop
+		self.period_pricecorrel: int | None = period_pricecorrel
+		self.period_mapricecorrel: int | None = period_mapricecorrel
+		self.period_vwap: int | None = period_vwap
+		self.pow_high_prop: int | None = pow_high_prop
+		self.pow_high_pricecorrel: int | None = pow_high_pricecorrel
+		self.pow_high_mapricecorrel: int | None = pow_high_mapricecorrel
+		self.pow_medium_prop: int | None = pow_medium_prop
+		self.pow_medium_pricecorrel: int | None = pow_medium_pricecorrel
+		self.pow_medium_mapricecorrel: int | None = pow_medium_mapricecorrel
+		self.dbs: db.Session = dbs
 
-		self.type = None
-		self.wf_indicators = pd.DataFrame()
+		self.type: str | None = None
+		self.wf_indicators:pd.DataFrame = pd.DataFrame()
 
 	async def fit(self) -> StockFFFull:
 		# Get defaults value
@@ -77,15 +77,15 @@ class StockFFFull():
 		self.pow_medium_prop = int(default_ff['default_ff_pow_medium_prop']) if self.pow_medium_prop is None else self.pow_medium_prop
 		self.pow_medium_pricecorrel = int(default_ff['default_ff_pow_medium_pricecorrel']) if self.pow_medium_pricecorrel is None else self.pow_medium_pricecorrel
 		self.pow_medium_mapricecorrel = int(default_ff['default_ff_pow_medium_mapricecorrel']) if self.pow_medium_mapricecorrel is None else self.pow_medium_mapricecorrel
-		preoffset_period_param = max(self.period_mf,self.period_prop,self.period_pricecorrel,(self.period_mapricecorrel+self.period_vwap))-1
+		preoffset_period_param:int = max(self.period_mf,self.period_prop,self.period_pricecorrel,(self.period_mapricecorrel+self.period_vwap))-1
 
 		# Raw Data
 		if self.type == 'composite':
-			raw_data = await self.__get_composite_raw_data(self.dbs,\
+			raw_data:pd.DataFrame = await self.__get_composite_raw_data(self.dbs,\
 				self.startdate,self.enddate,\
 				default_months_range,preoffset_period_param)
 		else: #self.type == 'stock'
-			raw_data = await self.__get_stock_raw_data(self.dbs,self.stockcode,\
+			raw_data:pd.DataFrame = await self.__get_stock_raw_data(self.dbs,self.stockcode,\
 				self.startdate,self.enddate,\
 				default_months_range,preoffset_period_param)
 		
@@ -333,30 +333,30 @@ class ForeignRadar():
 		period_pricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
-		self.startdate = startdate
-		self.enddate = enddate
-		self.radar_period = radar_period
-		self.y_axis_type = y_axis_type
-		self.stockcode_excludes = stockcode_excludes
-		self.include_composite = include_composite
-		self.screener_min_value = screener_min_value
-		self.screener_min_frequency = screener_min_frequency
-		self.screener_min_prop = screener_min_prop
-		self.period_mf = period_mf
-		self.period_pricecorrel = period_pricecorrel
-		self.dbs = dbs
+		self.startdate:datetime.date | None = startdate
+		self.enddate:datetime.date = enddate
+		self.radar_period: int | None = radar_period
+		self.y_axis_type: dp.ListRadarType = y_axis_type
+		self.stockcode_excludes: set[str] = stockcode_excludes
+		self.include_composite: bool = include_composite
+		self.screener_min_value: int | None = screener_min_value
+		self.screener_min_frequency: int | None = screener_min_frequency
+		self.screener_min_prop: int | None = screener_min_prop
+		self.period_mf: int | None = period_mf
+		self.period_pricecorrel: int | None = period_pricecorrel
+		self.dbs: db.Session = dbs
 
-		self.radar_indicators =  pd.DataFrame()
+		self.radar_indicators:pd.DataFrame =  pd.DataFrame()
 
 	async def fit(self) -> ForeignRadar:
 		# Get default value of parameter
-		default_radar = await self._get_default_radar()
+		default_radar:pd.Series = await self._get_default_radar()
 		assert self.screener_min_value is not None
 		assert self.screener_min_frequency is not None
 		assert self.screener_min_prop is not None
 		
 		# Get filtered stockcodes
-		filtered_stockcodes = await self._get_stockcodes(
+		filtered_stockcodes:pd.Series = await self._get_stockcodes(
 			screener_min_value=self.screener_min_value,
 			screener_min_frequency=self.screener_min_frequency,
 			screener_min_prop=self.screener_min_prop,
@@ -364,13 +364,14 @@ class ForeignRadar():
 			dbs=self.dbs)
 
 		# Get raw data
+		bar_range:int | None
 		if self.startdate is None:
 			assert self.period_mf is not None
 			assert self.period_pricecorrel is not None
 			bar_range = max(self.period_mf,self.period_pricecorrel)
 		else:
 			bar_range = None
-		stocks_raw_data = await self.__get_stocks_raw_data(
+		stocks_raw_data:pd.DataFrame = await self.__get_stocks_raw_data(
 			startdate=self.startdate,
 			enddate=self.enddate,
 			filtered_stockcodes=filtered_stockcodes,
@@ -390,13 +391,13 @@ class ForeignRadar():
 			stocks_raw_data=stocks_raw_data,y_axis_type=self.y_axis_type)
 
 		if self.include_composite is True:
-			composite_raw_data = await self.__get_composite_raw_data(
+			composite_raw_data:pd.DataFrame = await self.__get_composite_raw_data(
 				startdate=self.startdate,
 				enddate=self.enddate,
 				bar_range=bar_range,
 				dbs=self.dbs
 			)
-			composite_radar_indicators = await self.calc_radar_indicators(\
+			composite_radar_indicators:pd.DataFrame = await self.calc_radar_indicators(\
 				stocks_raw_data=composite_raw_data,y_axis_type=self.y_axis_type)
 			
 			self.radar_indicators = pd.concat([self.radar_indicators,composite_radar_indicators])
@@ -411,13 +412,13 @@ class ForeignRadar():
 			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")) | (db.DataParam.param.like("default_ff_%")))
 		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 		
-		self.period_mf = int(default_radar['default_radar_period_mf']) if self.startdate is None else None
-		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.startdate is None else None
-		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value
-		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency
-		self.screener_min_prop = int(default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop
+		self.period_mf = int(default_radar['default_radar_period_mf']) if self.startdate is None else None # type: ignore
+		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.startdate is None else None # type: ignore
+		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value # type: ignore
+		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency # type: ignore
+		self.screener_min_prop = int(default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop # type: ignore
 		
-		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else self.radar_period
+		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else self.radar_period # type: ignore
 
 		return default_radar
 		
@@ -604,18 +605,18 @@ class ScreenerBase(ForeignRadar):
 			dbs = dbs,
 		)
 
-		self.radar_period = radar_period
+		self.radar_period:int | None = radar_period
 
 	async def _fit_base(self, predata: str | None = None) -> ScreenerBase:
 		# get default param radar
-		self.default_radar = await super()._get_default_radar()
+		self.default_radar:pd.Series = await super()._get_default_radar()
 		assert self.screener_min_value is not None
 		assert self.screener_min_frequency is not None
 		assert self.screener_min_prop is not None
 		assert self.radar_period is not None
 		if predata == "vwap":
-			self.period_vwap = int(self.default_radar['default_ff_period_vwap']) if self.period_vwap is None else self.period_vwap
-			self.percentage_range = float(self.default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
+			self.period_vwap:int = int(self.default_radar['default_ff_period_vwap']) if self.period_vwap is None else self.period_vwap
+			self.percentage_range:float = float(self.default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
 		
 		# Define startdate
 		if self.startdate is None:
@@ -630,7 +631,7 @@ class ScreenerBase(ForeignRadar):
 			self.startdate = sub_qry
 
 		# get list_stock that should be analyzed
-		self.filtered_stockcodes = await super()._get_stockcodes(
+		self.filtered_stockcodes:pd.Series = await super()._get_stockcodes(
 			screener_min_value=self.screener_min_value,
 			screener_min_frequency=self.screener_min_frequency,
 			screener_min_prop=self.screener_min_prop,
@@ -670,8 +671,8 @@ class ScreenerMoneyFlow(ScreenerBase):
 			dbs = dbs,
 		)
 
-		self.accum_or_distri = accum_or_distri
-		self.n_stockcodes = n_stockcodes
+		self.accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = accum_or_distri
+		self.n_stockcodes: int = n_stockcodes
 	
 	async def screen(self) -> ScreenerMoneyFlow:
 		# Get default param: self.period_mf, self.period_pricecorrel, self.screener_min_value, self.screener_min_frequency, self.screener_min_prop, self.bar_range
@@ -696,7 +697,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 	async def _get_mf_top_stockcodes(self,
 		accum_or_distri: dp.ScreenerList = dp.ScreenerList.most_accumulated,
 		n_stockcodes: int = 10,
-		startdate: datetime.date = ...,
+		startdate: datetime.date | None = None,
 		enddate: datetime.date = ...,
 		radar_period: int | None = None,
 		period_pricecorrel: int | None = None,
@@ -743,14 +744,14 @@ class ScreenerMoneyFlow(ScreenerBase):
 			qry = qry.filter(db.StockData.date.between(startdate,enddate))
 
 		# Query fetching using pandas
-		raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind).reset_index(drop=True)\
+		raw_data:pd.DataFrame = pd.read_sql(sql=qry.statement, con=dbs.bind).reset_index(drop=True)\
 			.sort_values(['code','date']).set_index(['code','date'])
 
 		# Check raw_data row, if zero, raise error: data not available
 		if raw_data.shape[0] == 0:
 			raise ValueError(f'No data available between {startdate} and {enddate}')
 		
-		top_stockcodes = pd.DataFrame()
+		top_stockcodes:pd.DataFrame = pd.DataFrame()
 		top_stockcodes['pricecorrel'] = raw_data\
 			.groupby('code').diff().groupby('code')[["close","netvol"]]\
 			.corr(method='pearson').iloc[0::2,-1].droplevel(1)
@@ -782,6 +783,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		enddate = raw_data.index.get_level_values('date').max()
 		bar_range = int(raw_data.groupby(level='code').size().max())
 
+		assert isinstance(startdate, datetime.date)
 		return top_stockcodes, startdate, enddate, bar_range
 
 class ScreenerVWAP(ScreenerBase):
@@ -833,19 +835,29 @@ class ScreenerVWAP(ScreenerBase):
 			dbs = dbs,
 		)
 
-		self.screener_vwap_criteria = screener_vwap_criteria
-		self.n_stockcodes = n_stockcodes
-		self.percentage_range = percentage_range
-		self.period_vwap = period_vwap
+		self.screener_vwap_criteria: Literal[
+			dp.ScreenerList.vwap_rally,
+			dp.ScreenerList.vwap_around,
+			dp.ScreenerList.vwap_breakout,
+			dp.ScreenerList.vwap_breakdown
+			] = screener_vwap_criteria
+		self.n_stockcodes: int = n_stockcodes
+		self.percentage_range: float | None = percentage_range
+		self.period_vwap: int | None = period_vwap
 
 	async def screen(self) -> ScreenerVWAP:
 		# Get default param: self.period_mf, self.period_pricecorrel, self.screener_min_value, self.screener_min_frequency, self.screener_min_prop, self.bar_range
 		# Get processed self.startdate, self.filtered_stockcodes
 		await super()._fit_base(predata='vwap')
 		assert isinstance(self.period_vwap, int), 'period_vwap must be int'
-		assert isinstance(self.percentage_range, float), f'percentage_range must be float'
+		assert isinstance(self.percentage_range, float), 'percentage_range must be float'
 
 		# Get self.raw_data, and update self.startdate, self.enddate
+		self.startdate: datetime.date
+		self.enddate: datetime.date
+		self.bar_range: int
+		self.raw_data: pd.DataFrame
+
 		self.startdate, self.enddate, self.bar_range, self.raw_data = await self._vwap_prep(
 			startdate=self.startdate,
 			enddate=self.enddate,
@@ -855,6 +867,7 @@ class ScreenerVWAP(ScreenerBase):
 			dbs=self.dbs)
 
 		# Go to get top codes for each screener_vwap_criteria
+		stocklist:list
 		if self.screener_vwap_criteria == dp.ScreenerList.vwap_rally:
 			stocklist = await self._get_vwap_rally(raw_data=self.raw_data)
 		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_around:
@@ -867,10 +880,12 @@ class ScreenerVWAP(ScreenerBase):
 			raise ValueError(f'Invalid screener_vwap_criteria: {self.screener_vwap_criteria}')
 		
 		# Get data from stocklist
+		self.top_data:pd.DataFrame
 		self.stocklist, self.top_data = await self._get_data_from_stocklist(
 			raw_data=self.raw_data, stocklist=stocklist, n_stockcodes=self.n_stockcodes)
 
 		# Compile data for top_stockcodes from stocklist and top_data
+		self.top_stockcodes:pd.DataFrame
 		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
 		self.top_stockcodes['mf'] = self.top_data['netval'].groupby(level='code').sum()
 		self.top_stockcodes = self.top_stockcodes.sort_values('mf', ascending=False)

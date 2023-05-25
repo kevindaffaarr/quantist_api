@@ -32,10 +32,11 @@ class StockPorto():
         The risk_aversion number is adjusted by reward-to-risk ratio to output the lot and value sizing of the portofolio
         """
         # Calculate reward-to-risk ratio
+        rtr:float
         if price_target is not None and price_cl is not None:
-            rtr:float = (price_target - price_current) / (price_cl - price_current)
+            rtr = (price_target - price_current) / (price_cl - price_current)
         else:
-            rtr:float = 1
+            rtr = 1
         
         # Calculate adjusted risk_aversion
         adj_risk_aversion:float = self.risk_aversion/100 * rtr
