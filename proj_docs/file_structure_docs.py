@@ -21,3 +21,33 @@
 		├── fastapi_docs.py
 		└── file_structure_docs.py # This File
 """
+
+"""
+==========
+Package Management
+==========
+
+pip install pipdeptree
+pipdeptree
+
+pip install --upgrade --upgrade-strategy eager -r requirements.txt
+pip freeze > requirements.txt
+
+Main Package (Prod):
+python-dateutil
+numpy
+pandas
+scikit-learn
+SQLAlchemy
+google-cloud-bigquery
+sqlalchemy-bigquery
+pydantic
+gunicorn
+fastapi
+plotly
+kaleido
+
+python-dateutil numpy pandas scikit-learn SQLAlchemy google-cloud-bigquery sqlalchemy-bigquery pydantic gunicorn fastapi plotly kaleido
+
+"""
+
