@@ -146,6 +146,7 @@ class StockBFFull():
 			# Get broker flow parameters using correlation method
 			self.selected_broker, self.optimum_n_selected_cluster, self.optimum_corr, self.broker_features = \
 				await self.__get_bf_parameters(
+					startdate=self.startdate,
 					raw_data_close=raw_data_full["close"],
 					raw_data_broker_nval=raw_data_broker_nval,
 					raw_data_broker_sumval=raw_data_broker_sumval,
@@ -531,6 +532,7 @@ class StockBFFull():
 		return pd.DataFrame(df_std, index=df.index, columns=df.columns)
 
 	async def __get_bf_parameters(self,
+		startdate: datetime.date,
 		raw_data_close: pd.Series,
 		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
@@ -542,11 +544,11 @@ class StockBFFull():
 		stepup_n_cluster_threshold: float = 0.05,
 		) -> tuple[list[str], int, float, pd.DataFrame]:
 
-		# Delete the first self.preoffset_period_param rows from raw_data
-		raw_data_close = raw_data_close.iloc[self.preoffset_period_param:]
-		raw_data_broker_nval = raw_data_broker_nval.iloc[self.preoffset_period_param:,:]
-		raw_data_broker_sumval = raw_data_broker_sumval.iloc[self.preoffset_period_param:,:]
-
+		# Trim raw_data to only >= startdate
+		raw_data_close = raw_data_close.loc[startdate:]
+		raw_data_broker_nval = raw_data_broker_nval.loc[startdate:]
+		raw_data_broker_sumval = raw_data_broker_sumval.loc[startdate:]
+		
 		# Only get third quartile of raw_data so not over-fitting
 		# length = len(raw_data_close)
 		# start_index = int(length*training_start_index)
