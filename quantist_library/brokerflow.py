@@ -104,6 +104,7 @@ class StockBFFull():
 		assert isinstance(self.pow_medium_prop, int), "pow_medium_prop must be int"
 		assert isinstance(self.pow_medium_pricecorrel, int), "pow_medium_pricecorrel must be int"
 		assert isinstance(self.pow_medium_mapricecorrel, int), "pow_medium_mapricecorrel must be int"
+		assert isinstance(self.startdate, datetime.date), "startdate must be datetime.date"
 
 		# Check Does Stock Code is available in database if self.stockcode is not "composite"
 		if self.stockcode != "composite":
