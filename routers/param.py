@@ -32,8 +32,13 @@ async def get_list_code(dbs: db.Session, list_category: dp.ListCategory = dp.Lis
 # ==========
 @router.get("/dataparam", response_model=list[dp.DataParam])
 @timeit
-async def get_dataparam(dbs: db.Session = Depends(db.get_dbs)):
-	return dbs.query(db.DataParam).all()
+async def get_dataparam(key:str|None = None, dbs: db.Session = Depends(db.get_dbs)):
+	if key is None:
+		return dbs.query(db.DataParam).all()
+	if key:
+		return dbs.query(db.DataParam).filter(db.DataParam.param == key).all()
+	
+	return None
 
 @router.get("/list/{list_category}", response_model=list[dp.ListCode], response_model_exclude_unset=True)
 @timeit
