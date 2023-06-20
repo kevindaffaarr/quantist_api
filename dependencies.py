@@ -11,7 +11,7 @@ class DataParam(BaseModel):
 	value: str
 
 	class Config:
-		orm_mode = True
+		from_attributes = True
 
 class ListCode(BaseModel):
 	index: int
@@ -22,7 +22,7 @@ class ListCode(BaseModel):
 	foreignbuyval: Decimal | None = None
 
 	class Config:
-		orm_mode = True
+		from_attributes = True
 
 # ==========
 # Metadata Tags
