@@ -8,6 +8,8 @@ import dependencies as dp
 from quantist_library import foreignflow as ff, brokerflow as bf, holdingcomposition as hc
 from quantist_library import genchart
 
+pd.options.mode.copy_on_write = True
+
 class WhaleFlow():
 	def __init__(self,
 		analysis_method: dp.AnalysisMethod,

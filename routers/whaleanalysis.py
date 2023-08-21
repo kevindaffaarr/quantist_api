@@ -2,7 +2,6 @@ from typing import Literal
 from io import BytesIO
 import datetime
 import zipfile
-import pandas as pd
 from fastapi import APIRouter, status, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 

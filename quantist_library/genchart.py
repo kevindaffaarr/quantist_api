@@ -9,6 +9,8 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import dependencies as dp
 
+pd.options.mode.copy_on_write = True
+
 def html_wrap(text:str, width:int = 16, n_lines:int = 2):
 	text_arr = textwrap.wrap(text=text, width=width)
 	text_arr = text_arr[0:n_lines]

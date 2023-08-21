@@ -9,6 +9,8 @@ import database as db
 import dependencies as dp
 from quantist_library import genchart
 
+pd.options.mode.copy_on_write = True
+
 class StockFFFull():
 	def __init__(self,
 		stockcode: str | None = None,

@@ -8,6 +8,8 @@ from sqlalchemy.sql import func
 import database as db
 import dependencies as dp
 
+pd.options.mode.copy_on_write = True
+
 class HoldingComposition():
 	"""
 	Input: stockcode, date range, categorization
