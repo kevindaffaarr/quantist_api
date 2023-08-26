@@ -2,6 +2,7 @@ import os
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import ORJSONResponse
 
 from routers import whaleanalysis, param
 from dependencies import Tags
@@ -39,6 +40,7 @@ Consists of high-end analysis tools based on data with top-down analysis:
 
 # INITIATE APP
 app = FastAPI(
+	default_response_class=ORJSONResponse,
 	debug=DEBUG_STATUS,
 	dependencies=[Depends(get_api_key)],
 	title="quantist_api",
