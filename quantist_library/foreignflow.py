@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Literal
+from fastapi_globals import g
+
 import datetime
 from dateutil.relativedelta import relativedelta
 import pandas as pd
@@ -57,12 +59,18 @@ class StockFFFull():
 		if self.stockcode == 'composite':
 			self.type = 'composite'
 		else:
-			qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
-			row = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
-			if len(row) != 0:
-				self.type = 'stock'
+			if "g" in globals() and hasattr(g, "LIST_STOCK") and isinstance(g.LIST_STOCK, pd.DataFrame):
+				if self.stockcode in g.LIST_STOCK["code"].values:
+					self.type = 'stock'
+				else:
+					raise KeyError("There is no such stock code in the database.")
 			else:
-				raise KeyError("There is no such stock code in the database.")
+				qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
+				row = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
+				if len(row) != 0:
+					self.type = 'stock'
+				else:
+					raise KeyError("There is no such stock code in the database.")
 		
 		# Data Parameter
 		default_months_range = int(default_ff['default_months_range']) if self.startdate is None else 0
@@ -103,14 +111,17 @@ class StockFFFull():
 		# self.chart(media_type="json")
 
 		return self
-		
-	async def __get_default_ff(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
 
-		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-			.filter((db.DataParam.param.like("default_ff_%")) | \
-				(db.DataParam.param.like("default_stockcode")) | \
-				(db.DataParam.param.like("default_months_range")))
-		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+	async def __get_default_ff(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
+		# Check does g.DEFAULT_PARAM is available and is a pandas series
+		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
+			return g.DEFAULT_PARAM
+		else:
+			qry = dbs.query(db.DataParam.param, db.DataParam.value)\
+				.filter((db.DataParam.param.like("default_ff_%")) | \
+					(db.DataParam.param.like("default_stockcode")) | \
+					(db.DataParam.param.like("default_months_range")))
+			return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 	async def __get_stock_raw_data(self,
 		dbs:db.Session = next(db.get_dbs()),
@@ -408,11 +419,15 @@ class ForeignRadar():
 		# self.chart(media_type="json")
 
 		return self
-		
+
 	async def _get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
-		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-			.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")) | (db.DataParam.param.like("default_ff_%")))
-		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+		# Check does g.DEFAULT_PARAM is available and is a pandas series
+		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
+			default_radar = g.DEFAULT_PARAM
+		else:
+			qry = dbs.query(db.DataParam.param, db.DataParam.value)\
+				.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")) | (db.DataParam.param.like("default_ff_%")))
+			default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 		
 		self.period_mf = int(default_radar['default_radar_period_mf']) if self.startdate is None else None # type: ignore
 		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.startdate is None else None # type: ignore

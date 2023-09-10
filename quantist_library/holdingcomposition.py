@@ -1,4 +1,5 @@
 from __future__ import annotations
+from fastapi_globals import g
 
 import datetime
 from dateutil.relativedelta import relativedelta
@@ -46,9 +47,14 @@ class HoldingComposition():
 			raise ValueError("Enddate must be <= last month")
 	
 	async def __get_param(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
-		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-			.filter(db.DataParam.param == 'default_months_range')
-		return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")["value"])
+		# Check does g.DEFAULT_PARAM is available and is a pandas series
+		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
+			default_param = g.DEFAULT_PARAM
+		else:
+			qry = dbs.query(db.DataParam.param, db.DataParam.value)\
+				.filter(db.DataParam.param == 'default_months_range')
+			default_param = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")["value"])
+		return default_param
 
 	async def __get_data_ksei(self, dbs:db.Session = next(db.get_dbs())) -> pd.DataFrame:
 		"""

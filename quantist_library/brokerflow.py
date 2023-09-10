@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Literal
 import gc
+from fastapi_globals import g
 
 import datetime
 import pandas as pd
@@ -110,10 +111,14 @@ class StockBFFull():
 
 		# Check Does Stock Code is available in database if self.stockcode is not "composite"
 		if self.stockcode != "composite":
-			qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
-			row:pd.DataFrame = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
-			if len(row) == 0:
-				raise KeyError("There is no such stock code in the database.")
+			if "g" in globals() and hasattr(g, "LIST_STOCK") and isinstance(g.LIST_STOCK, pd.DataFrame):
+				if self.stockcode not in g.LIST_STOCK["code"].values:
+					raise KeyError("There is no such stock code in the database.")
+			else:
+				qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
+				row:pd.DataFrame = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
+				if len(row) == 0:
+					raise KeyError("There is no such stock code in the database.")
 
 		# Get full stockdatatransaction
 		raw_data_full:pd.DataFrame
@@ -189,12 +194,16 @@ class StockBFFull():
 		return self
 
 	async def __get_default_bf(self,dbs: db.Session = next(db.get_dbs())) -> pd.Series:
-		# Get Default Broker Flow
-		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-			.filter((db.DataParam.param.like("default_bf_%")) | \
-				(db.DataParam.param.like("default_stockcode")) | \
-				(db.DataParam.param.like("default_months_range")))
-		default_bf = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+		# Check does g.DEFAULT_PARAM is available and is a pandas series
+		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
+			default_bf = g.DEFAULT_PARAM
+		else:
+			# Get Default Broker Flow
+			qry = dbs.query(db.DataParam.param, db.DataParam.value)\
+				.filter((db.DataParam.param.like("default_bf_%")) | \
+					(db.DataParam.param.like("default_stockcode")) | \
+					(db.DataParam.param.like("default_months_range")))
+			default_bf = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 		
 		# Default stock is parameterized, may become a branding or endorsement option
 		self.stockcode = (str(default_bf['default_stockcode']) if self.stockcode is None else self.stockcode).lower()
@@ -1080,14 +1089,18 @@ class WhaleRadar():
 		return self
 	
 	async def _get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
-		qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-			.filter(
-				(db.DataParam.param.like("default_months_range")) | \
-				(db.DataParam.param.like("default_radar_%")) | \
-				(db.DataParam.param.like("default_screener_%")) | \
-				(db.DataParam.param.like("default_bf_%"))
-				)
-		default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+		# Check does g.DEFAULT_PARAM is available and is a pandas series
+		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
+			default_radar = g.DEFAULT_PARAM
+		else:
+			qry = dbs.query(db.DataParam.param, db.DataParam.value)\
+				.filter(
+					(db.DataParam.param.like("default_months_range")) | \
+					(db.DataParam.param.like("default_radar_%")) | \
+					(db.DataParam.param.like("default_screener_%")) | \
+					(db.DataParam.param.like("default_bf_%"))
+					)
+			default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
 
 		# Data Parameter
 		self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100  # type: ignore

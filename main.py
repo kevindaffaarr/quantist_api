@@ -1,14 +1,18 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
+from fastapi_globals import g, GlobalsMiddleware
 
 from routers import whaleanalysis, param
 from dependencies import Tags
 
 from auth import get_api_key
 from lib import timeit
+
+from quantist_library import flowhelper
 
 ENV_OR_PROD = os.getenv("ENV_OR_PROD", "DEV")
 DEBUG_STATUS = True if ENV_OR_PROD == "DEV" else False
@@ -38,11 +42,24 @@ Consists of high-end analysis tools based on data with top-down analysis:
 * Behaviour: supply & demand, momentum, trend, time
 """
 
+# Get Default Param
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+	# Load default_param
+	DEFAULT_PARAM = await flowhelper.get_default_param()
+	LIST_STOCK = await flowhelper.get_list_stock()
+	g.set_default("DEFAULT_PARAM", DEFAULT_PARAM)
+	g.set_default("LIST_STOCK", LIST_STOCK)
+	yield
+	# Release default_param
+	del DEFAULT_PARAM
+
 # INITIATE APP
 app = FastAPI(
 	default_response_class=ORJSONResponse,
 	debug=DEBUG_STATUS,
 	dependencies=[Depends(get_api_key)],
+	lifespan=lifespan,
 	title="quantist_api",
 	description=DESCRIPTION,
 	version="0.0.0",
@@ -63,6 +80,7 @@ app.add_middleware(
 	allow_methods=["GET"],
 	allow_headers=["*"]
 )
+app.add_middleware(GlobalsMiddleware)
 
 # INCLUDE ROUTER
 app.include_router(whaleanalysis.router)
