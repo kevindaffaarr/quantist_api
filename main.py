@@ -1,4 +1,7 @@
 import os
+ENV_OR_PROD = os.getenv("ENV_OR_PROD", "DEV")
+DEBUG_STATUS = True if ENV_OR_PROD == "DEV" else False
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
@@ -12,10 +15,7 @@ from dependencies import Tags
 from auth import get_api_key
 from lib import timeit
 
-from quantist_library import flowhelper
-
-ENV_OR_PROD = os.getenv("ENV_OR_PROD", "DEV")
-DEBUG_STATUS = True if ENV_OR_PROD == "DEV" else False
+import database as db
 
 """
 =============================
@@ -46,8 +46,8 @@ Consists of high-end analysis tools based on data with top-down analysis:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 	# Load default_param
-	DEFAULT_PARAM = await flowhelper.get_default_param()
-	LIST_STOCK = await flowhelper.get_list_stock()
+	DEFAULT_PARAM = await db.get_default_param()
+	LIST_STOCK = await db.get_list_stock()
 	g.set_default("DEFAULT_PARAM", DEFAULT_PARAM)
 	g.set_default("LIST_STOCK", LIST_STOCK)
 	yield

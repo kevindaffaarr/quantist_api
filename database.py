@@ -9,6 +9,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import Column, Integer, String, Date, Numeric
 from sqlalchemy.orm import Session
 
+import pandas as pd
+
 env: str = os.getenv("ENV_PROD_DEV", "DEV")
 
 # Create Database SQLAlchemy Engine
@@ -197,3 +199,20 @@ class KseiKepemilikanEfek(Base):
 
 # INITIATE DATABASE
 # Base.metadata.create_all(bind=engine)
+
+# ==========
+# Flow Helper
+# ==========
+async def get_default_param() -> pd.Series:
+	dbs: Session = next(get_dbs())
+	qry = dbs.query(DataParam.param, DataParam.value)
+	DEFAULT_PARAM = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value']) # type: ignore
+
+	return DEFAULT_PARAM
+
+async def get_list_stock() -> pd.DataFrame:
+	dbs: Session = next(get_dbs())
+	qry = dbs.query(ListStock.code)
+	list_stock:pd.DataFrame = pd.read_sql(sql=qry.statement, con=dbs.bind) # type: ignore
+
+	return list_stock
