@@ -10,6 +10,7 @@ from sqlalchemy.sql import func, desc, asc
 import database as db
 import dependencies as dp
 from quantist_library import genchart
+import lib
 
 pd.options.mode.copy_on_write = True
 
@@ -103,6 +104,8 @@ class StockFFFull():
 			self.pow_medium_pricecorrel,self.pow_medium_mapricecorrel,\
 			preoffset_period_param
 			)
+		
+		self.nbins = await lib.calc_bins(self.wf_indicators)
 
 		# Not to be ran inside init, but just as a method that return plotly fig
 		# self.chart(media_type="json")
@@ -302,7 +305,7 @@ class StockFFFull():
 
 		# End of Method: Return Processed Raw Data to FF Indicators
 		return raw_data.loc[self.startdate:self.enddate]
-	
+
 	async def chart(self,media_type:str | None = None):
 		assert self.stockcode is not None
 		fig = await genchart.quantist_stock_chart(
@@ -313,6 +316,7 @@ class StockFFFull():
 			period_pricecorrel=self.period_pricecorrel,
 			period_mapricecorrel=self.period_mapricecorrel,
 			period_vwap=self.period_vwap,
+			nbins = self.nbins
 			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)

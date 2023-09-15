@@ -19,6 +19,7 @@ from sqlalchemy.sql import func
 import database as db
 import dependencies as dp
 from quantist_library import genchart
+import lib
 
 pd.options.mode.copy_on_write = True
 
@@ -188,6 +189,8 @@ class StockBFFull():
 			pow_medium_mapricecorrel = self.pow_medium_mapricecorrel,
 			preoffset_period_param = self.preoffset_period_param,
 		)
+
+		self.nbins = await lib.calc_bins(self.wf_indicators)
 
 		return self
 
@@ -873,6 +876,7 @@ class StockBFFull():
 			selected_broker=self.selected_broker,
 			optimum_n_selected_cluster=self.optimum_n_selected_cluster,
 			optimum_corr=self.optimum_corr,
+			nbins = self.nbins
 			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)

@@ -1,5 +1,6 @@
 from functools import wraps
 from time import perf_counter
+import pandas as pd
 
 # import asyncio
 # import nest_asyncio
@@ -24,3 +25,18 @@ def timeit(func):
 # def resolve_async(func_with_args):
 # 	loop = asyncio.get_event_loop()
 # 	return loop.run_until_complete(func_with_args)
+
+# Determine the number of nbins by Freedman-Diaconis rule
+async def calc_bins(data:pd.DataFrame) -> int:
+    # Calculate IQR from data["close"]
+    q1 = (data["close"]).quantile(0.25)
+    q3 = (data["close"]).quantile(0.75)
+    iqr = q3 - q1
+    # State the number of data
+    n = len(data["netval"])
+    # Calculate the bin width
+    bin_width = 2*iqr/(n**(1/3))
+    # Calculate the number of nbins
+    data_range = data["close"].max() - data["close"].min()
+    nbins = int(data_range/bin_width)
+    return nbins

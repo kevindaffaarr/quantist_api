@@ -30,6 +30,7 @@ async def quantist_stock_chart(
 	selected_broker: list[str] | None = None,
 	optimum_n_selected_cluster: int | None = None,
 	optimum_corr: float | None = None,
+	nbins:int | None = None,
 	) -> go.Figure:
 	if analysis_method == dp.AnalysisMethod.foreign:
 		abv = "F"
@@ -38,9 +39,10 @@ async def quantist_stock_chart(
 		abv = "W"
 		method = "Whale"
 	
-	if optimum_corr is None:
-		optimum_corr = np.nan
-		
+	optimum_corr = np.nan if optimum_corr is None else optimum_corr
+	nbins = 100 if nbins is None else nbins
+	nbins += 1
+
 	# Make Subplots
 	if holding_composition is not None:
 		fig = make_subplots(rows=2, cols=2, shared_xaxes=True,
@@ -122,19 +124,24 @@ async def quantist_stock_chart(
 	# Whale Value Profile
 	assert isinstance(fig.data, tuple)
 	val_profile_index = len(fig.data)
-	fig.add_trace(go.Histogram(
-		x=wf_indicators['netval'],
-		y=wf_indicators['close'],
-		histfunc="sum",
-		name="Net Value Profile",orientation="h",opacity=0.1,
-		legendrank=8),
-		row=1,col=1,secondary_y=True)
-	bins=np.arange(fig.full_figure_for_development(warn=False).data[val_profile_index].ybins.start, # type:ignore
-		fig.full_figure_for_development(warn=False).data[val_profile_index].ybins.end, # type:ignore
-		fig.full_figure_for_development(warn=False).data[val_profile_index].ybins.size) # type:ignore
-	bins = pd.Series(bins)
+	size = (wf_indicators['close'].max()-wf_indicators['close'].min())/nbins
+	bins = pd.Series(np.arange(wf_indicators['close'].min(),wf_indicators['close'].max(),size))
 	hist_bar = wf_indicators.groupby(pd.cut(wf_indicators['close'].to_numpy(),bins=bins))['netval'].sum() # type:ignore
-	fig.data[val_profile_index].update(marker=dict(color=np.where(hist_bar<0,"tomato","cyan")),xaxis=f'x{val_profile_index}') # type:ignore
+	bins = bins + size/2
+
+	# Create horizontal barchart with zero distance so like histogram
+	fig.add_trace(go.Bar(
+		x=hist_bar.values,
+		y=bins.values,
+		orientation='h',
+		name=f"Net Value Profile",
+		marker_color=np.where(hist_bar<0,"tomato","cyan"),
+		opacity=0.2,
+		legendrank=7,
+		),
+		row=1,col=1,secondary_y=True,
+	)
+	fig.data[val_profile_index].update(xaxis=f'x{val_profile_index}') # type:ignore
 
 	# UPDATE AXES
 	# Column 1

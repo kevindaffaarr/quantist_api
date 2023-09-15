@@ -70,6 +70,7 @@ class WhaleFlow():
 	async def _gen_full_chart(self,
 		wf_indicators:pd.DataFrame,
 		media_type: dp.ListMediaType | None = None,
+		nbins: int | None = None,
 		selected_broker: list[str] | None = None,
 		optimum_n_selected_cluster: int | None = None,
 		optimum_corr: float | None = None,
@@ -87,6 +88,7 @@ class WhaleFlow():
 			selected_broker=selected_broker,
 			optimum_n_selected_cluster=optimum_n_selected_cluster,
 			optimum_corr=optimum_corr,
+			nbins=nbins,
 			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)
@@ -164,6 +166,7 @@ class ForeignFlow(WhaleFlow, ff.StockFFFull):
 		return await WhaleFlow._gen_full_chart(self,
 			wf_indicators=self.wf_indicators,
 			media_type=media_type,
+			nbins=self.nbins,
 			)
 
 
@@ -266,4 +269,5 @@ class BrokerFlow(WhaleFlow, bf.StockBFFull):
 			selected_broker=self.selected_broker,
 			optimum_n_selected_cluster=self.optimum_n_selected_cluster,
 			optimum_corr=self.optimum_corr,
+			nbins=self.nbins,
 			)
