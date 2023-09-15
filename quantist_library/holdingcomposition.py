@@ -51,9 +51,7 @@ class HoldingComposition():
 		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
 			default_param = g.DEFAULT_PARAM
 		else:
-			qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-				.filter(db.DataParam.param == 'default_months_range')
-			default_param = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")["value"])
+			default_param = await db.get_default_param()
 		return default_param
 
 	async def __get_data_ksei(self, dbs:db.Session = next(db.get_dbs())) -> pd.DataFrame:
@@ -82,7 +80,7 @@ class HoldingComposition():
 				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_sc).label('foreign_sc'),
 				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_fd).label('foreign_fd'),
 				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_ot).label('foreign_ot'),
-				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_total).label('foreign_total'),
+				func.sum(db.KseiKepemilikanEfek.price * db.KseiKepemilikanEfek.foreign_total).label('foreign_total'), # type: ignore
 			).distinct(db.KseiKepemilikanEfek.date)\
 			.group_by(db.KseiKepemilikanEfek.date)\
 			.filter(db.KseiKepemilikanEfek.sectype == 'equity')\
@@ -91,14 +89,12 @@ class HoldingComposition():
 		if self.stockcode != "composite":
 			qry = qry.filter(db.KseiKepemilikanEfek.code == self.stockcode)
 			
-		return pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).set_index("date").sort_index()
+		return pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).set_index("date").sort_index() # type: ignore
 	
 	async def __get_data_scripless(self, list_date:list, dbs:db.Session = next(db.get_dbs())) -> pd.DataFrame:
 		# Query table stockdata: tradebleshares divided by listedshares for filtercode each list_date
-		qry = dbs.query(db.StockData.date, db.StockData.tradebleshares, db.StockData.listedshares)\
-			.filter(db.StockData.code == self.stockcode)\
-			.filter(db.StockData.date.in_(list_date))
-		data_scripless = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).set_index("date").sort_index()
+		qry = dbs.query(db.StockData.date, db.StockData.tradebleshares, db.StockData.listedshares).filter(db.StockData.code == self.stockcode).filter(db.StockData.date.in_(list_date)) # type: ignore
+		data_scripless = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).set_index("date").sort_index() # type: ignore
 		data_scripless["scripless_ratio"] = data_scripless["tradebleshares"] / data_scripless["listedshares"]
 		return data_scripless[["scripless_ratio"]]
 

@@ -60,18 +60,15 @@ class StockFFFull():
 			self.type = 'composite'
 		else:
 			if "g" in globals() and hasattr(g, "LIST_STOCK") and isinstance(g.LIST_STOCK, pd.DataFrame):
-				if self.stockcode in g.LIST_STOCK["code"].values:
-					self.type = 'stock'
-				else:
-					raise KeyError("There is no such stock code in the database.")
+				list_stock:pd.DataFrame = g.LIST_STOCK
 			else:
-				qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
-				row = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
-				if len(row) != 0:
-					self.type = 'stock'
-				else:
-					raise KeyError("There is no such stock code in the database.")
-		
+				list_stock:pd.DataFrame = await db.get_list_stock()
+			
+			if self.stockcode in list_stock["code"].values:
+				self.type = 'stock'
+			else:
+				raise KeyError("There is no such stock code in the database.")
+			
 		# Data Parameter
 		default_months_range = int(default_ff['default_months_range']) if self.startdate is None else 0
 		self.enddate = datetime.date.today() if self.enddate is None else self.enddate
@@ -117,11 +114,8 @@ class StockFFFull():
 		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
 			return g.DEFAULT_PARAM
 		else:
-			qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-				.filter((db.DataParam.param.like("default_ff_%")) | \
-					(db.DataParam.param.like("default_stockcode")) | \
-					(db.DataParam.param.like("default_months_range")))
-			return pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+			default_param = await db.get_default_param()
+			return default_param
 
 	async def __get_stock_raw_data(self,
 		dbs:db.Session = next(db.get_dbs()),
@@ -146,14 +140,13 @@ class StockFFFull():
 			db.StockData.value,
 			db.StockData.foreignbuy,
 			db.StockData.foreignsell
-		).filter(db.StockData.code == stockcode)
+		).filter(db.StockData.code == stockcode) # type: ignore
 		
 		# Main Query
 		qry_main = qry.filter(db.StockData.date.between(startdate, enddate)).order_by(db.StockData.date.asc())
 		
 		# Main Query Fetching
-		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
-			.reset_index(drop=True).set_index("date")
+		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index("date") # type: ignore
 		
 		# Check how many row is returned
 		if raw_data_main.shape[0] == 0:
@@ -169,11 +162,10 @@ class StockFFFull():
 			.order_by(db.StockData.date.desc())\
 			.limit(preoffset_period_param)\
 			.subquery()
-		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc())
+		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc()) # type: ignore
 
 		# Pre-Data Query Fetching
-		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"])\
-			.reset_index(drop=True).set_index('date')
+		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index('date') # type: ignore
 
 		# Concatenate Pre and Main Query
 		raw_data = pd.concat([raw_data_pre,raw_data_main])
@@ -214,8 +206,7 @@ class StockFFFull():
 		qry_main = qry.filter(db.IndexData.date.between(startdate, enddate)).order_by(db.IndexData.date.asc())
 		
 		# Main Query Fetching
-		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
-			.reset_index(drop=True).set_index('date')
+		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index('date') # type: ignore
 		
 		# Check how many row is returned
 		if raw_data_main.shape[0] == 0:
@@ -230,11 +221,10 @@ class StockFFFull():
 		qry_pre = qry.filter(db.IndexData.date < startdate)\
 			.order_by(db.IndexData.date.desc())\
 			.limit(preoffset_period_param).subquery()
-		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc())
+		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc()) # type: ignore
 
 		# Pre-Data Query Fetching
-		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"])\
-			.reset_index(drop=True).set_index('date')
+		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index('date') # type: ignore
 
 		# Concatenate Pre and Main Query
 		raw_data = pd.concat([raw_data_pre,raw_data_main])
@@ -425,9 +415,7 @@ class ForeignRadar():
 		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
 			default_radar = g.DEFAULT_PARAM
 		else:
-			qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-				.filter((db.DataParam.param.like("default_radar_%")) | (db.DataParam.param.like("default_screener_%")) | (db.DataParam.param.like("default_ff_%")))
-			default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+			default_radar = await db.get_default_param()
 		
 		self.period_mf = int(default_radar['default_radar_period_mf']) if self.startdate is None else None # type: ignore
 		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.startdate is None else None # type: ignore
@@ -461,10 +449,10 @@ class ForeignRadar():
 					(db.ListStock.foreignbuyval > 0) &
 					(db.ListStock.foreignsellval > 0) &
 					(((db.ListStock.foreignsellval+db.ListStock.foreignbuyval)/(db.ListStock.value*2)) > (screener_min_prop/100)) &
-					(db.ListStock.code.not_in(stockcode_excludes_lower)))
+					(db.ListStock.code.not_in(stockcode_excludes_lower))) # type: ignore
 		
 		# Query Fetching: filtered_stockcodes
-		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code'])
+		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code']) # type: ignore
 
 	async def __get_stocks_raw_data(self,
 		startdate: datetime.date | None = None,
@@ -503,8 +491,7 @@ class ForeignRadar():
 			.order_by(db.StockData.code.asc(),db.StockData.date.asc())
 			
 		# Query Fetching: stocks raw data
-		return pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"])\
-			.reset_index(drop=True)
+		return pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"]).reset_index(drop=True) # type: ignore
 	
 	async def __get_composite_raw_data(self,
 		startdate:datetime.date | None =None,
@@ -545,8 +532,7 @@ class ForeignRadar():
 			.order_by(db.IndexData.date.asc())
 
 		# Query Fetching: composite raw data
-		composite_raw_data = pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"])\
-			.reset_index(drop=True)
+		composite_raw_data = pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"]).reset_index(drop=True) # type: ignore
 		return composite_raw_data
 
 	async def calc_radar_indicators(self,
@@ -761,8 +747,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 			qry = qry.filter(db.StockData.date.between(startdate,enddate))
 
 		# Query fetching using pandas
-		raw_data:pd.DataFrame = pd.read_sql(sql=qry.statement, con=dbs.bind).reset_index(drop=True)\
-			.sort_values(['code','date']).set_index(['code','date'])
+		raw_data:pd.DataFrame = pd.read_sql(sql=qry.statement, con=dbs.bind).reset_index(drop=True).sort_values(['code','date']).set_index(['code','date']) # type: ignore
 
 		# Check raw_data row, if zero, raise error: data not available
 		if raw_data.shape[0] == 0:
@@ -931,8 +916,7 @@ class ScreenerVWAP(ScreenerBase):
 		.order_by(db.StockData.code, db.StockData.date)
 		
 		# Main Query Fetching
-		raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True)\
-			.sort_values(['code','date']).set_index(['code','date'])
+		raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).sort_values(['code','date']).set_index(['code','date']) # type: ignore
 		# Update startdate and enddate based on raw_data
 		startdate = raw_data.index.get_level_values('date').min().date()
 		enddate = raw_data.index.get_level_values('date').max().date()
@@ -944,7 +928,7 @@ class ScreenerVWAP(ScreenerBase):
 		.filter(db.StockData.date < startdate)\
 		.order_by(db.StockData.date.desc())\
 		.limit(period_vwap)
-		fetch = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True)
+		fetch = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True) # type: ignore
 		pre_startdate = fetch.iloc[:,0].min().date()
 		# Get pre-data for VWAP
 		qry = dbs.query(
@@ -958,8 +942,7 @@ class ScreenerVWAP(ScreenerBase):
 		.filter(db.StockData.date < startdate)\
 		.filter(db.StockData.date >= pre_startdate)\
 		.order_by(db.StockData.code, db.StockData.date)
-		pre_raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True)\
-			.sort_values(['code','date']).set_index(['code','date'])
+		pre_raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).sort_values(['code','date']).set_index(['code','date']) # type: ignore
 		
 		# Concat data
 		raw_data = pd.concat([pre_raw_data, raw_data], axis=0)

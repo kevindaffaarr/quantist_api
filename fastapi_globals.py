@@ -112,7 +112,7 @@ async def globals_middleware_dispatch(
     def _call_next() -> Awaitable[Response]:
         return call_next(request)
 
-    return await ctx.run(_call_next)
+    return await ctx.run(_call_next) # type: ignore
 
 
 class GlobalsMiddleware(BaseHTTPMiddleware):  # noqa

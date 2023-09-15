@@ -112,13 +112,11 @@ class StockBFFull():
 		# Check Does Stock Code is available in database if self.stockcode is not "composite"
 		if self.stockcode != "composite":
 			if "g" in globals() and hasattr(g, "LIST_STOCK") and isinstance(g.LIST_STOCK, pd.DataFrame):
-				if self.stockcode not in g.LIST_STOCK["code"].values:
-					raise KeyError("There is no such stock code in the database.")
+				list_stock:pd.DataFrame = g.LIST_STOCK
 			else:
-				qry = self.dbs.query(db.ListStock.code).filter(db.ListStock.code == self.stockcode)
-				row:pd.DataFrame = pd.read_sql(sql=qry.statement, con=self.dbs.bind)
-				if len(row) == 0:
-					raise KeyError("There is no such stock code in the database.")
+				list_stock:pd.DataFrame = await db.get_list_stock()
+			if self.stockcode not in list_stock["code"].values:
+				raise KeyError("There is no such stock code in the database.")
 
 		# Get full stockdatatransaction
 		raw_data_full:pd.DataFrame
@@ -198,12 +196,7 @@ class StockBFFull():
 		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
 			default_bf = g.DEFAULT_PARAM
 		else:
-			# Get Default Broker Flow
-			qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-				.filter((db.DataParam.param.like("default_bf_%")) | \
-					(db.DataParam.param.like("default_stockcode")) | \
-					(db.DataParam.param.like("default_months_range")))
-			default_bf = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+			default_bf = await db.get_default_param()
 		
 		# Default stock is parameterized, may become a branding or endorsement option
 		self.stockcode = (str(default_bf['default_stockcode']) if self.stockcode is None else self.stockcode).lower()
@@ -285,8 +278,7 @@ class StockBFFull():
 			.order_by(db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
-		raw_data_broker_full = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
-			.reset_index(drop=True).set_index("date")
+		raw_data_broker_full = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index("date") # type: ignore
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -316,7 +308,7 @@ class StockBFFull():
 				db.IndexData.lowest.label("low"),
 				db.IndexData.close,
 				db.IndexData.value,
-			).filter(db.IndexData.code == stockcode)
+			).filter(db.IndexData.code == stockcode) # type: ignore
 
 			qry_main = qry.filter(db.IndexData.date.between(startdate, enddate)).order_by(db.IndexData.date.asc())
 		else:
@@ -328,13 +320,12 @@ class StockBFFull():
 				db.StockData.low,
 				db.StockData.close,
 				db.StockData.value,
-			).filter(db.StockData.code == stockcode)
+			).filter(db.StockData.code == stockcode) # type: ignore
 
 			qry_main = qry.filter(db.StockData.date.between(startdate, enddate)).order_by(db.StockData.date.asc())
 
 		# Main Query Fetching
-		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"])\
-			.reset_index(drop=True).set_index('date')
+		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index('date') # type: ignore
 
 		# Check how many row is returned
 		if raw_data_main.shape[0] == 0:
@@ -356,11 +347,10 @@ class StockBFFull():
 				.order_by(db.StockData.date.desc())\
 				.limit(preoffset_period_param)\
 				.subquery()
-		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc())
+		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc()) # type: ignore
 
 		# Pre-Data Query Fetching
-		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"])\
-			.reset_index(drop=True).set_index('date')
+		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index('date') # type: ignore
 
 		# Concatenate Pre and Main Query
 		raw_data_full = pd.concat([raw_data_pre,raw_data_main])
@@ -1093,14 +1083,7 @@ class WhaleRadar():
 		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
 			default_radar = g.DEFAULT_PARAM
 		else:
-			qry = dbs.query(db.DataParam.param, db.DataParam.value)\
-				.filter(
-					(db.DataParam.param.like("default_months_range")) | \
-					(db.DataParam.param.like("default_radar_%")) | \
-					(db.DataParam.param.like("default_screener_%")) | \
-					(db.DataParam.param.like("default_bf_%"))
-					)
-			default_radar = pd.Series(pd.read_sql(sql=qry.statement, con=dbs.bind).set_index("param")['value'])
+			default_radar = await db.get_default_param()
 
 		# Data Parameter
 		self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100  # type: ignore
@@ -1137,10 +1120,10 @@ class WhaleRadar():
 		qry = dbs.query(db.ListStock.code)\
 			.filter((db.ListStock.value > screener_min_value) &
 					(db.ListStock.frequency > screener_min_frequency) &
-					(db.ListStock.code.not_in(stockcode_excludes_lower)))
+					(db.ListStock.code.not_in(stockcode_excludes_lower))) # type: ignore
 		
 		# Query Fetching: filtered_stockcodes
-		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code'])
+		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code']) # type: ignore
 	
 	# Get Net Val Sum Val Broker Transaction
 	async def __get_nvsv_broker_transaction(self,
@@ -1184,8 +1167,7 @@ class WhaleRadar():
 		.order_by(db.StockTransaction.code.asc(), db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
-		raw_data_broker_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])\
-			.reset_index(drop=True).set_index(["code","date"])
+		raw_data_broker_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index(["code","date"]) # type: ignore
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -1203,13 +1185,10 @@ class WhaleRadar():
 
 		# Check data availability if startdate is not None
 		if startdate is not None:
-			qry = dbs.query(db.StockData.code
-				).filter(db.StockData.code.in_(filtered_stockcodes.to_list())
-				).filter(db.StockData.date.between(startdate, enddate)
-				).group_by(db.StockData.code)
+			qry = dbs.query(db.StockData.code).filter(db.StockData.code.in_(filtered_stockcodes.to_list())).filter(db.StockData.date.between(startdate, enddate)).group_by(db.StockData.code) # type: ignore
 			
 			# Query Fetching
-			raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])
+			raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"]) # type: ignore
 
 			# Check how many row is returned
 			if raw_data.shape[0] == 0:
@@ -1233,8 +1212,7 @@ class WhaleRadar():
 			.order_by(db.StockData.code.asc(), db.StockData.date.asc())
 
 		# Main Query Fetching
-		raw_data_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"])\
-			.reset_index(drop=True).set_index(["code","date"])
+		raw_data_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index(["code","date"]) # type: ignore
 
 		# End of Method: Return or Assign Attribute
 		return raw_data_full

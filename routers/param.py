@@ -36,7 +36,7 @@ async def get_dataparam(key:str|None = None, dbs: db.Session = Depends(db.get_db
 	if key is None:
 		return dbs.query(db.DataParam).all()
 	if key:
-		return dbs.query(db.DataParam).filter(db.DataParam.param == key).all()
+		return dbs.query(db.DataParam).filter(db.DataParam.param == key).all() # type: ignore
 	
 	return None
 
