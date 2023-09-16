@@ -40,7 +40,7 @@ class Bin():
     async def fit(self, nbins:int | None = None) -> Bin:
         self.nbins = await self.calc_bins() if nbins is None else nbins
         self.size = (self.data['close'].max()-self.data['close'].min())/self.nbins
-        self.bins_range = pd.Series(np.arange(self.data['close'].min(),self.data['close'].max(),self.size))
+        self.bins_range = pd.Series(np.arange(self.data['close'].min()-self.size,self.data['close'].max()+self.size,self.size))
         self.hist_bar = self.data.groupby(pd.cut(self.data['close'].to_numpy(),bins=self.bins_range))['netval'].sum() # type:ignore
         self.bins_mid = self.bins_range + self.size/2
         return self
