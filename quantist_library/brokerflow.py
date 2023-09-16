@@ -190,7 +190,8 @@ class StockBFFull():
 			preoffset_period_param = self.preoffset_period_param,
 		)
 
-		self.nbins = await lib.calc_bins(self.wf_indicators)
+		self.bin_obj:lib.Bin = lib.Bin(data=self.wf_indicators)
+		self.bin_obj:lib.Bin = await self.bin_obj.fit()
 
 		return self
 
@@ -876,7 +877,7 @@ class StockBFFull():
 			selected_broker=self.selected_broker,
 			optimum_n_selected_cluster=self.optimum_n_selected_cluster,
 			optimum_corr=self.optimum_corr,
-			nbins = self.nbins
+			bin_obj = self.bin_obj,
 			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)

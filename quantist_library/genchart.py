@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import dependencies as dp
+import lib as lib
 
 pd.options.mode.copy_on_write = True
 
@@ -30,7 +31,7 @@ async def quantist_stock_chart(
 	selected_broker: list[str] | None = None,
 	optimum_n_selected_cluster: int | None = None,
 	optimum_corr: float | None = None,
-	nbins:int | None = None,
+	bin_obj:lib.Bin | None = None,
 	) -> go.Figure:
 	if analysis_method == dp.AnalysisMethod.foreign:
 		abv = "F"
@@ -40,8 +41,8 @@ async def quantist_stock_chart(
 		method = "Whale"
 	
 	optimum_corr = np.nan if optimum_corr is None else optimum_corr
-	nbins = 100 if nbins is None else nbins
-	nbins += 1
+	bin_obj = lib.Bin(data=wf_indicators) if bin_obj is None else bin_obj
+	bin_obj.nbins += 1
 
 	# Make Subplots
 	if holding_composition is not None:
@@ -124,24 +125,21 @@ async def quantist_stock_chart(
 	# Whale Value Profile
 	assert isinstance(fig.data, tuple)
 	val_profile_index = len(fig.data)
-	size = (wf_indicators['close'].max()-wf_indicators['close'].min())/nbins
-	bins = pd.Series(np.arange(wf_indicators['close'].min(),wf_indicators['close'].max(),size))
-	hist_bar = wf_indicators.groupby(pd.cut(wf_indicators['close'].to_numpy(),bins=bins))['netval'].sum() # type:ignore
-	bins = bins + size/2
 
 	# Create horizontal barchart with zero distance so like histogram
 	fig.add_trace(go.Bar(
-		x=hist_bar.values,
-		y=bins.values,
+		x=bin_obj.hist_bar.values,
+		y=bin_obj.bins_mid.values,
 		orientation='h',
 		name=f"Net Value Profile",
-		marker_color=np.where(hist_bar<0,"tomato","cyan"),
+		marker_color=np.where(bin_obj.hist_bar<0,"tomato","cyan"),
 		opacity=0.2,
 		legendrank=7,
 		),
 		row=1,col=1,secondary_y=True,
 	)
 	fig.data[val_profile_index].update(xaxis=f'x{val_profile_index}') # type:ignore
+	fig.update_layout(bargap=0)
 
 	# UPDATE AXES
 	# Column 1
@@ -167,8 +165,6 @@ async def quantist_stock_chart(
 	fig.update_xaxes(title_text="Scripless % | Date", row=1, col=2, showgrid=True, showticklabels=True)
 	fig.update_xaxes(rangeslider={"autorange":True, "visible":False})
 	fig.update_xaxes(col=1, rangebreaks=[dict(values=dt_breaks)])
-	# fig.update_layout({"xaxis_range":[start_temp,end_temp+datetime.timedelta(days=round(len(wf_indicators)*0.1))]})
-	# fig.update_layout({"xaxis2_range":None})
 
 	fig.update_layout({f"xaxis{val_profile_index}":{'anchor': 'y', 'overlaying': 'x','showgrid':False,"visible":False}})
 

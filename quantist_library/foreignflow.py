@@ -105,7 +105,8 @@ class StockFFFull():
 			preoffset_period_param
 			)
 		
-		self.nbins = await lib.calc_bins(self.wf_indicators)
+		self.bin_obj:lib.Bin = lib.Bin(data=self.wf_indicators)
+		self.bin_obj:lib.Bin = await self.bin_obj.fit()
 
 		# Not to be ran inside init, but just as a method that return plotly fig
 		# self.chart(media_type="json")
@@ -316,7 +317,7 @@ class StockFFFull():
 			period_pricecorrel=self.period_pricecorrel,
 			period_mapricecorrel=self.period_mapricecorrel,
 			period_vwap=self.period_vwap,
-			nbins = self.nbins
+			bin_obj = self.bin_obj
 			)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)
