@@ -19,6 +19,7 @@ WORKDIR /
 COPY requirements.txt ./
 
 # Install dependencies.
+RUN python -m pip install --upgrade pip
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 # Copy local code to the container image.
