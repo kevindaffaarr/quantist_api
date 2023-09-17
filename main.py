@@ -1,4 +1,9 @@
 import os
+import warnings
+# Ignore FutureWarning, DeprecationWarning
+warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=DeprecationWarning)
+
 ENV_OR_PROD = os.getenv("ENV_OR_PROD", "DEV")
 DEBUG_STATUS = True if ENV_OR_PROD == "DEV" else False
 
