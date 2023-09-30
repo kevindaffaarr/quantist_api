@@ -20,8 +20,8 @@ def html_wrap(text:str, width:int = 16, n_lines:int = 2):
 	return "<br>".join(text_arr)
 
 async def quantist_stock_chart(
-	stockcode:str = ..., 
-	wf_indicators:pd.DataFrame = ...,
+	stockcode:str,
+	wf_indicators:pd.DataFrame,
 	analysis_method: dp.AnalysisMethod = dp.AnalysisMethod.broker,
 	period_prop: int | None = None,
 	period_pricecorrel: int | None = None,
@@ -234,10 +234,11 @@ async def quantist_stock_chart(
 	return fig
 
 async def radar_chart(
-	startdate:datetime.date,enddate:datetime.date,
+	startdate:datetime.date,
+	enddate:datetime.date,
+	radar_indicators:pd.DataFrame,
 	y_axis_type:dp.ListRadarType = dp.ListRadarType.correlation,
-	method:str = "Foreign",
-	radar_indicators:pd.DataFrame=...
+	method:str = "Foreign"
 	) -> go.Figure:
 	# INIT
 	fig = go.Figure()

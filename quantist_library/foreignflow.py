@@ -93,9 +93,14 @@ class StockFFFull():
 				self.startdate,self.enddate,\
 				default_months_range,preoffset_period_param)
 		else: #self.type == 'stock'
-			raw_data:pd.DataFrame = await self.__get_stock_raw_data(self.dbs,self.stockcode,\
-				self.startdate,self.enddate,\
-				default_months_range,preoffset_period_param)
+			raw_data:pd.DataFrame = await self.__get_stock_raw_data(
+				stockcode = self.stockcode,
+				startdate = self.startdate,
+				enddate = self.enddate,
+				default_months_range = default_months_range,
+				preoffset_period_param = preoffset_period_param,
+				dbs = self.dbs
+				)
 		
 		# Foreign Flow Indicators
 		self.wf_indicators = await self.calc_wf_indicators(raw_data,\
@@ -122,12 +127,12 @@ class StockFFFull():
 			return default_param
 
 	async def __get_stock_raw_data(self,
-		dbs:db.Session = next(db.get_dbs()),
-		stockcode: str = ...,
+		stockcode: str,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		default_months_range:int | None = None,
-		preoffset_period_param: int = 50
+		preoffset_period_param: int = 50,
+		dbs:db.Session = next(db.get_dbs()),
 		) -> pd.DataFrame:
 
 		# Define startdate to 1 year before enddate if startdate is None
@@ -380,9 +385,9 @@ class ForeignRadar():
 		else:
 			bar_range = None
 		stocks_raw_data:pd.DataFrame = await self.__get_stocks_raw_data(
+			filtered_stockcodes=filtered_stockcodes,
 			startdate=self.startdate,
 			enddate=self.enddate,
-			filtered_stockcodes=filtered_stockcodes,
 			bar_range=bar_range,
 			dbs=self.dbs)
 
@@ -460,9 +465,9 @@ class ForeignRadar():
 		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code']) # type: ignore
 
 	async def __get_stocks_raw_data(self,
+		filtered_stockcodes:pd.Series,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
-		filtered_stockcodes:pd.Series = ...,
 		bar_range:int | None = 5,
 		dbs: db.Session = next(db.get_dbs())
 		) -> pd.DataFrame:
@@ -575,10 +580,11 @@ class ForeignRadar():
 		assert self.startdate is not None
 
 		fig = await genchart.radar_chart(
-			startdate=self.startdate,enddate=self.enddate,
+			startdate=self.startdate,
+			enddate=self.enddate,
+			radar_indicators=self.radar_indicators,
 			y_axis_type=self.y_axis_type,
-			method="Foreign",
-			radar_indicators=self.radar_indicators
+			method="Foreign"
 		)
 		if media_type in ["png","jpeg","jpg","webp","svg"]:
 			return await genchart.fig_to_image(fig,media_type)
@@ -689,28 +695,28 @@ class ScreenerMoneyFlow(ScreenerBase):
 		
 		# get ranked, filtered, and pre-calculated indicator data of filtered_stockcodes
 		self.top_stockcodes, self.startdate, self.enddate, self.bar_range = await self._get_mf_top_stockcodes(
+			enddate = self.enddate,
+			filtered_stockcodes = self.filtered_stockcodes,
+			stockcode_excludes = self.stockcode_excludes,
 			accum_or_distri = self.accum_or_distri,
 			n_stockcodes = self.n_stockcodes,
 			startdate = self.startdate,
-			enddate = self.enddate,
 			radar_period=self.radar_period,
 			period_pricecorrel = self.period_pricecorrel,
-			filtered_stockcodes = self.filtered_stockcodes,
-			stockcode_excludes = self.stockcode_excludes,
 			dbs = self.dbs,
 		)
 
 		return self
 	
 	async def _get_mf_top_stockcodes(self,
+		enddate: datetime.date,
+		filtered_stockcodes: pd.Series,
+		stockcode_excludes: set[str],
 		accum_or_distri: dp.ScreenerList = dp.ScreenerList.most_accumulated,
 		n_stockcodes: int = 10,
 		startdate: datetime.date | None = None,
-		enddate: datetime.date = ...,
 		radar_period: int | None = None,
 		period_pricecorrel: int | None = None,
-		filtered_stockcodes: pd.Series = ...,
-		stockcode_excludes: set[str] = ...,
 		dbs: db.Session = next(db.get_dbs())
 		) -> tuple[pd.DataFrame, datetime.date, datetime.date, int]:
 		
@@ -901,11 +907,11 @@ class ScreenerVWAP(ScreenerBase):
 
 
 	async def _vwap_prep(self,
-		startdate: datetime.date = ...,
-		enddate: datetime.date = ...,
-		period_vwap: int = ...,
-		filtered_stockcodes: pd.Series = ...,
-		stockcode_excludes: set[str] = ...,
+		startdate: datetime.date,
+		enddate: datetime.date,
+		period_vwap: int,
+		filtered_stockcodes: pd.Series,
+		stockcode_excludes: set[str],
 		dbs: db.Session = next(db.get_dbs())
 		) -> tuple[datetime.date, datetime.date, int, pd.DataFrame]:
 		# Get main data from startdate to enddate

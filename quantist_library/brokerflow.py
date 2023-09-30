@@ -128,8 +128,8 @@ class StockBFFull():
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self.__get_stock_raw_data(
 				stockcode=self.stockcode,
-				startdate=self.startdate,
 				enddate=self.enddate,
+				startdate=self.startdate,
 				preoffset_period_param=self.preoffset_period_param,
 				dbs=self.dbs
 				)
@@ -251,7 +251,7 @@ class StockBFFull():
 
 	async def __get_full_broker_transaction(self,
 		stockcode: str,
-		preoffset_startdate: datetime.date = ...,
+		preoffset_startdate: datetime.date,
 		enddate: datetime.date = datetime.date.today(),
 		dbs: db.Session = next(db.get_dbs()),
 		):
@@ -290,7 +290,7 @@ class StockBFFull():
 		return raw_data_broker_full
 
 	async def __get_stock_price_data(self,
-		stockcode: str = ...,
+		stockcode: str,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		preoffset_period_param: int = 50,
@@ -371,9 +371,9 @@ class StockBFFull():
 		return raw_data_full, preoffset_startdate
 
 	async def __get_stock_raw_data(self,
-		stockcode: str = ...,
+		stockcode: str,
+		enddate: datetime.date,
 		startdate: datetime.date | None = None,
-		enddate: datetime.date = ...,
 		default_months_range: int = 12,
 		preoffset_period_param: int = 50,
 		dbs: db.Session = next(db.get_dbs()),
@@ -1000,8 +1000,8 @@ class WhaleRadar():
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
 			await self._get_stock_raw_data(
 				filtered_stockcodes=self.filtered_stockcodes,
-				startdate=self.startdate,
 				enddate=self.enddate,
+				startdate=self.startdate,
 				default_months_range=self.default_months_range,
 				dbs=self.dbs
 				)
@@ -1052,13 +1052,13 @@ class WhaleRadar():
 		# Get radar period filtered stockdata
 		self.startdate, self.enddate, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self._get_radar_period_filtered_stock_data(
-				startdate = self.startdate,
-				radar_period = self.radar_period,
-				period_predata=self.period_pricecorrel,
 				raw_data_full = raw_data_full,
 				raw_data_broker_nvol = raw_data_broker_nvol,
 				raw_data_broker_nval = raw_data_broker_nval,
 				raw_data_broker_sumval = raw_data_broker_sumval,
+				startdate = self.startdate,
+				radar_period = self.radar_period,
+				period_predata=self.period_pricecorrel
 			)
 		
 		# Get sum of selected broker transaction for each stock
@@ -1147,7 +1147,7 @@ class WhaleRadar():
 		return raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 
 	async def __get_full_broker_transaction(self,
-		filtered_stockcodes: pd.Series = ...,
+		filtered_stockcodes: pd.Series,
 		enddate: datetime.date = datetime.date.today(),
 		default_months_range: int = 12,
 		dbs: db.Session = next(db.get_dbs()),
@@ -1180,7 +1180,7 @@ class WhaleRadar():
 		return raw_data_broker_full
 	
 	async def __get_stock_price_data(self,
-		filtered_stockcodes: pd.Series = ...,
+		filtered_stockcodes: pd.Series,
 		startdate:datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		default_months_range: int = 12,
@@ -1223,9 +1223,9 @@ class WhaleRadar():
 		return raw_data_full
 
 	async def _get_stock_raw_data(self,
-		filtered_stockcodes: pd.Series = ...,
+		filtered_stockcodes: pd.Series,
+		enddate: datetime.date,
 		startdate: datetime.date | None = None,
-		enddate: datetime.date = ...,
 		default_months_range: int = 6,
 		dbs: db.Session = next(db.get_dbs()),
 		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series]:
@@ -1586,13 +1586,13 @@ class WhaleRadar():
 		return filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 
 	async def _get_radar_period_filtered_stock_data(self,
+		raw_data_full: pd.DataFrame,
+		raw_data_broker_nvol: pd.DataFrame,
+		raw_data_broker_nval: pd.DataFrame,
+		raw_data_broker_sumval: pd.DataFrame,
 		startdate: datetime.date | None = None,
 		radar_period: int | None = None,
-		period_predata: int | None = 0,
-		raw_data_full: pd.DataFrame = ...,
-		raw_data_broker_nvol: pd.DataFrame = ...,
-		raw_data_broker_nval: pd.DataFrame = ...,
-		raw_data_broker_sumval: pd.DataFrame = ...,
+		period_predata: int | None = 0
 		) -> tuple[datetime.date, datetime.date, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		# Update startdate, and enddate based on Data Queried
 		# Then update raw_data_full, raw_data_broker_nvol, raw_data_broker_nval
@@ -1647,9 +1647,9 @@ class WhaleRadar():
 		fig = await genchart.radar_chart(
 			startdate=self.startdate,
 			enddate=self.enddate,
-			y_axis_type=self.y_axis_type,
-			method="Whale",
 			radar_indicators=self.radar_indicators,
+			y_axis_type=self.y_axis_type,
+			method="Whale"
 		)
 
 		if media_type in [
@@ -1739,8 +1739,8 @@ class ScreenerBase(WhaleRadar):
 		raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval, self.filtered_stockcodes = \
 			await self._get_stock_raw_data(
 				filtered_stockcodes=self.filtered_stockcodes,
-				startdate=self.startdate,
 				enddate=self.enddate,
+				startdate=self.startdate,
 				default_months_range=self.default_months_range,
 				dbs=self.dbs
 				)
@@ -1792,13 +1792,13 @@ class ScreenerBase(WhaleRadar):
 		# Get radar period filtered stockdata
 		self.startdate, self.enddate, self.raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self._get_radar_period_filtered_stock_data(
-				startdate = self.startdate,
-				radar_period = self.radar_period,
-				period_predata = self.period_predata,
 				raw_data_full = raw_data_full,
 				raw_data_broker_nvol = raw_data_broker_nvol,
 				raw_data_broker_nval = raw_data_broker_nval,
 				raw_data_broker_sumval = raw_data_broker_sumval,
+				startdate = self.startdate,
+				radar_period = self.radar_period,
+				period_predata = self.period_predata
 			)
 		
 		# Get sum of selected broker transaction for each stock
@@ -2036,10 +2036,10 @@ class ScreenerVWAP(ScreenerBase):
 		return self
 
 	async def _vwap_prepare(self,
-		raw_data_full: pd.DataFrame = ...,
-		period_vwap: int = ...,
-		startdate: datetime.date = ...,
-		enddate: datetime.date = ...,
+		raw_data_full: pd.DataFrame,
+		period_vwap: int,
+		startdate: datetime.date,
+		enddate: datetime.date,
 		)-> tuple[pd.DataFrame, int]:
 		# Whale-VWAP
 		raw_data_full['vwap'] = ((raw_data_full['broker_nval'].groupby(level='code').rolling(window=period_vwap).apply(lambda x: x[x>0].sum()))\
