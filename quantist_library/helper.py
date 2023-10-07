@@ -24,7 +24,7 @@ class Bin():
 		- bins_range: range of bins: pd.Series
 		- hist_bar: histogram of each bin: pd.Series
 		- bins_mid: mid point of each bin: pd.Series
-		
+		- peaks_index: index of peaks and valleys of hist_bar: list
 		"""
 		self.nbins = await self.calc_nbins() if nbins is None else nbins
 		self.size = (self.data['close'].max()-self.data['close'].min())/self.nbins
@@ -57,19 +57,24 @@ class Bin():
 		# Split scaling for positive and negative values
 		hist_bar_pos = hist_bar[hist_bar>=0].to_numpy().reshape(-1,1)
 		hist_bar_neg = hist_bar[hist_bar<0].to_numpy().reshape(-1,1)
-		# Scale the data
-		scaler = MinMaxScaler()
-		hist_bar_pos = scaler.fit_transform(hist_bar_pos)
-		hist_bar_neg = scaler.fit_transform(-hist_bar_neg)
 		
-		# Find peaks and valleys
-		peaks, _ = find_peaks(x=hist_bar_pos.flatten(), prominence=0.1)
-		valleys, _ = find_peaks(x=hist_bar_neg.flatten(), prominence=0.1)
-		# if peaks or valleys is empty, return max value from hist_bar_pos or hist_bar_neg
-		if len(peaks) == 0:
-			peaks = [np.argmax(hist_bar_pos).item()]
-		if len(valleys) == 0:
-			valleys = [np.argmax(hist_bar_neg).item()]
+		peaks = []
+		valleys = []
+		scaler = MinMaxScaler()
+		if len(hist_bar_pos)>0:
+			# Scale the data
+			hist_bar_pos = scaler.fit_transform(hist_bar_pos)
+			# Find peaks and valleys
+			peaks, _ = find_peaks(x=hist_bar_pos.flatten(), prominence=0.1)
+			# if peaks or valleys is empty, return max value from hist_bar_pos or hist_bar_neg
+			if len(peaks) == 0:
+				peaks = [np.argmax(hist_bar_pos).item()]
+
+		if len(hist_bar_neg)>0:
+			hist_bar_neg = scaler.fit_transform(-hist_bar_neg)
+			valleys, _ = find_peaks(x=hist_bar_neg.flatten(), prominence=0.1)
+			if len(valleys) == 0:
+				valleys = [np.argmax(hist_bar_neg).item()]
 		
 		# Find the index of peaks and valleys from the original data
 		peaks_ori = hist_bar[hist_bar>=0].index[peaks].to_list()

@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 import pandas as pd
 import numpy as np
 from sqlalchemy.sql import func, desc, asc
+import asyncio
 import database as db
 import dependencies as dp
 from quantist_library import genchart
@@ -631,7 +632,12 @@ class ScreenerBase(ForeignRadar):
 		if predata == "vwap":
 			self.period_vwap:int = int(self.default_radar['default_ff_period_vwap']) if self.period_vwap is None else self.period_vwap
 			self.percentage_range:float = float(self.default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
-		
+		if predata == "vprofile":
+			default_months_range = int(self.default_radar['default_months_range']) if self.startdate is None else 0
+			self.enddate = datetime.date.today() if self.enddate is None else self.enddate
+			self.startdate = self.enddate - relativedelta(months=default_months_range) if self.startdate is None else self.startdate
+
+
 		# Define startdate
 		if self.startdate is None:
 			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
@@ -988,9 +994,6 @@ class ScreenerVWAP(ScreenerBase):
 		# Get data from stocklist
 		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
 		
-		stocklist = stocklist
-		top_data = top_data
-
 		return stocklist, top_data
 
 	async def _get_vwap_rally(self, raw_data: pd.DataFrame) -> list:
@@ -1044,3 +1047,139 @@ class ScreenerVWAP(ScreenerBase):
 		stocklist = stocklist[stocklist].index.tolist()
 
 		return stocklist
+
+class ScreenerVProfile(ScreenerBase):
+	def __init__ (
+		self,
+		n_stockcodes: int = 10,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = datetime.date.today(),
+		radar_period: int | None = None,
+		stockcode_excludes: set[str] = set(),
+		percentage_range: float | None = 0.0,
+		screener_min_value: int | None = None,
+		screener_min_frequency: int | None = None,
+		screener_min_prop:int | None = None,
+		dbs: db.Session = next(db.get_dbs())
+		) -> None:
+		super().__init__(
+			startdate = startdate,
+			enddate = enddate,
+			radar_period = radar_period,
+			stockcode_excludes = stockcode_excludes,
+			screener_min_value = screener_min_value,
+			screener_min_frequency = screener_min_frequency,
+			screener_min_prop = screener_min_prop,
+			dbs = dbs,
+		)
+
+		self.n_stockcodes: int = n_stockcodes
+		self.percentage_range: float = percentage_range if percentage_range is not None else 0.0
+	
+	async def screen(self) -> ScreenerVProfile:
+		await super()._fit_base(predata='vprofile')
+		
+		# Get self.raw_data, and update self.startdate, self.enddate
+		self.startdate: datetime.date
+		self.enddate: datetime.date
+		self.bar_range: int
+		self.raw_data: pd.DataFrame
+		self.startdate, self.enddate, self.bar_range, self.raw_data = await self._vprofile_prep(
+			startdate=self.startdate,
+			enddate=self.enddate,
+			filtered_stockcodes=self.filtered_stockcodes,
+			stockcode_excludes=self.stockcode_excludes,
+			dbs=self.dbs)
+		
+		# Get stocklist
+		stocklist = await self._get_vprofile_stocklist(raw_data=self.raw_data)
+
+		# Get top_stockcodes
+		self.stocklist, self.top_stockcodes = await self._get_data_from_stocklist(
+			raw_data=self.raw_data,
+			stocklist=stocklist,
+			n_stockcodes=self.n_stockcodes,
+		)
+		
+		return self
+	
+	async def _get_data_from_stocklist(
+		self,
+		raw_data: pd.DataFrame,
+		stocklist: list[str],
+		n_stockcodes: int
+		) -> tuple[list[str], pd.DataFrame]:
+		assert isinstance(self.radar_period, int), 'radar_period must be int'
+		
+		# Sum netval in the last self.radar_period for each code
+		raw_data_netval = raw_data.groupby(level='code').tail(self.radar_period).groupby(level='code')['netval'].sum()
+		# Get top n_stockcodes
+		stocklist = raw_data_netval.loc[raw_data_netval.index.get_level_values('code').isin(stocklist)].nlargest(n_stockcodes).index.tolist()
+		
+		# Get data from stocklist
+		raw_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
+
+		# Compile top_stockcodes
+		top_stockcodes:pd.DataFrame
+		top_stockcodes = raw_data[['close']].groupby(level='code').last()
+		top_stockcodes['mf'] = raw_data['netval'].groupby(level='code').tail(self.radar_period).groupby(level='code').sum()
+		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
+
+		return stocklist, top_stockcodes
+	
+	async def _vprofile_prep(
+		self,
+		startdate: datetime.date,
+		enddate: datetime.date,
+		filtered_stockcodes: pd.Series,
+		stockcode_excludes: set[str],
+		dbs: db.Session = next(db.get_dbs())
+		) -> tuple[datetime.date, datetime.date, int, pd.DataFrame]:
+		qry = dbs.query(
+			db.StockData.date,
+			db.StockData.code,
+			db.StockData.close,
+			db.StockData.foreignbuy,
+			db.StockData.foreignsell,
+		).filter(db.StockData.code.in_(filtered_stockcodes))\
+		.filter(db.StockData.code.notin_(stockcode_excludes))\
+		.filter(db.StockData.date.between(startdate,enddate))\
+		.order_by(db.StockData.code, db.StockData.date)
+
+		# Main Query Fetching
+		raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).sort_values(['code','date']).set_index(['code','date']) # type: ignore
+		# Update startdate and enddate based on raw_data
+		startdate = raw_data.index.get_level_values('date').min().date()
+		enddate = raw_data.index.get_level_values('date').max().date()
+
+		# Calculate NetVal
+		raw_data['fbval'] = raw_data['close']*raw_data['foreignbuy']
+		raw_data['fsval'] = raw_data['close']*raw_data['foreignsell']
+		raw_data['netval'] = raw_data['fbval']-raw_data['fsval']
+
+		bar_range = int(raw_data.groupby(level='code').size().max())
+
+		return startdate, enddate, bar_range, raw_data
+	
+	async def _get_vprofile_stocklist(self, raw_data: pd.DataFrame) -> list[str]:
+		results = await asyncio.gather(*[self._get_vprofile_inside(data_group) for code, data_group in raw_data.groupby(level='code', group_keys=False)])
+		results_series = pd.Series(dict(results))
+		stocklist = results_series[results_series].index.tolist()
+		return stocklist
+
+	async def _get_vprofile_inside(self, data:pd.DataFrame) -> tuple[str, bool]:
+		# Get code from level 0 index of data
+		code:str = data.index.get_level_values('code')[0] # type: ignore
+
+		# Check last close
+		last_close = data["close"].iloc[-1]
+		
+		# Check important price by hist_bar peaks
+		bin_obj:Bin = Bin(data=data)
+		bin_obj = await bin_obj.fit()
+		trading_zone = bin_obj.hist_bar.index[bin_obj.peaks_index]
+
+		# Check does last close in trading zone
+		is_inside_interval =  any(last_close in interval for interval in trading_zone)
+
+		return code, is_inside_interval
