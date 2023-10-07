@@ -19,7 +19,7 @@ from sqlalchemy.sql import func
 import database as db
 import dependencies as dp
 from quantist_library import genchart
-import lib
+from .helper import Bin
 
 pd.options.mode.copy_on_write = True
 
@@ -190,8 +190,8 @@ class StockBFFull():
 			preoffset_period_param = self.preoffset_period_param,
 		)
 
-		self.bin_obj:lib.Bin = lib.Bin(data=self.wf_indicators)
-		self.bin_obj:lib.Bin = await self.bin_obj.fit()
+		self.bin_obj:Bin = Bin(data=self.wf_indicators)
+		self.bin_obj:Bin = await self.bin_obj.fit()
 
 		return self
 

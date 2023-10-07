@@ -7,7 +7,7 @@ import dependencies as dp
 
 from quantist_library import foreignflow as ff, brokerflow as bf, holdingcomposition as hc
 from quantist_library import genchart
-import lib as lib
+from .helper import Bin
 
 pd.options.mode.copy_on_write = True
 
@@ -71,7 +71,7 @@ class WhaleFlow():
 	async def _gen_full_chart(self,
 		wf_indicators:pd.DataFrame,
 		media_type: dp.ListMediaType | None = None,
-		bin_obj:lib.Bin | None = None,
+		bin_obj:Bin | None = None,
 		selected_broker: list[str] | None = None,
 		optimum_n_selected_cluster: int | None = None,
 		optimum_corr: float | None = None,

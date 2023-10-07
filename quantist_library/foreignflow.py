@@ -10,7 +10,7 @@ from sqlalchemy.sql import func, desc, asc
 import database as db
 import dependencies as dp
 from quantist_library import genchart
-import lib
+from .helper import Bin
 
 pd.options.mode.copy_on_write = True
 
@@ -110,8 +110,8 @@ class StockFFFull():
 			preoffset_period_param
 			)
 		
-		self.bin_obj:lib.Bin = lib.Bin(data=self.wf_indicators)
-		self.bin_obj:lib.Bin = await self.bin_obj.fit()
+		self.bin_obj:Bin = Bin(data=self.wf_indicators)
+		self.bin_obj:Bin = await self.bin_obj.fit()
 
 		# Not to be ran inside init, but just as a method that return plotly fig
 		# self.chart(media_type="json")

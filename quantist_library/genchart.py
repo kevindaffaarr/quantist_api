@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import dependencies as dp
-import lib as lib
+from .helper import Bin
 
 pd.options.mode.copy_on_write = True
 
@@ -31,7 +31,7 @@ async def quantist_stock_chart(
 	selected_broker: list[str] | None = None,
 	optimum_n_selected_cluster: int | None = None,
 	optimum_corr: float | None = None,
-	bin_obj:lib.Bin | None = None,
+	bin_obj:Bin | None = None,
 	) -> go.Figure:
 	if analysis_method == dp.AnalysisMethod.foreign:
 		abv = "F"
@@ -41,7 +41,7 @@ async def quantist_stock_chart(
 		method = "Whale"
 	
 	optimum_corr = np.nan if optimum_corr is None else optimum_corr
-	bin_obj = lib.Bin(data=wf_indicators) if bin_obj is None else bin_obj
+	bin_obj = Bin(data=wf_indicators) if bin_obj is None else bin_obj
 	bin_obj.nbins += 1
 
 	# Make Subplots
