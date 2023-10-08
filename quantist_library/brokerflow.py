@@ -3,6 +3,8 @@ from typing import Literal
 import gc
 from fastapi_globals import g
 
+import asyncio
+
 import datetime
 import pandas as pd
 import numpy as np
@@ -453,18 +455,15 @@ class StockBFFull():
 			# Define correlation param
 			corr_list = []
 
-			# Iterate optimum n_cluster
-			for n_selected_cluster in range(1,len(centroids_cluster)):
-				# Get correlation between close and selected_broker_ncum
-				selected_broker_ncum_corr = await self.__get_corr_selected_broker_ncum(
+			corr_list = await asyncio.gather(*[
+				self.__get_corr_selected_broker_ncum(
 					clustered_features=clustered_features,
 					raw_data_close=raw_data_close,
 					broker_ncum=broker_ncum,
 					centroids_cluster=centroids_cluster,
 					n_selected_cluster=n_selected_cluster
-					)
-				# Get correlation
-				corr_list.append(selected_broker_ncum_corr)
+					) for n_selected_cluster in range(1,len(centroids_cluster))
+				])
 
 			# Define optimum n_selected_cluster
 			max_corr: float = np.max(corr_list)
@@ -499,6 +498,13 @@ class StockBFFull():
 
 		return selected_broker, optimum_n_selected_cluster, optimum_corr
 
+	async def __iterate_optimum_n_cluster(self, X:np.ndarray, n_cluster:int):
+		# Clustering
+		kmeans:KMeans = KMeans(init="k-means++", n_init='auto', n_clusters=n_cluster, random_state=0)
+		kmeans.fit(X)
+		score = silhouette_score(X, kmeans.labels_)
+		return score
+
 	async def __kmeans_clustering(self,
 		features: pd.DataFrame,
 		x: str,
@@ -514,12 +520,10 @@ class StockBFFull():
 		max_n_cluster = min(max_n_cluster, len(X)-1)
 
 		# Iterate optimum n_cluster
-		for n_cluster in range(min_n_cluster, max_n_cluster+1):
-			# Clustering
-			kmeans:KMeans = KMeans(init="k-means++", n_init='auto', n_clusters=n_cluster, random_state=0)
-			kmeans.fit(X)
-			score = silhouette_score(X, kmeans.labels_)
-			silhouette_coefficient.append(score)
+		silhouette_coefficient = await asyncio.gather(*[
+			self.__iterate_optimum_n_cluster(X=X,n_cluster=n_cluster) for n_cluster in range(min_n_cluster, max_n_cluster+1)
+			])
+		
 		# Define optimum n_cluster
 		optimum_n_cluster = int(np.argmax(silhouette_coefficient)) + min_n_cluster
 
@@ -1310,17 +1314,15 @@ class WhaleRadar():
 			corr_list = []
 
 			# Iterate optimum n_cluster
-			for n_selected_cluster in range(1,len(centroids_cluster)):
-				# Get correlation between close and selected_broker_ncum
-				selected_broker_ncum_corr = await self.__get_corr_selected_broker_ncum(
+			corr_list = await asyncio.gather(*[
+				self.__get_corr_selected_broker_ncum(
 					clustered_features=clustered_features,
 					raw_data_close=raw_data_close,
 					broker_ncum=broker_ncum,
 					centroids_cluster=centroids_cluster,
 					n_selected_cluster=n_selected_cluster
-					)
-				# Get correlation
-				corr_list.append(selected_broker_ncum_corr)
+					) for n_selected_cluster in range(1,len(centroids_cluster))
+				])
 
 			# Define optimum n_selected_cluster
 			max_corr: float = np.max(corr_list)
@@ -1368,14 +1370,21 @@ class WhaleRadar():
 
 		return df
 
+	async def __iterate_optimum_n_cluster(self, X:np.ndarray, n_cluster:int):
+		# Clustering
+		kmeans = KMeans(init="k-means++", n_init='auto', n_clusters=n_cluster, random_state=0).fit(X)
+		score = silhouette_score(X, kmeans.labels_)
+		return score
+
 	async def __kmeans_clustering(self,
-		features: pd.DataFrame,
+		features: pd.DataFrame|pd.Series,
 		x: str,
 		y: str,
 		min_n_cluster:int = 4,
 		max_n_cluster:int = 10,
 		) -> tuple[pd.DataFrame, pd.DataFrame]:
-
+		if isinstance(features, pd.Series):
+			features = features.to_frame()
 		# Get X and Y
 		X = features[[x,y]].values
 		# Define silhouette param
@@ -1383,11 +1392,9 @@ class WhaleRadar():
 		max_n_cluster = min(max_n_cluster, len(X)-1)
 
 		# Iterate optimum n_cluster
-		for n_cluster in range(min_n_cluster, max_n_cluster+1):
-			# Clustering
-			kmeans = KMeans(init="k-means++", n_init='auto', n_clusters=n_cluster, random_state=0).fit(X)
-			score = silhouette_score(X, kmeans.labels_)
-			silhouette_coefficient.append(score)
+		silhouette_coefficient = await asyncio.gather(*[
+			self.__iterate_optimum_n_cluster(X=X, n_cluster=n_cluster) for n_cluster in range(min_n_cluster, max_n_cluster+1)
+			])
 		# Define optimum n_cluster
 		optimum_n_cluster = int(np.argmax(silhouette_coefficient)) + min_n_cluster
 
@@ -1404,6 +1411,39 @@ class WhaleRadar():
 		df_std = StandardScaler().fit_transform(df)
 		return pd.DataFrame(df_std, index=df.index, columns=df.columns)
 	
+	async def __pos_neg_clustering(self, broker_features_std_pos:pd.DataFrame, code:str, splitted_min_n_cluster:int, splitted_max_n_cluster:int):
+		features, centroids = \
+			await self.__kmeans_clustering(
+				features=broker_features_std_pos.loc[code,:],
+				x='corr_ncum_close',
+				y='broker_sumval',
+				min_n_cluster=splitted_min_n_cluster,
+				max_n_cluster=splitted_max_n_cluster,
+			)
+		features['code'] = code
+		features = features.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
+		centroids['code'] = code
+		centroids = centroids.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
+		return features, centroids
+
+	async def __loop_optimize_selected_cluster(self, code:str, 
+		broker_features:pd.DataFrame,
+		raw_data_close:pd.Series, broker_ncum:pd.DataFrame,
+		broker_features_centroids:pd.DataFrame,
+		stepup_n_cluster_threshold:float,
+		n_selected_cluster:int|None = None,
+		):
+		selected_broker_code, optimum_n_selected_cluster_code, optimum_corr_code = \
+			await self.__optimize_selected_cluster(
+				clustered_features=broker_features.loc[code,:], # type: ignore
+				raw_data_close=raw_data_close.loc[code],
+				broker_ncum=broker_ncum.loc[code,:], # type: ignore
+				centroids_cluster=broker_features_centroids.loc[code,:], # type: ignore
+				n_selected_cluster=n_selected_cluster,
+				stepup_n_cluster_threshold=stepup_n_cluster_threshold
+			)
+		return code, selected_broker_code, optimum_n_selected_cluster_code, optimum_corr_code
+
 	async def _get_bf_parameters(self,
 		raw_data_close: pd.Series,
 		raw_data_broker_nval: pd.DataFrame,
@@ -1463,48 +1503,36 @@ class WhaleRadar():
 		broker_features_std_neg = broker_features[broker_features['corr_ncum_close']<=0]
 		
 		# Positive Clustering
-		broker_features_pos = pd.DataFrame()
-		centroids_pos = pd.DataFrame()
-		for code in broker_features_std_pos.index.get_level_values('code').unique():
-			features, centroids = \
-				await self.__kmeans_clustering(
-					features=broker_features_std_pos.loc[code,:],
-					x='corr_ncum_close',
-					y='broker_sumval',
-					min_n_cluster=splitted_min_n_cluster,
-					max_n_cluster=splitted_max_n_cluster,
-				)
-			features['code'] = code
-			features = features.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
-			broker_features_pos = pd.concat([broker_features_pos, features], axis=0)
-			centroids['code'] = code
-			centroids = centroids.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
-			centroids_pos = pd.concat([centroids_pos, centroids], axis=0)
+		res = await asyncio.gather(*[
+			self.__pos_neg_clustering(
+				broker_features_std_pos=broker_features_std_pos,
+				code=code,
+				splitted_min_n_cluster=splitted_min_n_cluster,
+				splitted_max_n_cluster=splitted_max_n_cluster
+				) for code in broker_features_std_pos.index.get_level_values('code').unique()
+			])
+		broker_features_pos = pd.concat([x[0] for x in res], axis=0)
+		centroids_pos = pd.concat([x[1] for x in res], axis=0)
 
 		# Negative Clustering
-		broker_features_neg = pd.DataFrame()
-		centroids_neg = pd.DataFrame()
-		for code in broker_features_std_neg.index.get_level_values('code').unique():
-			features, centroids = \
-				await self.__kmeans_clustering(
-					features=broker_features_std_neg.loc[code,:],
-					x='corr_ncum_close',
-					y='broker_sumval',
-					min_n_cluster=splitted_min_n_cluster,
-					max_n_cluster=splitted_max_n_cluster,
-				)
-			features['code'] = code
-			features = features.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
-			if code in broker_features_pos.index.get_level_values('code'):
-				features = features + (broker_features_pos.loc[(code),"cluster"].max()) + 1 # type: ignore
-				broker_features_neg = pd.concat([broker_features_neg, features], axis=0)
+		res = await asyncio.gather(*[
+			self.__pos_neg_clustering(
+				broker_features_std_pos=broker_features_std_neg,
+				code=code,
+				splitted_min_n_cluster=splitted_min_n_cluster,
+				splitted_max_n_cluster=splitted_max_n_cluster
+				) for code in broker_features_std_neg.index.get_level_values('code').unique()
+			])
+		broker_features_neg = pd.concat([x[0] for x in res], axis=0)
+		centroids_neg = pd.concat([x[1] for x in res], axis=0)
 
-			centroids['code'] = code
-			if code in broker_features_pos.index.get_level_values('code'):
-				centroids.index = centroids.index + centroids_pos.loc[code,:].index.max() + 1
-			centroids = centroids.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
-			centroids_neg = pd.concat([centroids_neg, centroids], axis=0)
-			
+		# Add broker_features_std_neg["cluster"] with max value of broker_features_pos["cluster"] + 1
+		max_pos_cluster = broker_features_pos.groupby(by='code')["cluster"].max()
+		broker_features_neg["cluster"] = broker_features_neg.groupby(by='code')["cluster"].apply(lambda x: x + max_pos_cluster.loc[x.name] + 1).droplevel(0)
+
+		centroids_neg = centroids_neg.set_index(centroids_neg.reset_index().groupby(by='code')["level_1"].apply(lambda x: x + max_pos_cluster.loc[x.name] + 1),append=True).droplevel(1)
+		centroids_neg.index = centroids_neg.index.set_names(["code",None])
+
 		# Combine Positive and Negative Clustering
 		broker_features_cluster = pd.concat([broker_features_pos,broker_features_neg],axis=0)
 		broker_features_centroids = pd.concat([centroids_pos,centroids_neg],axis=0)
@@ -1516,7 +1544,6 @@ class WhaleRadar():
 		# Join broker_features on (index code and column cluster) with broker_features_centroids on (index code and index cluster_idx)
 		broker_features = broker_features.join(broker_features_centroids[0].rename('corr_cluster'), on=["code","cluster"])
 
-
 		# Delete variable for memory management
 		del broker_features_std_pos, broker_features_std_neg, \
 			broker_features_pos, centroids_pos, \
@@ -1525,24 +1552,21 @@ class WhaleRadar():
 		gc.collect()
 
 		# Define optimum selected cluster: net transaction clusters with highest correlation to close
-		selected_broker = {}
-		optimum_n_selected_cluster = {}
-		optimum_corr = {}
-		for code in broker_features.index.get_level_values('code').unique():
-			assert isinstance(code, str)
-			selected_broker_code, optimum_n_selected_cluster_code, optimum_corr_code = \
-				await self.__optimize_selected_cluster(
-					clustered_features=broker_features.loc[code,:], # type: ignore
-					raw_data_close=raw_data_close.loc[code],
-					broker_ncum=broker_ncum.loc[code,:], # type: ignore
-					centroids_cluster=broker_features_centroids.loc[code,:], # type: ignore
-					n_selected_cluster=n_selected_cluster,
-					stepup_n_cluster_threshold=stepup_n_cluster_threshold
-				)
-			selected_broker[code] = selected_broker_code
-			optimum_n_selected_cluster[code] = optimum_n_selected_cluster_code
-			optimum_corr[code] = optimum_corr_code
-		
+		res = await asyncio.gather(*[
+			self.__loop_optimize_selected_cluster(
+				code=code,
+				broker_features=broker_features,
+				raw_data_close=raw_data_close,
+				broker_ncum=broker_ncum,
+				broker_features_centroids=broker_features_centroids,
+				stepup_n_cluster_threshold=stepup_n_cluster_threshold,
+				n_selected_cluster=n_selected_cluster,
+				) for code in broker_features.index.get_level_values('code').unique()
+			])
+		selected_broker = {x[0]:x[1] for x in res}
+		optimum_n_selected_cluster = {x[0]:x[2] for x in res}
+		optimum_corr = {x[0]:x[3] for x in res}
+
 		optimum_n_selected_cluster = pd.DataFrame.from_dict(optimum_n_selected_cluster, orient='index').rename(columns={0:'optimum_n_selected_cluster'})
 		optimum_corr = pd.DataFrame.from_dict(optimum_corr, orient='index').rename(columns={0:'optimum_corr'})
 
