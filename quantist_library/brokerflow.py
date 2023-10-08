@@ -1496,7 +1496,7 @@ class WhaleRadar():
 			features['code'] = code
 			features = features.set_index('code', append=True).swaplevel(0,1).sort_index(level=0)
 			if code in broker_features_pos.index.get_level_values('code'):
-				features = features + (broker_features_pos.loc[(code),"cluster"].max()) + 1 # type: ignore
+				features["cluster"] = features["cluster"] + (broker_features_pos.loc[(code),"cluster"].max()) + 1 # type: ignore
 				broker_features_neg = pd.concat([broker_features_neg, features], axis=0)
 
 			centroids['code'] = code
