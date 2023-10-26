@@ -9,6 +9,7 @@ DEBUG_STATUS = True if ENV_OR_PROD == "DEV" else False
 
 from contextlib import asynccontextmanager
 
+import uvicorn
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
@@ -95,3 +96,6 @@ app.include_router(param.router)
 @timeit
 async def home():
 	return {"message": "Welcome to Quantist.io"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000)
