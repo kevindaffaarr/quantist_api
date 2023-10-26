@@ -1725,6 +1725,12 @@ class ScreenerBase(WhaleRadar):
 			self.period_vwap:int = int(default_radar['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap
 			self.percentage_range:float = float(default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
 			self.period_predata:int = self.radar_period + self.period_vwap
+		if predata == "vprofile":
+			default_months_range:int = int(default_radar['default_months_range']) if self.default_months_range is None else self.default_months_range
+			self.enddate = datetime.date.today() if self.enddate is None else self.enddate
+			self.startdate = self.enddate - relativedelta(months=default_months_range) if self.startdate is None else self.startdate
+			# TODO
+			# self.period_predata:int = ...
 		else:
 			self.period_predata:int = 0
 
@@ -2117,3 +2123,67 @@ class ScreenerVWAP(ScreenerBase):
 		stocklist = stocklist[stocklist].index.tolist()
 
 		return stocklist
+
+class ScreenerVProfile(ScreenerBase):
+	def __init__(
+		self,
+		n_stockcodes: int = 10,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = datetime.date.today(),
+		radar_period: int | None = None,
+		stockcode_excludes: set[str] = set(),
+		screener_min_value: int | None = None,
+		screener_min_frequency: int | None = None,
+		n_selected_cluster:int | None = None,
+		period_mf: int | None = None,
+		period_pricecorrel: int | None = None,
+		default_months_range: int | None = None,
+		training_start_index: float | None = None,
+		training_end_index: float | None = None,
+		min_n_cluster: int | None = None,
+		max_n_cluster: int | None = None,
+		splitted_min_n_cluster: int | None = None,
+		splitted_max_n_cluster: int | None = None,
+		stepup_n_cluster_threshold: int | None = None,
+		filter_opt_corr: int | None = None,
+		dbs: db.Session = next(db.get_dbs())
+		) -> None:
+		super().__init__(
+			startdate=startdate,
+			enddate=enddate,
+			stockcode_excludes=stockcode_excludes,
+			screener_min_value=screener_min_value,
+			screener_min_frequency=screener_min_frequency,
+			n_selected_cluster=n_selected_cluster,
+			radar_period=radar_period,
+			period_mf=period_mf,
+			period_pricecorrel=period_pricecorrel,
+			default_months_range=default_months_range,
+			training_start_index=training_start_index,
+			training_end_index=training_end_index,
+			min_n_cluster=min_n_cluster,
+			max_n_cluster=max_n_cluster,
+			splitted_min_n_cluster=splitted_min_n_cluster,
+			splitted_max_n_cluster=splitted_max_n_cluster,
+			stepup_n_cluster_threshold=stepup_n_cluster_threshold,
+			filter_opt_corr=filter_opt_corr,
+			dbs=dbs,
+		)
+
+		self.n_stockcodes: int = n_stockcodes
+		self.radar_period: int | None = radar_period
+	
+	async def screen(self) -> ScreenerVProfile:
+		await super()._fit_base(predata="vprofile")
+		return self
+	
+	# async def _vprofile_prep(
+	# 	self,
+	# 	startdate: datetime.date,
+	# 	enddate: datetime.date,
+	# 	filtered_stockcodes:pd.Series,
+	# 	stockcode_excludes: set[str],
+	# 	dbs: db.Session = next(db.get_dbs())
+	# 	) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+	# 	# Get raw data
+		
