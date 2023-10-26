@@ -1019,6 +1019,18 @@ class WhaleRadar():
 				splitted_max_n_cluster=self.splitted_max_n_cluster,
 			)
 		
+		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
+		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+			await self._get_filtered_stockcodes_by_corr(
+				filter_opt_corr=self.filter_opt_corr,
+				optimum_corr=self.optimum_corr,
+				filtered_stockcodes=self.filtered_stockcodes,
+				raw_data_full=raw_data_full,
+				raw_data_broker_nvol=raw_data_broker_nvol,
+				raw_data_broker_nval=raw_data_broker_nval,
+				raw_data_broker_sumval=raw_data_broker_sumval
+			)
+		
 		# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 		raw_data_broker_nvol = raw_data_broker_nvol.groupby(level="code", group_keys=False).apply(
 			lambda x: pd.concat(
@@ -1036,18 +1048,6 @@ class WhaleRadar():
 				],axis=1
 			)
 		).sort_index(axis=1)
-
-		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
-		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
-			await self._get_filtered_stockcodes_by_corr(
-				filter_opt_corr=self.filter_opt_corr,
-				optimum_corr=self.optimum_corr,
-				filtered_stockcodes=self.filtered_stockcodes,
-				raw_data_full=raw_data_full,
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_nval=raw_data_broker_nval,
-				raw_data_broker_sumval=raw_data_broker_sumval
-			)
 
 		# Get radar period filtered stockdata
 		self.startdate, self.enddate, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
@@ -1570,9 +1570,9 @@ class WhaleRadar():
 		raw_data_broker_nval: pd.DataFrame,
 		raw_data_broker_sumval: pd.DataFrame,
 		) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-		# Filter code based on self.optimum_corr should be greater than filter_opt_corr
+		# Filter code based on self.optimum_corr should be greater than filter_opt_corr and not NaN
 		filtered_stockcodes = \
-			filtered_stockcodes[(abs(optimum_corr['optimum_corr']) > filter_opt_corr)]\
+			filtered_stockcodes[(optimum_corr['optimum_corr'] > filter_opt_corr) & (optimum_corr['optimum_corr'].notna())]\
 			.reset_index(drop=True)
 		raw_data_full = \
 			raw_data_full[raw_data_full.index.get_level_values(0).isin(filtered_stockcodes)]
@@ -1726,7 +1726,7 @@ class ScreenerBase(WhaleRadar):
 			self.percentage_range:float = float(default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
 			self.period_predata:int = self.radar_period + self.period_vwap
 		else:
-			self.period_predata = 0
+			self.period_predata:int = 0
 
 		# Get  filtered_stock that should be analyzed
 		self.filtered_stockcodes = await self._get_stockcodes(
@@ -1758,6 +1758,18 @@ class ScreenerBase(WhaleRadar):
 				splitted_max_n_cluster=self.splitted_max_n_cluster,
 			)
 		
+		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
+		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
+			await self._get_filtered_stockcodes_by_corr(
+				filter_opt_corr=self.filter_opt_corr,
+				optimum_corr=self.optimum_corr,
+				filtered_stockcodes=self.filtered_stockcodes,
+				raw_data_full=raw_data_full,
+				raw_data_broker_nvol=raw_data_broker_nvol,
+				raw_data_broker_nval=raw_data_broker_nval,
+				raw_data_broker_sumval=raw_data_broker_sumval,
+			)
+		
 		# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 		raw_data_broker_nvol = raw_data_broker_nvol.groupby(level="code", group_keys=False).apply(
 			lambda x: pd.concat(
@@ -1777,18 +1789,6 @@ class ScreenerBase(WhaleRadar):
 			)
 		).sort_index(axis=1)
 
-		# Filter code based on self.optimum_corr should be greater than self.filter_opt_corr
-		self.filtered_stockcodes, raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
-			await self._get_filtered_stockcodes_by_corr(
-				filter_opt_corr=self.filter_opt_corr,
-				optimum_corr=self.optimum_corr,
-				filtered_stockcodes=self.filtered_stockcodes,
-				raw_data_full=raw_data_full,
-				raw_data_broker_nvol=raw_data_broker_nvol,
-				raw_data_broker_nval=raw_data_broker_nval,
-				raw_data_broker_sumval=raw_data_broker_sumval,
-			)
-		
 		# Get radar period filtered stockdata
 		self.startdate, self.enddate, self.raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval = \
 			await self._get_radar_period_filtered_stock_data(
