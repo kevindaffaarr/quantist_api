@@ -1056,7 +1056,6 @@ class ScreenerVProfile(ScreenerBase):
 		enddate: datetime.date = datetime.date.today(),
 		radar_period: int | None = None,
 		stockcode_excludes: set[str] = set(),
-		percentage_range: float | None = 0.0,
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
 		screener_min_prop:int | None = None,
@@ -1074,7 +1073,6 @@ class ScreenerVProfile(ScreenerBase):
 		)
 
 		self.n_stockcodes: int = n_stockcodes
-		self.percentage_range: float = percentage_range if percentage_range is not None else 0.0
 	
 	async def screen(self) -> ScreenerVProfile:
 		await super()._fit_base(predata='vprofile')
@@ -1102,30 +1100,6 @@ class ScreenerVProfile(ScreenerBase):
 		)
 		
 		return self
-	
-	async def _get_data_from_stocklist(
-		self,
-		raw_data: pd.DataFrame,
-		stocklist: list[str],
-		n_stockcodes: int
-		) -> tuple[list[str], pd.DataFrame]:
-		assert isinstance(self.radar_period, int), 'radar_period must be int'
-		
-		# Sum netval in the last self.radar_period for each code
-		raw_data_netval = raw_data.groupby(level='code').tail(self.radar_period).groupby(level='code')['netval'].sum()
-		# Get top n_stockcodes
-		stocklist = raw_data_netval.loc[raw_data_netval.index.get_level_values('code').isin(stocklist)].nlargest(n_stockcodes).index.tolist()
-		
-		# Get data from stocklist
-		raw_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
-
-		# Compile top_stockcodes
-		top_stockcodes:pd.DataFrame
-		top_stockcodes = raw_data[['close']].groupby(level='code').last()
-		top_stockcodes['mf'] = raw_data['netval'].groupby(level='code').tail(self.radar_period).groupby(level='code').sum()
-		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
-
-		return stocklist, top_stockcodes
 	
 	async def _vprofile_prep(
 		self,
@@ -1166,7 +1140,7 @@ class ScreenerVProfile(ScreenerBase):
 		results_series = pd.Series(dict(results))
 		stocklist = results_series[results_series].index.tolist()
 		return stocklist
-
+	
 	async def _get_vprofile_inside(self, data:pd.DataFrame) -> tuple[str, bool]:
 		# Get code from level 0 index of data
 		code:str = data.index.get_level_values('code')[0] # type: ignore
@@ -1183,3 +1157,27 @@ class ScreenerVProfile(ScreenerBase):
 		is_inside_interval =  any(last_close in interval for interval in trading_zone)
 
 		return code, is_inside_interval
+	
+	async def _get_data_from_stocklist(
+		self,
+		raw_data: pd.DataFrame,
+		stocklist: list[str],
+		n_stockcodes: int
+		) -> tuple[list[str], pd.DataFrame]:
+		assert isinstance(self.radar_period, int), 'radar_period must be int'
+		
+		# Sum netval in the last self.radar_period for each code
+		raw_data_netval = raw_data.groupby(level='code').tail(self.radar_period).groupby(level='code')['netval'].sum()
+		# Get top n_stockcodes
+		stocklist = raw_data_netval.loc[raw_data_netval.index.get_level_values('code').isin(stocklist)].nlargest(n_stockcodes).index.tolist()
+		
+		# Get data from stocklist
+		raw_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
+
+		# Compile top_stockcodes
+		top_stockcodes:pd.DataFrame
+		top_stockcodes = raw_data[['close']].groupby(level='code').last()
+		top_stockcodes['mf'] = raw_data['netval'].groupby(level='code').tail(self.radar_period).groupby(level='code').sum()
+		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
+
+		return stocklist, top_stockcodes
