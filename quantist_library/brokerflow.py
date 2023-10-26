@@ -1572,7 +1572,7 @@ class WhaleRadar():
 		) -> tuple[pd.Series, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		# Filter code based on self.optimum_corr should be greater than filter_opt_corr and not NaN
 		filtered_stockcodes = \
-			filtered_stockcodes[(optimum_corr['optimum_corr'] > filter_opt_corr) & (optimum_corr['optimum_corr'].notna())]\
+			filtered_stockcodes[(abs(optimum_corr['optimum_corr']) > filter_opt_corr) & (optimum_corr['optimum_corr'].notna())]\
 			.reset_index(drop=True)
 		raw_data_full = \
 			raw_data_full[raw_data_full.index.get_level_values(0).isin(filtered_stockcodes)]
@@ -1725,7 +1725,7 @@ class ScreenerBase(WhaleRadar):
 			self.period_vwap:int = int(default_radar['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap
 			self.percentage_range:float = float(default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
 			self.period_predata:int = self.radar_period + self.period_vwap
-		if predata == "vprofile":
+		elif predata == "vprofile":
 			default_months_range:int = int(default_radar['default_months_range']) if self.default_months_range is None else self.default_months_range
 			self.enddate = datetime.date.today() if self.enddate is None else self.enddate
 			self.startdate = self.enddate - relativedelta(months=default_months_range) if self.startdate is None else self.startdate
