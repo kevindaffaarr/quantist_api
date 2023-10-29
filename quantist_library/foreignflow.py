@@ -1136,25 +1136,29 @@ class ScreenerVProfile(ScreenerBase):
 		return startdate, enddate, bar_range, raw_data
 	
 	async def _get_vprofile_stocklist(self, raw_data: pd.DataFrame) -> list[str]:
-		results = await asyncio.gather(*[self._get_vprofile_inside(data_group) for code, data_group in raw_data.groupby(level='code', group_keys=False)])
+		assert isinstance(self.radar_period, int)
+		results = await asyncio.gather(*[self._get_vprofile_inside(self.radar_period, data_group) for code, data_group in raw_data.groupby(level='code', group_keys=False)])
 		results_series = pd.Series(dict(results))
 		stocklist = results_series[results_series].index.tolist()
 		return stocklist
 	
-	async def _get_vprofile_inside(self, data:pd.DataFrame) -> tuple[str, bool]:
+	async def _get_vprofile_inside(self, checking_period:int, data:pd.DataFrame) -> tuple[str, bool]:
 		# Get code from level 0 index of data
 		code:str = data.index.get_level_values('code')[0] # type: ignore
 
-		# Check last close
-		last_close = data["close"].iloc[-1]
-		
+		# Get last n(checking_period) close
+		last_close = data["close"].iloc[-checking_period:]
+
 		# Check important price by hist_bar peaks
 		bin_obj:Bin = Bin(data=data)
 		bin_obj = await bin_obj.fit()
 		trading_zone = bin_obj.hist_bar.index[bin_obj.peaks_index]
 
-		# Check does last close in trading zone
-		is_inside_interval =  any(last_close in interval for interval in trading_zone)
+		if bin_obj.nbins <= 2:
+			return code, False
+
+		# Check does any last close in trading zone
+		is_inside_interval = any(last_close.apply(lambda x: any(x in interval for interval in trading_zone)))
 
 		return code, is_inside_interval
 	
@@ -1165,19 +1169,20 @@ class ScreenerVProfile(ScreenerBase):
 		n_stockcodes: int
 		) -> tuple[list[str], pd.DataFrame]:
 		assert isinstance(self.radar_period, int), 'radar_period must be int'
-		
-		# Sum netval in the last self.radar_period for each code
-		raw_data_netval = raw_data.groupby(level='code').tail(self.radar_period).groupby(level='code')['netval'].sum()
-		# Get top n_stockcodes
-		stocklist = raw_data_netval.loc[raw_data_netval.index.get_level_values('code').isin(stocklist)].nlargest(n_stockcodes).index.tolist()
-		
-		# Get data from stocklist
+		# Get raw_data that has level 0 index (code) in self.stocklist
 		raw_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
 
+		# Sum netval in the last self.radar_period for each code
+		mf = raw_data.groupby(level='code').tail(self.radar_period).groupby(level='code')['netval'].sum()
+		
+		# Get top n_stockcodes
+		stocklist = mf.nlargest(n_stockcodes).index.tolist()
+		raw_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
+		
 		# Compile top_stockcodes
 		top_stockcodes:pd.DataFrame
 		top_stockcodes = raw_data[['close']].groupby(level='code').last()
-		top_stockcodes['mf'] = raw_data['netval'].groupby(level='code').tail(self.radar_period).groupby(level='code').sum()
+		top_stockcodes['mf'] = mf.loc[stocklist]
 		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
 
 		return stocklist, top_stockcodes
