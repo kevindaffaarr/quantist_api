@@ -43,6 +43,8 @@ class Bin():
 		n = len(self.data["netval"])
 		# Calculate the bin width
 		bin_width = 2*iqr/(n**(1/3))
+		if bin_width == 0:
+			return 1
 		# Calculate the number of nbins
 		data_range = self.data["close"].max() - self.data["close"].min()
 		nbins = int(data_range/bin_width)
