@@ -7,13 +7,13 @@ import datetime
 import pandas as pd
 import numpy as np
 from dateutil.relativedelta import relativedelta
+import asyncio
+
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
-
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
-
 from sqlalchemy.sql import func
 
 import database as db
@@ -1724,15 +1724,13 @@ class ScreenerBase(WhaleRadar):
 		if predata == "vwap":
 			self.period_vwap:int = int(default_radar['default_bf_period_vwap']) if self.period_vwap is None else self.period_vwap
 			self.percentage_range:float = float(default_radar['default_radar_percentage_range']) if self.percentage_range is None else self.percentage_range
-			self.period_predata:int = self.radar_period + self.period_vwap
+			self.period_predata:int|None = self.radar_period + self.period_vwap
 		elif predata == "vprofile":
-			default_months_range:int = int(default_radar['default_months_range']) if self.default_months_range is None else self.default_months_range
 			self.enddate = datetime.date.today() if self.enddate is None else self.enddate
-			self.startdate = self.enddate - relativedelta(months=default_months_range) if self.startdate is None else self.startdate
-			# TODO
-			# self.period_predata:int = ...
+			self.startdate = self.enddate - relativedelta(months=self.default_months_range) if self.startdate is None else self.startdate
+			self.period_predata:int|None = None
 		else:
-			self.period_predata:int = 0
+			self.period_predata:int|None = None
 
 		# Get  filtered_stock that should be analyzed
 		self.filtered_stockcodes = await self._get_stockcodes(
@@ -2175,15 +2173,58 @@ class ScreenerVProfile(ScreenerBase):
 	
 	async def screen(self) -> ScreenerVProfile:
 		await super()._fit_base(predata="vprofile")
+		self.wf_indicators:pd.DataFrame = await self._calc_wf_indicators_vprofile()
+		self.stocklist:list[str] = await self._get_vprofile_stocklist()
+		self.stocklist, self.top_stockcodes = await self._get_data_from_stocklist(self.n_stockcodes)
 		return self
 	
-	# async def _vprofile_prep(
-	# 	self,
-	# 	startdate: datetime.date,
-	# 	enddate: datetime.date,
-	# 	filtered_stockcodes:pd.Series,
-	# 	stockcode_excludes: set[str],
-	# 	dbs: db.Session = next(db.get_dbs())
-	# 	) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-	# 	# Get raw data
+	async def _calc_wf_indicators_vprofile(self)->pd.DataFrame:
+		self.raw_data_full["netval"] = self.selected_broker_nval
+		return self.raw_data_full
+
+	async def _get_vprofile_stocklist(self)->list[str]:
+		assert isinstance(self.radar_period, int)
+		results = await asyncio.gather(*[self._get_vprofile_inside(data_group, self.radar_period) for code, data_group in self.wf_indicators.groupby(level='code', group_keys=False)])
+		results_series = pd.Series(dict(results))
+		stocklist = results_series[results_series].index.tolist()
+		return stocklist
+
+	async def _get_vprofile_inside(self, data:pd.DataFrame, checking_period:int) -> tuple[str, bool]:
+		# Get code from level 0 index of data
+		code:str = data.index.get_level_values('code')[0] # type: ignore
+
+		# Get last n(checking_period) close
+		last_close = data["close"].iloc[-checking_period:]
+
+		# Check important price by hist_bar peaks
+		bin_obj:Bin = Bin(data=data)
+		bin_obj = await bin_obj.fit()
+		trading_zone = bin_obj.hist_bar.index[bin_obj.peaks_index]
 		
+		if bin_obj.nbins <= 2:
+			return code, False
+
+		# Check does any last close in trading zone
+		is_inside_interval = any(last_close.apply(lambda x: any(x in interval for interval in trading_zone)))
+
+		return code, is_inside_interval
+
+	async def _get_data_from_stocklist(self,n_stockcodes: int) -> tuple[list[str], pd.DataFrame]:
+		assert isinstance(self.radar_period, int), 'radar_period must be int'
+		# Get selected_broker_nval that has level 0 index (code) in self.stocklist
+		stocklist_selected_broker_nval = self.selected_broker_nval.loc[self.selected_broker_nval.index.get_level_values(0).isin(self.stocklist)]
+		
+		# Sum netval in the last self.radar_period for each code
+		mf = stocklist_selected_broker_nval.groupby(level='code').tail(self.radar_period).groupby(level='code')['broker_nval'].sum()
+
+		# Get top n_stockcodes
+		stocklist = mf.nlargest(n_stockcodes).index.tolist()
+
+		# Compile top_stockcodes
+		top_stockcodes:pd.DataFrame
+		top_stockcodes = self.raw_data_full.loc[self.raw_data_full.index.get_level_values('code').isin(stocklist)][['close']].groupby(level='code').last()
+		top_stockcodes['mf'] = mf.loc[mf.index.isin(stocklist)]
+		top_stockcodes['opt_corr'] = self.optimum_corr.loc[self.optimum_corr.index.isin(stocklist)]
+		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
+
+		return stocklist, top_stockcodes
