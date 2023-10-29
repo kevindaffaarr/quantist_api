@@ -1082,7 +1082,7 @@ class ScreenerVProfile(ScreenerBase):
 		self.enddate: datetime.date
 		self.bar_range: int
 		self.raw_data: pd.DataFrame
-		self.startdate, self.enddate, self.bar_range, self.raw_data = await self._vprofile_prep(
+		self.startdate, self.enddate, self.bar_range, self.raw_data, self.close_valflow_corr = await self._vprofile_prep(
 			startdate=self.startdate,
 			enddate=self.enddate,
 			filtered_stockcodes=self.filtered_stockcodes,
@@ -1090,14 +1090,10 @@ class ScreenerVProfile(ScreenerBase):
 			dbs=self.dbs)
 		
 		# Get stocklist
-		stocklist = await self._get_vprofile_stocklist(raw_data=self.raw_data)
+		self.stocklist = await self._get_vprofile_stocklist(raw_data=self.raw_data)
 
 		# Get top_stockcodes
-		self.stocklist, self.top_stockcodes = await self._get_data_from_stocklist(
-			raw_data=self.raw_data,
-			stocklist=stocklist,
-			n_stockcodes=self.n_stockcodes,
-		)
+		self.stocklist, self.top_stockcodes = await self._get_data_from_stocklist(n_stockcodes=self.n_stockcodes)
 		
 		return self
 	
@@ -1108,7 +1104,7 @@ class ScreenerVProfile(ScreenerBase):
 		filtered_stockcodes: pd.Series,
 		stockcode_excludes: set[str],
 		dbs: db.Session = next(db.get_dbs())
-		) -> tuple[datetime.date, datetime.date, int, pd.DataFrame]:
+		) -> tuple[datetime.date, datetime.date, int, pd.DataFrame, pd.Series]:
 		qry = dbs.query(
 			db.StockData.date,
 			db.StockData.code,
@@ -1131,9 +1127,14 @@ class ScreenerVProfile(ScreenerBase):
 		raw_data['fsval'] = raw_data['close']*raw_data['foreignsell']
 		raw_data['netval'] = raw_data['fbval']-raw_data['fsval']
 
+		# Calculate Correlation between close and valflow
+		raw_data['valflow'] = raw_data.groupby('code')['netval'].cumsum()
+		close_valflow_corr:pd.Series = raw_data.groupby(level='code').diff().groupby(level='code')[["close","valflow"]]\
+			.corr(method='pearson').iloc[0::2,-1].droplevel(1) # type: ignore
+		
 		bar_range = int(raw_data.groupby(level='code').size().max())
 
-		return startdate, enddate, bar_range, raw_data
+		return startdate, enddate, bar_range, raw_data, close_valflow_corr
 	
 	async def _get_vprofile_stocklist(self, raw_data: pd.DataFrame) -> list[str]:
 		assert isinstance(self.radar_period, int)
@@ -1162,15 +1163,10 @@ class ScreenerVProfile(ScreenerBase):
 
 		return code, is_inside_interval
 	
-	async def _get_data_from_stocklist(
-		self,
-		raw_data: pd.DataFrame,
-		stocklist: list[str],
-		n_stockcodes: int
-		) -> tuple[list[str], pd.DataFrame]:
+	async def _get_data_from_stocklist(self,n_stockcodes: int) -> tuple[list[str], pd.DataFrame]:
 		assert isinstance(self.radar_period, int), 'radar_period must be int'
 		# Get raw_data that has level 0 index (code) in self.stocklist
-		raw_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
+		raw_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(self.stocklist)]
 
 		# Sum netval in the last self.radar_period for each code
 		mf = raw_data.groupby(level='code').tail(self.radar_period).groupby(level='code')['netval'].sum()
@@ -1183,6 +1179,7 @@ class ScreenerVProfile(ScreenerBase):
 		top_stockcodes:pd.DataFrame
 		top_stockcodes = raw_data[['close']].groupby(level='code').last()
 		top_stockcodes['mf'] = mf.loc[stocklist]
+		top_stockcodes['corr'] = self.close_valflow_corr.loc[stocklist]
 		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
 
 		return stocklist, top_stockcodes

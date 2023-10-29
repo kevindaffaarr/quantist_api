@@ -2224,7 +2224,7 @@ class ScreenerVProfile(ScreenerBase):
 		top_stockcodes:pd.DataFrame
 		top_stockcodes = self.raw_data_full.loc[self.raw_data_full.index.get_level_values('code').isin(stocklist)][['close']].groupby(level='code').last()
 		top_stockcodes['mf'] = mf.loc[mf.index.isin(stocklist)]
-		top_stockcodes['opt_corr'] = self.optimum_corr.loc[self.optimum_corr.index.isin(stocklist)]
+		top_stockcodes['corr'] = self.optimum_corr.loc[self.optimum_corr.index.isin(stocklist)]
 		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
 
 		return stocklist, top_stockcodes
