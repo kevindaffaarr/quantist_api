@@ -1091,8 +1091,10 @@ class WhaleRadar():
 			default_radar = await db.get_default_param()
 
 		# Data Parameter
-		self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100  # type: ignore
-		self.training_end_index = (int(default_radar['default_bf_training_end_index'])-50)/(100/2) if self.training_end_index is None else self.training_end_index/100 # type: ignore
+		# self.training_start_index = (int(default_radar['default_bf_training_start_index'])-50)/(100/2) if self.training_start_index is None else self.training_start_index/100  # type: ignore
+		# self.training_end_index = (int(default_radar['default_bf_training_end_index'])-50)/(100/2) if self.training_end_index is None else self.training_end_index/100 # type: ignore
+		self.training_start_index = (int(default_radar['default_bf_training_start_index'])) if self.training_start_index is None else self.training_start_index/100  # type: ignore
+		self.training_end_index = (int(default_radar['default_bf_training_end_index'])) if self.training_end_index is None else self.training_end_index/100 # type: ignore
 		self.min_n_cluster = int(default_radar['default_bf_min_n_cluster']) if self.min_n_cluster is None else self.min_n_cluster # type: ignore
 		self.max_n_cluster = int(default_radar['default_bf_max_n_cluster']) if self.max_n_cluster is None else self.max_n_cluster # type: ignore
 		self.splitted_min_n_cluster = int(default_radar['default_bf_splitted_min_n_cluster']) if self.splitted_min_n_cluster is None else self.splitted_min_n_cluster # type: ignore
@@ -1104,7 +1106,7 @@ class WhaleRadar():
 		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency # type: ignore
 		self.filter_opt_corr = int(default_radar['default_radar_filter_opt_corr'])/100 if self.filter_opt_corr is None else self.filter_opt_corr/100 # type: ignore
 		
-		self.default_months_range = int((int(default_radar['default_months_range'])/2) + int(self.radar_period/20)) if self.startdate is None else self.default_months_range # type: ignore
+		self.default_months_range = int(int(default_radar['default_months_range']) + int(self.radar_period/20)) if self.startdate is None else self.default_months_range # type: ignore
 		
 		return default_radar
 	
