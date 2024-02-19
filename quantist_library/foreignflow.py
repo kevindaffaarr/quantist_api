@@ -14,6 +14,7 @@ from quantist_library import genchart
 from .helper import Bin
 
 pd.options.mode.copy_on_write = True
+pd.options.future.infer_string = True
 
 class StockFFFull():
 	def __init__(self,
@@ -364,7 +365,7 @@ class ForeignRadar():
 
 	async def fit(self) -> ForeignRadar:
 		# Get default value of parameter
-		default_radar:pd.Series = await self._get_default_radar()
+		await self._get_default_radar()
 		assert self.screener_min_value is not None
 		assert self.screener_min_frequency is not None
 		assert self.screener_min_prop is not None
@@ -1022,7 +1023,7 @@ class ScreenerVWAP(ScreenerBase):
 		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
 		top_data['close_morethan_vwap'] = top_data['close'] >= top_data['vwap']
 		top_data['breakout'] = top_data.groupby(level='code').rolling(window=2)['close_morethan_vwap']\
-			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0)
+			.apply(lambda x: (x.iloc[0] is False) & (x.iloc[1] is True)).droplevel(0)
 		
 		# Get stockcodes with breakout
 		stocklist = top_data['breakout'].groupby(level='code').any()
@@ -1040,7 +1041,7 @@ class ScreenerVWAP(ScreenerBase):
 		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
 		top_data['close_lessthan_vwap'] = top_data['close'] <= top_data['vwap']
 		top_data['breakdown'] = top_data.groupby(level='code').rolling(window=2)['close_lessthan_vwap']\
-			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0)
+			.apply(lambda x: (x.iloc[0] is False) & (x.iloc[1] is True)).droplevel(0)
 		
 		# Get stockcodes with breakdown
 		stocklist = top_data['breakdown'].groupby(level='code').any()

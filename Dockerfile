@@ -14,6 +14,11 @@ ENV PYTHONUNBUFFERED 1
 # Create and change to the app directory.
 WORKDIR /
 
+# Install Git
+RUN apt-get update && \
+    apt-get install -y git && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy application dependency manifests to the container image.
 # Copying this separately prevents re-running pip install on every code change.
 COPY requirements.txt ./
@@ -25,13 +30,10 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 # Copy local code to the container image.
 COPY . ./
 
-# Dev
-FROM base as dev
-COPY --from=base / /
-
-# Prod
-FROM base as prod
-COPY --from=base / /
+# Uninstall Git and clean up
+RUN apt-get purge -y git && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Already using tiangolo/uvicorn-gunicorn-fastapi image, so no need to specify
 # Run the web service on container startup.

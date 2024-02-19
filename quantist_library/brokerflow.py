@@ -22,6 +22,7 @@ from quantist_library import genchart
 from .helper import Bin
 
 pd.options.mode.copy_on_write = True
+pd.options.future.infer_string = True
 
 class StockBFFull():
 	"""
@@ -90,7 +91,7 @@ class StockBFFull():
 
 	async def fit(self) -> StockBFFull:
 		# Get default bf params
-		default_bf:pd.Series = await self.__get_default_bf(dbs=self.dbs)
+		await self.__get_default_bf(dbs=self.dbs)
 		assert isinstance(self.stockcode, str), "stockcode must be string"
 		assert isinstance(self.training_start_index, float), "training_start_index must be float"
 		assert isinstance(self.training_end_index, float), "training_end_index must be float"
@@ -2009,9 +2010,9 @@ class ScreenerVWAP(ScreenerBase):
 		# selected_broker each stock, also optimum_n_selected_cluster, optimum_corr, broker_features
 		# raw_data_full, selected_broker_nvol, selected_broker_nval, selected_broker_sumval
 		await super()._fit_base(predata="vwap")
-		assert isinstance(self.startdate, datetime.date), f'startdate must be datetime.date'
-		assert isinstance(self.period_vwap, int), f'period_vwap must be integer'
-		assert isinstance(self.percentage_range, float), f'percentage_range must be float'
+		assert isinstance(self.startdate, datetime.date), 'startdate must be datetime.date'
+		assert isinstance(self.period_vwap, int), 'period_vwap must be integer'
+		assert isinstance(self.percentage_range, float), 'percentage_range must be float'
 
 		# combine raw_data_full, selected_broker_nval, selected_broker_nvol, selected_broker_sumval
 		self.raw_data_full = self.raw_data_full.join([self.selected_broker_nval, self.selected_broker_nvol, self.selected_broker_sumval], how='left')
@@ -2098,7 +2099,7 @@ class ScreenerVWAP(ScreenerBase):
 		top_data = raw_data_full.loc[raw_data_full.index.get_level_values('code').isin(stocklist)]
 		top_data['close_morethan_vwap'] = top_data['close'] >= top_data['vwap']
 		top_data['breakout'] = top_data.groupby(level='code').rolling(window=2)['close_morethan_vwap']\
-			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0)
+			.apply(lambda x: (x.iloc[0] is False) & (x.iloc[1] is True)).droplevel(0)
 		
 		# Get stockcodes with breakout
 		stocklist = top_data['breakout'].groupby(level='code').any()
@@ -2116,7 +2117,7 @@ class ScreenerVWAP(ScreenerBase):
 		top_data = raw_data_full.loc[raw_data_full.index.get_level_values('code').isin(stocklist)]
 		top_data['close_lessthan_vwap'] = top_data['close'] <= top_data['vwap']
 		top_data['breakdown'] = top_data.groupby(level='code').rolling(window=2)['close_lessthan_vwap']\
-			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0)
+			.apply(lambda x: (x.iloc[0] is False) & (x.iloc[1] is True)).droplevel(0)
 		
 		# Get stockcodes with breakdown
 		stocklist = top_data['breakdown'].groupby(level='code').any()

@@ -47,7 +47,8 @@ else:
 	raise ValueError("ENV_PROD_DEV must be DEV or PROD")
 	
 SessionLocal: sessionmaker = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base(bind=engine)
+Base = declarative_base()
+Base.metadata.bind = engine
 
 # SQLAlchemy DB Session Dependency
 def get_dbs():

@@ -11,6 +11,7 @@ import dependencies as dp
 from .helper import Bin
 
 pd.options.mode.copy_on_write = True
+pd.options.future.infer_string = True
 
 def html_wrap(text:str, width:int = 16, n_lines:int = 2):
 	text_arr = textwrap.wrap(text=text, width=width)
@@ -131,7 +132,7 @@ async def quantist_stock_chart(
 		x=bin_obj.hist_bar.values,
 		y=bin_obj.bins_mid.values,
 		orientation='h',
-		name=f"Net Value Profile",
+		name="Net Value Profile",
 		marker_color=np.where(bin_obj.hist_bar<0,"tomato","cyan"),
 		opacity=0.2,
 		legendrank=7,
@@ -159,7 +160,7 @@ async def quantist_stock_chart(
 	assert isinstance(end_temp, datetime.datetime)
 	dt_all = pd.date_range(start=start_temp,end=end_temp)
 	dt_obs = [d.strftime("%Y-%m-%d") for d in wf_indicators.index] # type: ignore
-	dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if not d in dt_obs]
+	dt_breaks = [d for d in dt_all.strftime("%Y-%m-%d").tolist() if d not in dt_obs]
 
 	fig.update_xaxes(title_text="Date", row=2, col=1, showgrid=True)
 	fig.update_xaxes(title_text="Scripless % | Date", row=1, col=2, showgrid=True, showticklabels=True)
@@ -376,7 +377,7 @@ async def broker_cluster_chart(broker_features: pd.DataFrame, broker_nval_last: 
 		showarrow=False
 	)
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="right",yanchor="bottom",x=1,y=1,
-		text=f"<b>Chart by Quantist.io</b>",
+		text="<b>Chart by Quantist.io</b>",
 		font=dict(size=15),align="right",
 		showarrow=False
 	)
@@ -438,9 +439,9 @@ async def broker_cluster_timeseries_chart(
 			)
 		
 		# Set subplot title
-		fig.update_yaxes(title_text=f"Net Cum Trx", row=i//n_cols+1, col=i%n_cols+1, secondary_y=False)
-		fig.update_xaxes(title_text=f"Date", row=i//n_cols+1, col=i%n_cols+1)
-		fig.update_yaxes(title_text=f"Price", row=i//n_cols+1, col=i%n_cols+1, secondary_y=True)
+		fig.update_yaxes(title_text="Net Cum Trx", row=i//n_cols+1, col=i%n_cols+1, secondary_y=False)
+		fig.update_xaxes(title_text="Date", row=i//n_cols+1, col=i%n_cols+1)
+		fig.update_yaxes(title_text="Price", row=i//n_cols+1, col=i%n_cols+1, secondary_y=True)
 
 	# List the brokers in each cluster from broker_cluster index
 	cluster_brokers = [broker_cluster[broker_cluster['rank'] == i].index.tolist() for i in range(n_clusters)]
@@ -458,7 +459,7 @@ async def broker_cluster_timeseries_chart(
 		showarrow=False
 	)
 	fig.add_annotation(xref="paper",yref="paper",xanchor="right",yanchor="bottom",x=1,y=1.07,
-		text=f"<b>Chart by Quantist.io</b>",
+		text="<b>Chart by Quantist.io</b>",
 		font=dict(size=15),align="right",
 		showarrow=False
 	)

@@ -1,11 +1,5 @@
 import os
 import warnings
-# Ignore FutureWarning, DeprecationWarning
-warnings.simplefilter(action='ignore', category=FutureWarning)
-warnings.simplefilter(action='ignore', category=DeprecationWarning)
-
-ENV_OR_PROD = os.getenv("ENV_OR_PROD", "DEV")
-DEBUG_STATUS = True if ENV_OR_PROD == "DEV" else False
 
 from contextlib import asynccontextmanager
 
@@ -22,6 +16,13 @@ from auth import get_api_key
 from lib import timeit
 
 import database as db
+
+# Ignore FutureWarning, DeprecationWarning
+warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=DeprecationWarning)
+
+ENV_OR_PROD = os.getenv("ENV_OR_PROD", "DEV")
+DEBUG_STATUS = True if ENV_OR_PROD == "DEV" else False
 
 """
 =============================

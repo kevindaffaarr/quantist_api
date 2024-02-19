@@ -16,7 +16,7 @@ router = APIRouter(
 # Function
 # ==========
 async def get_list_code(dbs: db.Session, list_category: dp.ListCategory = dp.ListCategory.stock, extended:bool = False):
-	if list_category == "stock" and extended == True:
+	if list_category == "stock" and extended is True:
 		return dbs.query(db.ListStock).all()
 	elif list_category == "stock":
 		return dbs.query(db.ListStock.index, db.ListStock.code).all()
