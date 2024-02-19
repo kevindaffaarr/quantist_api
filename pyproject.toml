@@ -1,0 +1,29 @@
+# uv installation: pip install uv
+# create venv: uv venv
+# compile dependencies: uv pip compile pyproject.toml -o requirements.txt
+# installation: uv pip install flask
+# installation: uv pip install -r requirements.txt
+# Install from a requirements.txt file: uv pip sync requirements.txt
+
+[project]
+name = "quantist_api"
+version = "1.0.0"
+dependencies = [
+    "future",
+    "fastapi",
+    "orjson",
+    "uvicorn[standard]",
+    "gunicorn",
+    "plotly",
+    "kaleido",
+    "sqlalchemy-bigquery @ git+https://github.com/googleapis/python-bigquery-sqlalchemy.git@v1.11.0.dev2",
+    "google-cloud-bigquery",
+    "google-cloud-bigquery-storage",
+    "SQLAlchemy",
+    "pyarrow",
+    "scikit-learn",
+    "pandas[performance]"
+]
+
+[project.optional-dependencies]
+dev = ["ruff","uv"]
