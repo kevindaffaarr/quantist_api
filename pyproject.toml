@@ -1,6 +1,7 @@
 # uv installation: pip install uv
 # create venv: uv venv
 # compile dependencies: uv pip compile pyproject.toml -o requirements.txt
+# compile dev windows dependencies uv pip compile pyproject.toml -o requirements_windows.txt --extras dev --extras windows
 # installation: uv pip install flask
 # installation: uv pip install -r requirements.txt
 # Install from a requirements.txt file: uv pip sync requirements.txt
@@ -16,7 +17,7 @@ dependencies = [
     "gunicorn",
     "plotly",
     "kaleido",
-    "sqlalchemy-bigquery @ git+https://github.com/googleapis/python-bigquery-sqlalchemy.git@v1.11.0.dev2",
+    "sqlalchemy-bigquery @ git+https://github.com/googleapis/python-bigquery-sqlalchemy.git@v1.11.0.dev3",
     "google-cloud-bigquery",
     "google-cloud-bigquery-storage",
     "SQLAlchemy",
@@ -27,3 +28,4 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["ruff","uv"]
+windows = ["kaleido==0.1.0.post1","psycopg2"]
