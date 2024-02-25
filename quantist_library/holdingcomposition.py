@@ -10,7 +10,7 @@ import database as db
 import dependencies as dp
 
 pd.options.mode.copy_on_write = True
-pd.options.future.infer_string = True
+pd.options.future.infer_string = True # type: ignore
 
 class HoldingComposition():
 	"""

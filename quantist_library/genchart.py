@@ -11,7 +11,7 @@ import dependencies as dp
 from .helper import Bin
 
 pd.options.mode.copy_on_write = True
-pd.options.future.infer_string = True
+pd.options.future.infer_string = True # type: ignore
 
 def html_wrap(text:str, width:int = 16, n_lines:int = 2):
 	text_arr = textwrap.wrap(text=text, width=width)
@@ -170,7 +170,7 @@ async def quantist_stock_chart(
 	fig.update_layout({f"xaxis{val_profile_index}":{'anchor': 'y', 'overlaying': 'x','showgrid':False,"visible":False}})
 
 	# ANNOTATION
-	pricecorrel = wf_indicators.loc[end_temp,'pricecorrel'] # type:ignore
+	pricecorrel = float(wf_indicators.loc[end_temp,'pricecorrel']) # type:ignore
 	if pricecorrel >= 0.7:
 		pricecorrel_color = "SpringGreen"
 	elif pricecorrel >= 0.4:
@@ -179,7 +179,7 @@ async def quantist_stock_chart(
 		pricecorrel_color = "Red"
 	pricecorrel = "{:.2f}%".format(pricecorrel*100)
 
-	mapricecorrel = wf_indicators.loc[wf_indicators.index[-1],'mapricecorrel'] # type:ignore
+	mapricecorrel = float(wf_indicators.loc[wf_indicators.index[-1],'mapricecorrel']) # type:ignore
 	if mapricecorrel >= 0.7:
 		mapricecorrel_color = "SpringGreen"
 	elif mapricecorrel >= 0.4:
@@ -188,7 +188,7 @@ async def quantist_stock_chart(
 		mapricecorrel_color = "Red"
 	mapricecorrel = "{:.2f}%".format(mapricecorrel*100)
 	
-	pow = wf_indicators.loc[wf_indicators.index[-1],'pow'] # type:ignore
+	pow = int(wf_indicators.loc[wf_indicators.index[-1],'pow']) # type:ignore
 	if pow == 3:
 		pow_text = "<span style='color:SpringGreen'>High</span>"
 	elif pow == 2:

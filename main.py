@@ -57,9 +57,13 @@ async def lifespan(app: FastAPI):
 	LIST_STOCK = await db.get_list_stock()
 	g.set_default("DEFAULT_PARAM", DEFAULT_PARAM)
 	g.set_default("LIST_STOCK", LIST_STOCK)
-	yield
-	# Release default_param
-	del DEFAULT_PARAM
+	try:
+		yield
+	except Exception:
+		raise
+	finally:
+		# Release default_param
+		del DEFAULT_PARAM
 
 # INITIATE APP
 app = FastAPI(

@@ -55,6 +55,8 @@ def get_dbs():
 	dbs: Session=SessionLocal()
 	try:
 		yield dbs
+	except Exception:
+		raise
 	finally:
 		dbs.close()
 

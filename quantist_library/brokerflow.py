@@ -22,7 +22,7 @@ from quantist_library import genchart
 from .helper import Bin
 
 pd.options.mode.copy_on_write = True
-pd.options.future.infer_string = True
+pd.options.future.infer_string = True # type: ignore
 
 class StockBFFull():
 	"""
@@ -369,6 +369,7 @@ class StockBFFull():
 		raw_data_full['openprice'] = raw_data_full['openprice'].mask(raw_data_full['openprice'].eq(0),raw_data_full['previous'])
 
 		# End of Method: Return or Assign Attribute
+		assert isinstance(preoffset_startdate, datetime.date), "preoffset_startdate must be datetime.date"
 		return raw_data_full, preoffset_startdate
 
 	async def __get_stock_raw_data(self,
@@ -1607,7 +1608,7 @@ class WhaleRadar():
 		# Choose the maximum data length between radar_period, period_predata, and startdate
 		radar_period = radar_period if radar_period is not None else 0
 		period_predata = period_predata if period_predata is not None else 0
-		bar_range = max(radar_period, period_predata, raw_data_full.query("date >= @startdate").groupby('code').size().max())
+		bar_range = max(radar_period, period_predata, raw_data_full.query("date >= @startdate").groupby('code').size().max()) # type: ignore
 
 		# Get only bar_range rows from last row for each group by code from raw_data_full
 		raw_data_full = raw_data_full.groupby("code").tail(bar_range)
@@ -1906,7 +1907,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		self.selected_broker_nval = self.selected_broker_nval[self.selected_broker_nval.index.get_level_values(0).isin(top_stockcodes.index)]
 		self.selected_broker_sumval = self.selected_broker_sumval[self.selected_broker_sumval.index.get_level_values(0).isin(top_stockcodes.index)]
 		self.raw_data_full = self.raw_data_full[self.raw_data_full.index.get_level_values(0).isin(top_stockcodes.index)]
-		self.bar_range = int(self.raw_data_full.groupby(level='code').size().max())
+		self.bar_range = int(self.raw_data_full.groupby(level='code').size().max()) # type: ignore
 		
 		# Calculate top_stockcodes Prop. Get only between startdate and enddate based on level 1 date index
 		top_stockcodes['prop'] = (self.selected_broker_sumval.loc[
@@ -2058,7 +2059,7 @@ class ScreenerVWAP(ScreenerBase):
 			(raw_data_full.index.get_level_values('date') >= pd.Timestamp(startdate)) & \
 			(raw_data_full.index.get_level_values('date') <= pd.Timestamp(enddate))]
 
-		bar_range = int(raw_data_full.groupby(level='code').size().max())
+		bar_range = int(raw_data_full.groupby(level='code').size().max()) # type: ignore
 
 		return raw_data_full, bar_range
 	

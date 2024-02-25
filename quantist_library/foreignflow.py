@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Literal
+
+from sqlalchemy import ScalarSelect
 from fastapi_globals import g
 
 import datetime
@@ -14,7 +16,7 @@ from quantist_library import genchart
 from .helper import Bin
 
 pd.options.mode.copy_on_write = True
-pd.options.future.infer_string = True
+pd.options.future.infer_string = True # type: ignore
 
 class StockFFFull():
 	def __init__(self,
@@ -348,7 +350,7 @@ class ForeignRadar():
 		period_pricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
-		self.startdate:datetime.date | None = startdate
+		self.startdate:datetime.date | ScalarSelect | None = startdate
 		self.enddate:datetime.date = enddate
 		self.radar_period: int | None = radar_period
 		self.y_axis_type: dp.ListRadarType = y_axis_type
@@ -468,7 +470,7 @@ class ForeignRadar():
 
 	async def __get_stocks_raw_data(self,
 		filtered_stockcodes:pd.Series,
-		startdate: datetime.date | None = None,
+		startdate: datetime.date | ScalarSelect | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		bar_range:int | None = 5,
 		dbs: db.Session = next(db.get_dbs())
@@ -506,8 +508,8 @@ class ForeignRadar():
 		return pd.read_sql(sql=qry.statement,con=dbs.bind,parse_dates=["date"]).reset_index(drop=True) # type: ignore
 	
 	async def __get_composite_raw_data(self,
-		startdate:datetime.date | None =None,
-		enddate:datetime.date | None =None,
+		startdate:datetime.date | ScalarSelect | None =None,
+		enddate:datetime.date | ScalarSelect | None =None,
 		bar_range:int | None = 5,
 		dbs:db.Session = next(db.get_dbs())
 		) ->  pd.DataFrame:
@@ -579,7 +581,7 @@ class ForeignRadar():
 		return radar_indicators
 	
 	async def chart(self,media_type:str | None = None):
-		assert self.startdate is not None
+		assert isinstance(self.startdate, datetime.date)
 
 		fig = await genchart.radar_chart(
 			startdate=self.startdate,
@@ -701,6 +703,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		await super()._fit_base()
 		
 		# get ranked, filtered, and pre-calculated indicator data of filtered_stockcodes
+		assert isinstance(self.startdate, datetime.date)
 		self.top_stockcodes, self.startdate, self.enddate, self.bar_range = await self._get_mf_top_stockcodes(
 			enddate = self.enddate,
 			filtered_stockcodes = self.filtered_stockcodes,
@@ -801,7 +804,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		# Update startdate and enddate based on raw_data
 		startdate = raw_data.index.get_level_values('date').min()
 		enddate = raw_data.index.get_level_values('date').max()
-		bar_range = int(raw_data.groupby(level='code').size().max())
+		bar_range = int(raw_data.groupby(level='code').size().max()) # type: ignore
 
 		assert isinstance(startdate, datetime.date)
 		return top_stockcodes, startdate, enddate, bar_range
@@ -978,7 +981,7 @@ class ScreenerVWAP(ScreenerBase):
 			(raw_data.index.get_level_values('date') >= pd.Timestamp(startdate)) & \
 			(raw_data.index.get_level_values('date') <= pd.Timestamp(enddate))]
 
-		bar_range = int(raw_data.groupby(level='code').size().max())
+		bar_range = int(raw_data.groupby(level='code').size().max()) # type: ignore
 
 		return startdate, enddate, bar_range, raw_data
 
@@ -1133,7 +1136,7 @@ class ScreenerVProfile(ScreenerBase):
 		close_valflow_corr:pd.Series = raw_data.groupby(level='code').diff().groupby(level='code')[["close","valflow"]]\
 			.corr(method='pearson').iloc[0::2,-1].droplevel(1) # type: ignore
 		
-		bar_range = int(raw_data.groupby(level='code').size().max())
+		bar_range = int(raw_data.groupby(level='code').size().max()) # type: ignore
 
 		return startdate, enddate, bar_range, raw_data, close_valflow_corr
 	
