@@ -1026,7 +1026,7 @@ class ScreenerVWAP(ScreenerBase):
 		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
 		top_data['close_morethan_vwap'] = top_data['close'] >= top_data['vwap']
 		top_data['breakout'] = top_data.groupby(level='code').rolling(window=2)['close_morethan_vwap']\
-			.apply(lambda x: (x.iloc[0] is False) & (x.iloc[1] is True)).droplevel(0)
+			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0)  # noqa: E712
 		
 		# Get stockcodes with breakout
 		stocklist = top_data['breakout'].groupby(level='code').any()
@@ -1044,7 +1044,7 @@ class ScreenerVWAP(ScreenerBase):
 		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
 		top_data['close_lessthan_vwap'] = top_data['close'] <= top_data['vwap']
 		top_data['breakdown'] = top_data.groupby(level='code').rolling(window=2)['close_lessthan_vwap']\
-			.apply(lambda x: (x.iloc[0] is False) & (x.iloc[1] is True)).droplevel(0)
+			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0) # noqa: E712
 		
 		# Get stockcodes with breakdown
 		stocklist = top_data['breakdown'].groupby(level='code').any()
