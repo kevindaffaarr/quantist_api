@@ -703,7 +703,6 @@ class ScreenerMoneyFlow(ScreenerBase):
 		await super()._fit_base()
 		
 		# get ranked, filtered, and pre-calculated indicator data of filtered_stockcodes
-		assert isinstance(self.startdate, datetime.date)
 		self.top_stockcodes, self.startdate, self.enddate, self.bar_range = await self._get_mf_top_stockcodes(
 			enddate = self.enddate,
 			filtered_stockcodes = self.filtered_stockcodes,
@@ -724,7 +723,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		stockcode_excludes: set[str],
 		accum_or_distri: dp.ScreenerList = dp.ScreenerList.most_accumulated,
 		n_stockcodes: int = 10,
-		startdate: datetime.date | None = None,
+		startdate: datetime.date | ScalarSelect | None = None,
 		radar_period: int | None = None,
 		period_pricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())
