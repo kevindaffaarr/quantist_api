@@ -261,8 +261,6 @@ class StockBFFull():
 			qry_main = dbs.query(
 				db.IndexTransactionCompositeBroker.date,
 				db.IndexTransactionCompositeBroker.broker,
-				db.IndexTransactionCompositeBroker.bval,
-				db.IndexTransactionCompositeBroker.sval,
 				(db.IndexTransactionCompositeBroker.bval - db.IndexTransactionCompositeBroker.sval).label("nval"), # type: ignore
 				(db.IndexTransactionCompositeBroker.bval + db.IndexTransactionCompositeBroker.sval).label("sumval") # type: ignore
 			).filter(db.IndexTransactionCompositeBroker.date.between(preoffset_startdate, enddate))\
@@ -271,10 +269,6 @@ class StockBFFull():
 			qry_main = dbs.query(
 				db.StockTransaction.date,
 				db.StockTransaction.broker,
-				db.StockTransaction.bvol,
-				db.StockTransaction.svol,
-				db.StockTransaction.bval,
-				db.StockTransaction.sval,
 				(db.StockTransaction.bvol - db.StockTransaction.svol).label("nvol"), # type: ignore
 				(db.StockTransaction.bval - db.StockTransaction.sval).label("nval"), # type: ignore
 				(db.StockTransaction.bval + db.StockTransaction.sval).label("sumval") # type: ignore
@@ -1167,10 +1161,6 @@ class WhaleRadar():
 			db.StockTransaction.date,
 			db.StockTransaction.code,
 			db.StockTransaction.broker,
-			db.StockTransaction.bvol,
-			db.StockTransaction.svol,
-			db.StockTransaction.bval,
-			db.StockTransaction.sval,
 			(db.StockTransaction.bvol - db.StockTransaction.svol).label("nvol"), # type: ignore
 			(db.StockTransaction.bval - db.StockTransaction.sval).label("nval"), # type: ignore
 			(db.StockTransaction.bval + db.StockTransaction.sval).label("sumval") # type: ignore
