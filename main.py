@@ -21,8 +21,8 @@ import database as db
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=DeprecationWarning)
 
-ENV_OR_PROD = os.getenv("ENV_OR_PROD", "DEV")
-DEBUG_STATUS = True if ENV_OR_PROD == "DEV" else False
+ENV_PROD_DEV = os.getenv("ENV_PROD_DEV", "DEV")
+DEBUG_STATUS = True if ENV_PROD_DEV == "DEV" else False
 
 """
 =============================
@@ -103,4 +103,4 @@ async def home():
 	return {"message": "Welcome to Quantist.io"}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+	uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
