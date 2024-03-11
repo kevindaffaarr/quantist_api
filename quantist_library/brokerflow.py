@@ -367,6 +367,9 @@ class StockBFFull():
 
 		# Data Cleansing: zero openprice replace with previous
 		raw_data_full['openprice'] = raw_data_full['openprice'].mask(raw_data_full['openprice'].eq(0),raw_data_full['previous'])
+		# Data Cleansing: zero high and low replace with close
+		raw_data_full['high'] = raw_data_full['high'].mask(raw_data_full['high'].eq(0),raw_data_full['close'])
+		raw_data_full['low'] = raw_data_full['low'].mask(raw_data_full['low'].eq(0),raw_data_full['close'])
 
 		# End of Method: Return or Assign Attribute
 		assert isinstance(preoffset_startdate, datetime.date), "preoffset_startdate must be datetime.date"

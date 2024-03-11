@@ -185,6 +185,9 @@ class StockFFFull():
 
 		# Data Cleansing: zero openprice replace with previous
 		raw_data['openprice'] = raw_data['openprice'].mask(raw_data['openprice'].eq(0),raw_data['previous'])
+		# Data Cleansing: zero high and low replace with close
+		raw_data['high'] = raw_data['high'].mask(raw_data['high'].eq(0),raw_data['close'])
+		raw_data['low'] = raw_data['low'].mask(raw_data['low'].eq(0),raw_data['close'])
 
 		# End of Method: Return or Assign Attribute
 		return raw_data
