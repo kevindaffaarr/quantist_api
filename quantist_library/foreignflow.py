@@ -755,7 +755,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 			db.StockData.value,
 		).join(sub_qry_1, sub_qry_1.c.code == db.StockData.code)
 
-		if (startdate == enddate) or (radar_period == 1):
+		if (isinstance(startdate, datetime.date)) and ((startdate == enddate) or (radar_period == 1)):
 			# Sub Query for pricecorrel with date from enddate to n rows based on period_pricecorrel
 			# get date from BBCA from enddate to limit as much as bar range so we got the startdate
 			startdate_pricecorrel = dbs.query(db.StockData.date
