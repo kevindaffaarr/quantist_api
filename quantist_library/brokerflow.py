@@ -21,6 +21,9 @@ import dependencies as dp
 from quantist_library import genchart
 from .helper import Bin
 
+import polars as pl
+# TODO remove to_pandas(use_pyarrow_extension_array=True) from_pandas after polars fully implemented
+
 pd.options.mode.copy_on_write = True
 pd.options.future.infer_string = True # type: ignore
 
@@ -277,7 +280,7 @@ class StockBFFull():
 			.order_by(db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
-		raw_data_broker_full = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index("date") # type: ignore
+		raw_data_broker_full = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -324,15 +327,15 @@ class StockBFFull():
 			qry_main = qry.filter(db.StockData.date.between(startdate, enddate)).order_by(db.StockData.date.asc())
 
 		# Main Query Fetching
-		raw_data_main = pd.read_sql(sql=qry_main.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index('date') # type: ignore
+		raw_data_main = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
 
 		# Check how many row is returned
 		if raw_data_main.shape[0] == 0:
 			raise ValueError("No data available inside date range")
 		
 		# Update self.startdate and self.enddate to available date in database
-		self.startdate = raw_data_main.index[0].date() # type: ignore
-		self.enddate = raw_data_main.index[-1].date() # type: ignore
+		self.startdate = raw_data_main.index[0] # type: ignore
+		self.enddate = raw_data_main.index[-1] # type: ignore
 
 		# Pre-Data Query
 		startdate = self.startdate
@@ -349,13 +352,13 @@ class StockBFFull():
 		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc()) # type: ignore
 
 		# Pre-Data Query Fetching
-		raw_data_pre = pd.read_sql(sql=qry_pre.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index('date') # type: ignore
+		raw_data_pre = pl.read_database(query=qry_pre.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
 
 		# Concatenate Pre and Main Query
 		raw_data_full = pd.concat([raw_data_pre,raw_data_main])
 		
 		if len(raw_data_pre) > 0:
-			preoffset_startdate = raw_data_pre.index[0].date() # type: ignore
+			preoffset_startdate = raw_data_pre.index[0] # type: ignore
 		else:
 			preoffset_startdate = startdate
 
@@ -398,7 +401,7 @@ class StockBFFull():
 			raw_data_broker_nvol = raw_data_broker_nvol.fillna(0)
 			raw_data_broker_nvol = raw_data_broker_nvol.replace([np.inf, -np.inf], 0)
 			raw_data_broker_nvol = raw_data_broker_nvol.replace(np.nan, 0)
-			
+		
 		return raw_data_full, raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 
 	async def __get_selected_broker(self,
@@ -1129,7 +1132,8 @@ class WhaleRadar():
 					(db.ListStock.code.not_in(stockcode_excludes_lower))) # type: ignore
 		
 		# Query Fetching: filtered_stockcodes
-		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code']) # type: ignore
+		stockcodes = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True)['code'] # type: ignore
+		return pd.Series(stockcodes)
 	
 	# Get Net Val Sum Val Broker Transaction
 	async def __get_nvsv_broker_transaction(self,
@@ -1169,7 +1173,7 @@ class WhaleRadar():
 		.order_by(db.StockTransaction.code.asc(), db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
-		raw_data_broker_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index(["code","date"]) # type: ignore
+		raw_data_broker_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index(["code","date"]) # type: ignore
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -1190,7 +1194,7 @@ class WhaleRadar():
 			qry = dbs.query(db.StockData.code).filter(db.StockData.code.in_(filtered_stockcodes.to_list())).filter(db.StockData.date.between(startdate, enddate)).group_by(db.StockData.code) # type: ignore
 			
 			# Query Fetching
-			raw_data = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"]) # type: ignore
+			raw_data = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True) # type: ignore
 
 			# Check how many row is returned
 			if raw_data.shape[0] == 0:
@@ -1214,7 +1218,7 @@ class WhaleRadar():
 			.order_by(db.StockData.code.asc(), db.StockData.date.asc())
 
 		# Main Query Fetching
-		raw_data_full = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=["date"]).reset_index(drop=True).set_index(["code","date"]) # type: ignore
+		raw_data_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index(["code","date"]) # type: ignore
 
 		# End of Method: Return or Assign Attribute
 		return raw_data_full
@@ -1401,6 +1405,28 @@ class WhaleRadar():
 		df_std = StandardScaler().fit_transform(df)
 		return pd.DataFrame(df_std, index=df.index, columns=df.columns)
 	
+	async def _get_broker_ncum_corr(self,
+		broker_ncum: pd.DataFrame,
+		raw_data_close: pd.Series,
+		) -> pd.DataFrame:
+		broker_ncum_pl = pl.from_pandas(broker_ncum.reset_index())
+		raw_data_close_pl = pl.from_pandas(raw_data_close.reset_index())
+
+		# Get diff for each group by code
+		broker_ncum_pl_diff = broker_ncum_pl.groupby('code').map_groups(lambda group_df: group_df.with_columns(pl.exclude('code','date').diff()))
+		raw_data_close_pl_diff = raw_data_close_pl.groupby('code').map_groups(lambda group_df: group_df.with_columns(pl.exclude('code','date').diff()))
+
+		# Concat for correlation calculation preparation
+		concated_pl = broker_ncum_pl_diff.join(raw_data_close_pl_diff, on=['code','date'], how='inner')
+
+		# Calculate correlation for each broker to close price
+		corr  = concated_pl.select(pl.exclude('date')).groupby('code').map_groups(
+			lambda group_df: group_df.with_columns(pl.corr(pl.exclude('code','date','close'), pl.col('close'))).head(1)
+		).drop('close').sort('code')
+		
+		corr_ncum_close = corr.to_pandas(use_pyarrow_extension_array=True).set_index('code').rename_axis('broker', axis='columns')
+		return corr_ncum_close
+	
 	async def _get_bf_parameters(self,
 		raw_data_close: pd.Series,
 		raw_data_broker_nval: pd.DataFrame,
@@ -1434,11 +1460,10 @@ class WhaleRadar():
 
 		# Cumulate volume for nvol
 		broker_ncum = raw_data_broker_nval.groupby(by='code').cumsum(axis=0)
-		# Get correlation between raw_data_ncum and close
-		corr_ncum_close = broker_ncum.groupby(by='code').diff().groupby(by='code').corrwith(raw_data_close.groupby(by='code').diff(),axis=0) # type: ignore
-
 		# Get each broker's sum of transaction value
 		broker_sumval = raw_data_broker_sumval.groupby(by='code').sum()
+		# Get correlation between each broker's cumulated transaction and close price
+		corr_ncum_close = await self._get_broker_ncum_corr(broker_ncum=broker_ncum, raw_data_close=raw_data_close)
 
 		# fillna
 		corr_ncum_close.fillna(value=0, inplace=True)
@@ -1593,9 +1618,9 @@ class WhaleRadar():
 		) -> tuple[datetime.date, datetime.date, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		# Update startdate, and enddate based on Data Queried
 		# Then update raw_data_full, raw_data_broker_nvol, raw_data_broker_nval
-		enddate: datetime.date = raw_data_full.index.get_level_values("date").date.max() # type: ignore
+		enddate: datetime.date = raw_data_full.index.get_level_values("date").max() # type: ignore
 		if startdate is None:
-			startdate = raw_data_full.groupby("code").tail(radar_period).index.get_level_values("date").date.min() # type: ignore
+			startdate = raw_data_full.groupby("code").tail(radar_period).index.get_level_values("date").min() # type: ignore
 		assert startdate is not None
 
 		# Choose the maximum data length between radar_period, period_predata, and startdate

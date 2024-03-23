@@ -61,6 +61,7 @@ async def quantist_stock_chart(
 
 	# Add Trace
 	# OHLC Candlestick
+	wf_indicators.index = wf_indicators.index.astype('datetime64[ns]')
 	fig.add_trace(go.Candlestick(
 		x=wf_indicators.index,
 		open=wf_indicators["openprice"],

@@ -90,6 +90,7 @@ packaging==23.2
     #   sqlalchemy-bigquery
 pandas==2.2.1
 plotly==5.19.0
+polars==0.20.16
 proto-plus==1.23.0
     # via google-cloud-bigquery-storage
 protobuf==4.25.3

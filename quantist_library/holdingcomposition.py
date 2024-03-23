@@ -4,6 +4,7 @@ from fastapi_globals import g
 import datetime
 from dateutil.relativedelta import relativedelta
 import pandas as pd
+import polars as pl
 from sqlalchemy.sql import func
 
 import database as db
@@ -89,13 +90,16 @@ class HoldingComposition():
 			.filter(db.KseiKepemilikanEfek.date <= self.enddate)
 		if self.stockcode != "composite":
 			qry = qry.filter(db.KseiKepemilikanEfek.code == self.stockcode)
-			
-		return pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).set_index("date").sort_index() # type: ignore
+		
+		data_ksei = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date").sort_index() # type: ignore
+
+		return data_ksei
 	
 	async def __get_data_scripless(self, list_date:list, dbs:db.Session = next(db.get_dbs())) -> pd.DataFrame:
 		# Query table stockdata: tradebleshares divided by listedshares for filtercode each list_date
 		qry = dbs.query(db.StockData.date, db.StockData.tradebleshares, db.StockData.listedshares).filter(db.StockData.code == self.stockcode).filter(db.StockData.date.in_(list_date)) # type: ignore
-		data_scripless = pd.read_sql(sql=qry.statement, con=dbs.bind, parse_dates=['date']).reset_index(drop=True).set_index("date").sort_index() # type: ignore
+		data_scripless = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date").sort_index() # type: ignore
+		
 		data_scripless["scripless_ratio"] = data_scripless["tradebleshares"] / data_scripless["listedshares"]
 		return data_scripless[["scripless_ratio"]]
 
@@ -116,7 +120,7 @@ class HoldingComposition():
 		data_ksei = await self.__get_data_ksei(dbs=dbs)
 
 		# Get data scripless ratio for each date from data_ksei and convert to datetime.date
-		list_date = data_ksei.index.to_pydatetime().tolist() # type: ignore
+		list_date = data_ksei.index.tolist() # type: ignore
 		data_scripless = await self.__get_data_scripless(list_date=list_date, dbs=dbs)
 
 		# ==========
