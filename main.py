@@ -7,9 +7,10 @@ import uvicorn
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi_globals import g, GlobalsMiddleware
 
-from routers import whaleanalysis, param
+from routers import whaleanalysis, param, web
 from dependencies import Tags
 
 from auth import get_api_key
@@ -69,7 +70,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
 	default_response_class=ORJSONResponse,
 	debug=DEBUG_STATUS,
-	dependencies=[Depends(get_api_key)],
 	lifespan=lifespan,
 	title="quantist_api",
 	description=DESCRIPTION,
@@ -93,11 +93,14 @@ app.add_middleware(
 )
 app.add_middleware(GlobalsMiddleware)
 
-# INCLUDE ROUTER
-app.include_router(whaleanalysis.router)
-app.include_router(param.router)
+app.mount("/static", StaticFiles(directory="pages/static"), name="static")
 
-@app.get("/")
+# INCLUDE ROUTER
+app.include_router(whaleanalysis.router, dependencies=[Depends(get_api_key)])
+app.include_router(param.router, dependencies=[Depends(get_api_key)])
+app.include_router(web.router)
+
+@app.get("/", dependencies=[Depends(get_api_key)],)
 @timeit
 async def home():
 	return {"message": "Welcome to Quantist.io"}

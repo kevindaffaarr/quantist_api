@@ -1,0 +1,17 @@
+{
+  "name": "quantist_api",
+  "version": "1.0.0",
+  "description": "_Democratize the information of Indonesia Stocks and more to investors from retail to institution._",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "npx tailwindcss -i ./pages/src/input.css -o ./pages/static/styles.css --watch",
+    "build:watch": "npx tailwindcss -i ./pages/src/input.css -o ./pages/static/styles.css --watch"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "daisyui": "^4.10.1",
+    "tailwindcss": "^3.4.3"
+  }
+}

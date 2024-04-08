@@ -1,0 +1,34 @@
+<nav class="navbar flex">
+    <!-- Sidebar Button -->
+    <div class="flex-none">
+        <button class="btn btn-square btn-ghost">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-5 h-5 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+    </div>
+    <!-- Brand -->
+    <div class="flex-1">
+        <a class="flex font-bold text-slate-100 text-xl" href="/web">
+            <img src="/static/favicon.ico" alt="Quantist.io" class="inline-block w-6 h-6 mr-1">
+            Quantist.io
+        </a>
+    </div>
+    <!-- Search Input -->
+    <div class="flex-initial w-auto">
+        <div class="flex input input-bordered items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 opacity-70"><path fill-rule="evenodd" d="M9.965 11.026a5 5 0 1 1 1.06-1.06l2.755 2.754a.75.75 0 1 1-1.06 1.06l-2.755-2.754ZM10.5 7a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z" clip-rule="evenodd" /></svg>
+            <input id="search-navbar" type="text" class="grow" placeholder="Search...">
+            <kbd class="kbd kbd-sm">Ctrl</kbd>
+            <kbd class="kbd kbd-sm">K</kbd>
+        </div>
+    </div>
+</nav>
+
+<!-- Script for Ctrl + K or for mac to focus on search-navbar -->
+<script>
+    document.addEventListener('keydown', function (event) {
+        if (event.ctrlKey && event.key === 'k') {
+            event.preventDefault();
+            document.getElementById('search-navbar').focus();
+        }
+    });
+</script>

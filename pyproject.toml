@@ -2,9 +2,11 @@
 # create venv: uv venv
 # compile dependencies: uv pip compile pyproject.toml -o requirements.txt
 # compile dev windows dependencies: uv pip compile pyproject.toml -o requirements_windows.txt --extra dev --extra windows
-# installation: uv pip install flask
-# installation: uv pip install -r requirements.txt
-# Install from a requirements.txt file: uv pip sync requirements_windows.txt
+# single installation example: uv pip install fastapi
+# main installation: uv pip install -r requirements.txt
+# main sync: uv pip sync requirements.txt
+# dev installation: uv pip install -r requirements_windows.txt
+# dev sync: uv pip sync requirements_windows.txt
 
 [project]
 name = "quantist_api"
@@ -24,7 +26,8 @@ dependencies = [
     "pyarrow",
     "scikit-learn",
     "pandas[performance]",
-    "polars"
+    "polars",
+    "jinja2"
 ]
 
 [project.optional-dependencies]

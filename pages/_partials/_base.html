@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        {% block head %}
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{% block title %}{% endblock %}Quantist.io</title>
+        <link rel="icon" href="{{ url_for('static', path='/favicon.ico') }}">
+        <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+        {% endblock %}
+    </head>
+    <body>
+        {% block navbar %}{% include '/_partials/_navbar.html' %}{% endblock navbar %}
+        <main>
+        {% block main %}
+            <div>Welcome to Quantist.io{{ " "+name if name }}!</div>
+        {% endblock %}
+        </main>
+    </body>
+</html>

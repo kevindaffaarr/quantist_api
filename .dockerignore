@@ -3,9 +3,15 @@ env311
 __pycache__
 testing_*
 .git
-.dockerignore
+.vscode
+temp/*
+profiler_*
+.ruff_cache
+node_modules
+
 .gitignore
+.github
 proj_docs
 README.md
 requirements_*
-.vscode
+pages/src/*

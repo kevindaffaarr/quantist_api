@@ -1,0 +1,14 @@
+{% extends '_partials/_base.html' %}
+
+{% block head %}
+    {{ super() }}
+    <script src="https://cdn.plot.ly/plotly-2.30.0.min.js" charset="utf-8"></script>
+{% endblock %}
+
+{% block title %}Home | {% endblock %}
+
+{% block main %}
+<div class="container mx-auto">
+    <h1 class="text-4xl font-bold text-center">Welcome to Quantist.io{{ " "+name if name }}!</h1>
+</div>
+{% endblock main %}
