@@ -397,6 +397,10 @@ async def broker_cluster_timeseries_chart(
 	startdate: datetime.date,
 	enddate: datetime.date,
 	) -> go.Figure:
+
+	# Convert pyarrow index to datetime64[ns]
+	broker_ncum.index = broker_ncum.index.astype('datetime64[ns]')
+
 	# Count number of clusters
 	n_clusters = broker_cluster['cluster'].nunique()
 
