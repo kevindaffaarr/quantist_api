@@ -8,7 +8,422 @@
 {% block title %}Home | {% endblock %}
 
 {% block main %}
-<div class="container mx-auto">
-    <h1 class="text-4xl font-bold text-center">Welcome to Quantist.io{{ " "+name if name }}!</h1>
+<div id="content" name="content" class="container mx-auto place-content-center place-items-center justify-center text-center">
+    <div id="paramCard" name="paramCard" class="card card-bordered card-compact w-full bg-base-300 shadow-xl my-1">
+        <div class="flex flex-row flex-wrap flex-auto w-full p-2 gap-4">
+            <label class="flex flex-auto form-control">
+                <span class="label text-xs">Stock Code</span>
+                <input type="text" class="input input-bordered input-sm uppercase" id="stockcode" name="stockcode" placeholder="Stock Code" maxlength="4">
+            </label>
+            <label class="flex flex-auto form-control">
+                <span class="label text-xs">Start Date</span>
+                <input type="date" class="input input-bordered input-sm" id="startdate" name="startdate" placeholder="Start Date">
+            </label>
+            <label class="flex flex-auto form-control">
+                <span class="label text-xs">End Date</span>
+                <input type="date" class="input input-bordered input-sm" id="enddate" name="enddate" placeholder="End Date">
+            </label>
+            <label class="flex flex-none form-control">
+                <span class="label text-xs">Method</span>
+                <label class="flex gap-2">
+                    <span class="text-sm">Foreign Flow</span> 
+                    <input type="checkbox" id="analysismethod" name="analysismethod" value="whaleflow" class="toggle toggle-sm toggle-primary"/>
+                    <span class="text-sm text-primary">Whale Flow</span> 
+                </label>
+            </label>
+            <label class="flex flex-initial form-control justify-center">
+                <button class="btn btn-md btn-accent" onclick="document.getElementById('analysismethod').checked ? paramWhaleModal.showModal() : paramForeignModal.showModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sliders" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M11.5 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M9.05 3a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0V3zM4.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M2.05 8a2.5 2.5 0 0 1 4.9 0H16v1H6.95a2.5 2.5 0 0 1-4.9 0H0V8zm9.45 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m-2.45 1a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0v-1z"/></svg>
+                </button>
+            </label>
+            <label class="flex flex-initial form-control justify-center">
+                <button class="btn btn-md btn-primary text-white" id="getChart" name="getChart">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/></svg>
+                </button>
+            </label>
+        </div>
+    </div>
+    <div id="chartContainer" name="chartContainer" class="relative h-screen my-1">
+        <div id="loadingDiv" class="absolute inset-0 flex items-center justify-center z-10 transition-opacity duration-300 opacity-100">
+            <span class="loading loading-ring w-48 text-primary"></span>
+        </div>
+        <div id="chartCard" class="absolute inset-0 card card-bordered card-compact w-full bg-base-300 shadow-xl aspect-video max-w-full max-h-screen z-0 transition-opacity duration-300 ease-in-out opacity-0">
+            <div class="card-body">
+                <div id="chart" class="h-full w-full"></div>
+            </div>
+        </div>
+    </div>
+    <div id="clusterCard" class="card card-bordered card-compact w-full bg-base-300 shadow-xl aspect-video max-w-full max-h-screen z-0 transition-opacity duration-300 ease-in-out opacity-0 hidden">
+        <div class="card-body">
+            <div id="cluster" class="h-full w-full"></div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <dialog id="paramForeignModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg">Foreign Chart Parameters</h3>
+            <div class="flex flex-col flex-wrap flex-auto w-full p-2 gap-4">
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">Period: Money Flow</span>
+                    <input type="number" class="input input-bordered input-sm" id="foreign_period_mf" name="foreign_period_mf" placeholder="Period Money Flow" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">Period: Proportion</span>
+                    <input type="number" class="input input-bordered input-sm" id="foreign_period_prop" name="foreign_period_prop" placeholder="Period Proportion" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">Period: Price Correlation</span>
+                    <input type="number" class="input input-bordered input-sm" id="foreign_period_pricecorrel" name="foreign_period_pricecorrel" placeholder="Period Price Correlation" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">Period: MA Price Correlation</span>
+                    <input type="number" class="input input-bordered input-sm" id="foreign_period_mapricecorrel" name="foreign_period_mapricecorrel" placeholder="Period MA Price Correlation" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">Period: VWAP</span>
+                    <input type="number" class="input input-bordered input-sm" id="foreign_period_vwap" name="foreign_period_vwap" placeholder="Period VWAP" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+            </div>
+            <div class="modal-action">
+                <button class="btn btn-outline btn-accent" id="resetParamForeign">Reset</button>
+                <form method="dialog">
+                    <button class="btn btn-primary">Save</button>
+                </form>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <dialog id="paramWhaleModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg">Whale Chart Parameters</h3>
+            <div class="flex flex-col flex-wrap flex-auto w-full p-2 gap-4">
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">clustering_method</span>
+                    <select class="select select-bordered select-sm" id="whale_clustering_method" name="whale_clustering_method">
+                        <option value="correlation" selected>correlation</option>
+                        <option value="timeseries">timeseries</option>
+                    </select>
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">n_selected_cluster</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_n_selected_cluster" name="whale_n_selected_cluster" placeholder="whale_n_selected_cluster" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">period_mf</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_period_mf" name="whale_period_mf" placeholder="whale_period_mf" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">period_prop</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_period_prop" name="whale_period_prop" placeholder="whale_period_prop" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">period_pricecorrel</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_period_pricecorrel" name="whale_period_pricecorrel" placeholder="whale_period_pricecorrel" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">period_mapricecorrel</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_period_mapricecorrel" name="whale_period_mapricecorrel" placeholder="whale_period_mapricecorrel" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">period_vwap</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_period_vwap" name="whale_period_vwap" placeholder="whale_period_vwap" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">pow_high_prop</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_pow_high_prop" name="whale_pow_high_prop" placeholder="whale_pow_high_prop" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">pow_high_pricecorrel</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_pow_high_pricecorrel" name="whale_pow_high_pricecorrel" placeholder="whale_pow_high_pricecorrel" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">pow_high_mapricecorrel</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_pow_high_mapricecorrel" name="whale_pow_high_mapricecorrel" placeholder="whale_pow_high_mapricecorrel" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">pow_medium_prop</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_pow_medium_prop" name="whale_pow_medium_prop" placeholder="whale_pow_medium_prop" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">pow_medium_pricecorrel</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_pow_medium_pricecorrel" name="whale_pow_medium_pricecorrel" placeholder="whale_pow_medium_pricecorrel" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">pow_medium_mapricecorrel</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_pow_medium_mapricecorrel" name="whale_pow_medium_mapricecorrel" placeholder="whale_pow_medium_mapricecorrel" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">training_start_index</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_training_start_index" name="whale_training_start_index" placeholder="whale_training_start_index" min=0>
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">training_end_index</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_training_end_index" name="whale_training_end_index" placeholder="whale_training_end_index" min=0>
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">min_n_cluster</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_min_n_cluster" name="whale_min_n_cluster" placeholder="whale_min_n_cluster" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">max_n_cluster</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_max_n_cluster" name="whale_max_n_cluster" placeholder="whale_max_n_cluster" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">splitted_min_n_cluster</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_splitted_min_n_cluster" name="whale_splitted_min_n_cluster" placeholder="whale_splitted_min_n_cluster" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">splitted_max_n_cluster</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_splitted_max_n_cluster" name="whale_splitted_max_n_cluster" placeholder="whale_splitted_max_n_cluster" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+                <label class="flex flex-auto form-control">
+                    <span class="label text-xs">stepup_n_cluster_threshold</span>
+                    <input type="number" class="input input-bordered input-sm" id="whale_stepup_n_cluster_threshold" name="whale_stepup_n_cluster_threshold" placeholder="whale_stepup_n_cluster_threshold" min=0 step=1 onkeypress="return isNumberKey(event)">
+                </label>
+            </div>
+            <div class="modal-action">
+                <button class="btn btn-outline btn-accent" id="resetParamWhale">Reset</button>
+                <form method="dialog">
+                    <button class="btn btn-primary">Save</button>
+                </form>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
 </div>
 {% endblock main %}
+
+{% block script %}
+{{ super() }}
+<script>
+    // Global Variables
+    const API_ENDPOINT = '{{ "undefined"|getenv("API_ENDPOINT") }}';
+    const API_KEY = '{{ "undefined"|getenv("WEB_API_KEY") }}';
+    const plotConfig = {
+        "toImageButtonOptions":{
+            "format":"png",
+            "filename":"Quantist.io",
+            "scale":1
+        },
+        "modeBarButtonsToAdd":["drawline","drawopenpath","drawclosedpath","drawcircle","drawrect","eraseshape"], 
+        "scrollZoom": true,
+        "responsive": true
+    };
+</script>
+<script>
+    // Page Functions
+    // function to erase all input values from all input tag inside id given, including the child of child etc elements
+    function eraseAllInputValues(id){
+        var inputElements = document.getElementById(id).getElementsByTagName('input');
+        for (var i = 0; i < inputElements.length; i++) {
+            inputElements[i].value = '';
+        }
+    }
+
+    // resetParam Button Event Listener: Click
+    document.getElementById('resetParamForeign').addEventListener('click', function(){
+        eraseAllInputValues('paramForeignModal');
+    });
+    document.getElementById('resetParamWhale').addEventListener('click', function(){
+        eraseAllInputValues('paramWhaleModal');
+    });
+</script>
+<script>
+    // Chart Fetching and Rendering Script
+    function fetchChartForeign(){
+        // Make query param string using the following parameters
+        queryParam = new URLSearchParams();
+        const stockcode = document.getElementById('stockcode').value;
+        const startdate = document.getElementById('startdate').value;
+        const enddate = document.getElementById('enddate').value;
+        const period_mf = document.getElementById('foreign_period_mf').value;
+        const period_prop = document.getElementById('foreign_period_prop').value;
+        const period_pricecorrel = document.getElementById('foreign_period_pricecorrel').value;
+        const period_mapricecorrel = document.getElementById('foreign_period_mapricecorrel').value;
+        const period_vwap = document.getElementById('foreign_period_vwap').value;
+
+        if (stockcode) queryParam.append('stockcode', stockcode);
+        if (startdate) queryParam.append('startdate', startdate);
+        if (enddate) queryParam.append('enddate', enddate);
+        if (period_mf) queryParam.append('period_mf', period_mf);
+        if (period_prop) queryParam.append('period_prop', period_prop);
+        if (period_pricecorrel) queryParam.append('period_pricecorrel', period_pricecorrel);
+        if (period_mapricecorrel) queryParam.append('period_mapricecorrel', period_mapricecorrel);
+        if (period_vwap) queryParam.append('period_vwap', period_vwap);
+
+        url = `${API_ENDPOINT}/whaleanalysis/chart/foreign?media_type=json&${queryParam.toString()}`;
+
+        return fetch(
+            url, {
+                method:'GET',
+                headers:{
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-API-KEY': API_KEY
+                }
+            }
+        ).then(response => {
+            if (!response.ok) {
+                throw response;
+            }
+            return response;
+        }).catch(
+            error => {
+                throw error;
+            }
+        );
+    };
+
+    function fetchChartWhale(){
+        // Make query param string using the following parameters
+        queryParam = new URLSearchParams(); 
+        const stockcode = document.getElementById('stockcode').value;
+        const startdate = document.getElementById('startdate').value;
+        const enddate = document.getElementById('enddate').value;
+        const clustering_method = document.getElementById('whale_clustering_method').value;
+        const n_selected_cluster = document.getElementById('whale_n_selected_cluster').value;
+        const period_mf = document.getElementById('whale_period_mf').value;
+        const period_prop = document.getElementById('whale_period_prop').value;
+        const period_pricecorrel = document.getElementById('whale_period_pricecorrel').value;
+        const period_mapricecorrel = document.getElementById('whale_period_mapricecorrel').value;
+        const period_vwap = document.getElementById('whale_period_vwap').value;
+        const pow_high_prop = document.getElementById('whale_pow_high_prop').value;
+        const pow_high_pricecorrel = document.getElementById('whale_pow_high_pricecorrel').value;
+        const pow_high_mapricecorrel = document.getElementById('whale_pow_high_mapricecorrel').value;
+        const pow_medium_prop = document.getElementById('whale_pow_medium_prop').value;
+        const pow_medium_pricecorrel = document.getElementById('whale_pow_medium_pricecorrel').value;
+        const pow_medium_mapricecorrel = document.getElementById('whale_pow_medium_mapricecorrel').value;
+        const training_start_index = document.getElementById('whale_training_start_index').value;
+        const training_end_index = document.getElementById('whale_training_end_index').value;
+        const min_n_cluster = document.getElementById('whale_min_n_cluster').value;
+        const max_n_cluster = document.getElementById('whale_max_n_cluster').value;
+        const splitted_min_n_cluster = document.getElementById('whale_splitted_min_n_cluster').value;
+        const splitted_max_n_cluster = document.getElementById('whale_splitted_max_n_cluster').value;
+        const stepup_n_cluster_threshold = document.getElementById('whale_stepup_n_cluster_threshold').value;
+
+        if (stockcode) queryParam.append('stockcode', stockcode);
+        if (startdate) queryParam.append('startdate', startdate);
+        if (enddate) queryParam.append('enddate', enddate);
+        if (clustering_method) queryParam.append('clustering_method', clustering_method)
+        if (n_selected_cluster) queryParam.append('n_selected_cluster', n_selected_cluster)
+        if (period_mf) queryParam.append('period_mf', period_mf)
+        if (period_prop) queryParam.append('period_prop', period_prop)
+        if (period_pricecorrel) queryParam.append('period_pricecorrel', period_pricecorrel)
+        if (period_mapricecorrel) queryParam.append('period_mapricecorrel', period_mapricecorrel)
+        if (period_vwap) queryParam.append('period_vwap', period_vwap)
+        if (pow_high_prop) queryParam.append('pow_high_prop', pow_high_prop)
+        if (pow_high_pricecorrel) queryParam.append('pow_high_pricecorrel', pow_high_pricecorrel)
+        if (pow_high_mapricecorrel) queryParam.append('pow_high_mapricecorrel', pow_high_mapricecorrel)
+        if (pow_medium_prop) queryParam.append('pow_medium_prop', pow_medium_prop)
+        if (pow_medium_pricecorrel) queryParam.append('pow_medium_pricecorrel', pow_medium_pricecorrel)
+        if (pow_medium_mapricecorrel) queryParam.append('pow_medium_mapricecorrel', pow_medium_mapricecorrel)
+        if (training_start_index) queryParam.append('training_start_index', training_start_index)
+        if (training_end_index) queryParam.append('training_end_index', training_end_index)
+        if (min_n_cluster) queryParam.append('min_n_cluster', min_n_cluster)
+        if (max_n_cluster) queryParam.append('max_n_cluster', max_n_cluster)
+        if (splitted_min_n_cluster) queryParam.append('splitted_min_n_cluster', splitted_min_n_cluster)
+        if (splitted_max_n_cluster) queryParam.append('splitted_max_n_cluster', splitted_max_n_cluster)
+        if (stepup_n_cluster_threshold) queryParam.append('stepup_n_cluster_threshold', stepup_n_cluster_threshold)
+
+        url = `${API_ENDPOINT}/whaleanalysis/chart/broker?media_type=json&api_type=all&${queryParam.toString()}`;
+
+        return fetch(
+            url, {
+                method:'GET',
+                headers:{
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-API-KEY': API_KEY
+                }
+            }
+        ).then(response => {
+            if (!response.ok) {
+                throw response;
+            }
+            return response;
+        }).catch(
+            error => {
+                throw error;
+            }
+        );
+    };
+
+    function renderChart(chartDiv,plotlyJson){
+        plotData = plotlyJson["data"];
+        plotLayout = plotlyJson["layout"];
+        Plotly.setPlotConfig(plotConfig);
+        Plotly.react(chartDiv, plotData, plotLayout,{});
+        document.getElementById('loadingDiv').classList.add('opacity-0')
+        document.getElementById('loadingDiv').classList.remove('opacity-100')
+        document.getElementById('chartCard').classList.remove('opacity-0')
+        document.getElementById('chartCard').classList.add('opacity-100')
+    }
+    
+    function getChartForeign(){
+        chartDiv = document.getElementById('chart');
+        fetchChartForeign().then(response => {
+            response.json().then(plotlyJson => {
+                renderChart(chartDiv,plotlyJson);
+            }).catch(error => {
+                throw error;
+            });
+        }).catch(error => {
+            console.log(error);
+        });
+    };
+
+    function getChartWhale(chartDiv){
+        chartDiv = document.getElementById('chart');
+        clusterDiv = document.getElementById('cluster');
+
+        fetchChartWhale().then(response => {
+            response.json().then(responseJson => {
+                chartJson = responseJson["flow"];
+                clusterJson = responseJson["cluster"];
+
+                renderChart(chartDiv,chartJson);
+                
+                clusterCard = document.getElementById('clusterCard');
+                clusterCard.classList.remove('opacity-0')
+                clusterCard.classList.remove('hidden')
+                clusterCard.classList.add('opacity-100')
+                
+                renderChart(clusterDiv,clusterJson);
+            }).catch(error => {
+                throw error;
+            });
+        }).catch(error => {
+            console.log(error);
+        });
+    };
+
+    document.getElementById('getChart').addEventListener('click', () => {
+        document.getElementById('chartCard').classList.add('opacity-0')
+        document.getElementById('chartCard').classList.remove('opacity-100')
+        document.getElementById('loadingDiv').classList.remove('opacity-0')
+        document.getElementById('loadingDiv').classList.add('opacity-100')
+
+        document.getElementById('clusterCard').classList.add('opacity-0')
+        document.getElementById('clusterCard').classList.add('hidden')
+        document.getElementById('clusterCard').classList.remove('opacity-100')
+
+        analysismethod = document.getElementById('analysismethod').checked ? 'whale' : 'foreign';
+        if (analysismethod == 'foreign') {
+            getChartForeign();
+        } else if (analysismethod == 'whale') {
+            getChartWhale();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        chartDiv = document.getElementById('chart');
+        getChartForeign();
+    });
+</script>
+{% endblock %}
