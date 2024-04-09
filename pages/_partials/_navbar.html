@@ -1,26 +1,47 @@
-<nav class="navbar flex">
+<nav class="navbar flex gap-2 px-4">
     <!-- Sidebar Button -->
-    <div class="flex-none">
+    <!-- <div class="flex-none">
         <button class="btn btn-square btn-ghost">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-5 h-5 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
         </button>
-    </div>
+    </div> -->
     <!-- Brand -->
     <div class="flex-1">
-        <a class="flex font-bold text-slate-100 text-xl" href="/web">
+        <a class="flex font-bold text-slate-100 text-xl" href="/">
             <img src="/static/favicon.ico" alt="Quantist.io" class="inline-block w-6 h-6 mr-1">
             Quantist.io
         </a>
     </div>
+    <!-- Menu -->
+    <ul class="menu flex flex-initial flex-row menu-horizontal">
+        <li>
+            <a class="flex font-bold" href="/">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-house-door-fill" viewBox="0 0 16 16"><path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5"/></svg>
+                Home
+            </a>
+        </li>
+        <li>
+            <a class="flex font-bold text-primary" href="/web">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-graph-up-arrow" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M0 0h1v15h15v1H0zm10 3.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V4.9l-3.613 4.417a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61L13.445 4H10.5a.5.5 0 0 1-.5-.5"/></svg>
+                Chart
+            </a>
+        </li>
+        <li>
+            <a class="flex font-bold" href="https://t.me/quantistiobot" target="_blank">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-telegram" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8.287 5.906q-1.168.486-4.666 2.01-.567.225-.595.442c-.03.243.275.339.69.47l.175.055c.408.133.958.288 1.243.294q.39.01.868-.32 3.269-2.206 3.374-2.23c.05-.012.12-.026.166.016s.042.12.037.141c-.03.129-1.227 1.241-1.846 1.817-.193.18-.33.307-.358.336a8 8 0 0 1-.188.186c-.38.366-.664.64.015 1.088.327.216.589.393.85.571.284.194.568.387.936.629q.14.092.27.187c.331.236.63.448.997.414.214-.02.435-.22.547-.82.265-1.417.786-4.486.906-5.751a1.4 1.4 0 0 0-.013-.315.34.34 0 0 0-.114-.217.53.53 0 0 0-.31-.093c-.3.005-.763.166-2.984 1.09"/></svg>
+                Telegram Bot
+            </a>
+        </li>
+    </ul>
     <!-- Search Input -->
-    <div class="flex-initial w-auto">
+    <!-- <div class="flex-initial w-auto">
         <div class="flex input input-bordered items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 opacity-70"><path fill-rule="evenodd" d="M9.965 11.026a5 5 0 1 1 1.06-1.06l2.755 2.754a.75.75 0 1 1-1.06 1.06l-2.755-2.754ZM10.5 7a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z" clip-rule="evenodd" /></svg>
             <input id="search-navbar" type="text" class="grow" placeholder="Search...">
             <kbd class="kbd kbd-sm">Ctrl</kbd>
             <kbd class="kbd kbd-sm">K</kbd>
         </div>
-    </div>
+    </div> -->
 </nav>
 
 <!-- Script for Ctrl + K or for mac to focus on search-navbar -->

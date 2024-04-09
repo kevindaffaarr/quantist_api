@@ -27,3 +27,6 @@ templates.env.filters['getenv'] = getenv
 @timeit
 async def index(request: Request, name: str|None = None):
     return templates.TemplateResponse(request=request, name="index.html", context={"name": name})
+
+# TODO: router with query parameters
+# TODO: screener
