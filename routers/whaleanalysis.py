@@ -4,6 +4,7 @@ import datetime
 import zipfile
 from fastapi import APIRouter, status, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
+import orjson
 
 import dependencies as dp
 from dependencies import Tags
@@ -198,16 +199,20 @@ async def get_broker_chart(
 		elif api_type == dp.ListBrokerApiType.all:
 			chart_flow = await wf_obj.chart(media_type=media_type)
 			chart_cluster = await wf_obj.broker_cluster_chart(media_type=media_type)
-			# Create zip file to be sent through API
+			assert isinstance(chart_flow, str) and isinstance(chart_cluster, str)
 			chart_all = {
-				"flow": chart_flow,
-				"cluster": chart_cluster,
+				"flow": orjson.loads(chart_flow),
+				"cluster": orjson.loads(chart_cluster),
 			}
-			chart = BytesIO()
-			with zipfile.ZipFile(chart, "a", zipfile.ZIP_DEFLATED, False) as zf:
-				for key, value in chart_all.items():
-					zf.writestr(f"{key}.{media_type}", value) # type: ignore
-			chart.seek(0)
+			if media_type == dp.ListMediaType.json:
+				chart = orjson.dumps(chart_all)
+			else:
+				# Create zip file to be sent through API
+				chart = BytesIO()
+				with zipfile.ZipFile(chart, "a", zipfile.ZIP_DEFLATED, False) as zf:
+					for key, value in chart_all.items():
+						zf.writestr(f"{key}.{media_type}", value) # type: ignore
+				chart.seek(0)
 		else:
 			raise ValueError("api_type is not valid")
 
@@ -236,7 +241,7 @@ async def get_broker_chart(
 		# content=chart
 
 		# Define media_type
-		if api_type == dp.ListBrokerApiType.all:
+		if api_type == dp.ListBrokerApiType.all and media_type != dp.ListMediaType.json:
 			mimetype:str = "application/zip"
 			return StreamingResponse(chart, media_type=media_type, headers=headers) # type: ignore
 
