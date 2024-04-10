@@ -203,7 +203,7 @@
 {{ super() }}
 <script>
     // Global Variables
-    const API_ENDPOINT = '{{ "undefined"|getenv("API_ENDPOINT") }}';
+    const API_ENDPOINT = '{{ "undefined"|getenv("API_SCHEME") }}'+'://'+'{{ "undefined"|getenv("API_HOST") }}';
     const API_KEY = '{{ "undefined"|getenv("WEB_API_KEY") }}';
     const plotConfig = {
         "toImageButtonOptions":{

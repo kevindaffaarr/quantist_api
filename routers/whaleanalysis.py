@@ -33,6 +33,7 @@ router = APIRouter(
 # ==========
 # DEFAULT ROUTER
 # ==========
+@router.get("")
 @router.get("/")
 @timeit
 async def get_default_response():

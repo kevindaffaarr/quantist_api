@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import ORJSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi_globals import g, GlobalsMiddleware
 
@@ -100,10 +100,11 @@ app.include_router(whaleanalysis.router, dependencies=[Depends(get_api_key)])
 app.include_router(param.router, dependencies=[Depends(get_api_key)])
 app.include_router(web.router)
 
-@app.get("/", dependencies=[Depends(get_api_key)],)
+@app.get("")
+@app.get("/")
 @timeit
 async def home():
-	return {"message": "Welcome to Quantist.io"}
+	return RedirectResponse(url="/web")
 
 if __name__ == "__main__":
 	uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
