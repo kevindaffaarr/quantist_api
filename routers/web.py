@@ -6,13 +6,13 @@ from lib import timeit
 
 # Format newRequest format for Jinja2
 def format_newRequest(request: Request) -> Request:
-	request.scope['scheme'] = os.getenv("API_SCHEME", "https")
+	request.scope['scheme'] = os.getenv("API_SCHEME", "http")
 	header_list = list(request.scope['headers'])
 	# Search for key b"host" in header_list, then erase the b"host" key
 	for i, header in enumerate(header_list):
 		if header[0] == b"host":
 			del header_list[i]
-			header_list.append((b"host", os.getenv("API_HOST", "127.0.01").encode('ascii')))
+			header_list.append((b"host", os.getenv("API_HOST", "127.0.0.1").encode('ascii')))
 	request.scope['headers'] = tuple(header_list)
 
 	return Request(request.scope)
