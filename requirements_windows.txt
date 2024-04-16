@@ -159,7 +159,7 @@ tzdata==2024.1
     # via pandas
 urllib3==2.2.1
     # via requests
-uv==0.1.10
+uv==0.1.32
 uvicorn==0.27.1
 watchfiles==0.21.0
     # via uvicorn
