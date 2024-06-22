@@ -1,0 +1,8 @@
+{
+    // "python.linting.mypyEnabled": true,
+    // "python.linting.enabled": false
+    // "python.analysis.typeCheckingMode": "basic"
+    "files.associations": {
+        "*.css": "tailwindcss"
+    }
+}

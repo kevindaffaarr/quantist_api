@@ -3,7 +3,6 @@ env311
 __pycache__
 testing_*
 .git
-.vscode
 temp/*
 profiler_*
 .ruff_cache
