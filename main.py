@@ -1,5 +1,6 @@
 import os
 import warnings
+from dotenv import load_dotenv
 
 from contextlib import asynccontextmanager
 
@@ -17,6 +18,8 @@ from auth import get_api_key
 from lib import timeit
 
 import database as db
+
+load_dotenv()
 
 # Ignore FutureWarning, DeprecationWarning
 warnings.simplefilter(action='ignore', category=FutureWarning)

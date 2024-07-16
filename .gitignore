@@ -1,5 +1,4 @@
 env
-env311
 __pycache__
 testing_*
 .git
@@ -7,3 +6,4 @@ temp/*
 profiler_*
 .ruff_cache
 node_modules
+.env

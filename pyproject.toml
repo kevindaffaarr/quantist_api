@@ -27,7 +27,8 @@ dependencies = [
     "scikit-learn",
     "pandas[performance]",
     "polars",
-    "jinja2"
+    "jinja2",
+    "python-dotenv"
 ]
 
 [project.optional-dependencies]
