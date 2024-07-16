@@ -43,9 +43,9 @@ class HoldingComposition():
 		self.categorization: dp.HoldingSectorsCat = categorization
 
 		# Validation startdate and enddate
-		if isinstance(self.startdate, datetime.date) and self.startdate < datetime.date(2015, 1, 1):
+		if isinstance(self.startdate, datetime.date) and self.startdate < pd.Timestamp(datetime.date(2015, 1, 1)):
 			raise ValueError("Startdate must be >= 2015-01-01")
-		if self.enddate > datetime.date.today().replace(day=1) - datetime.timedelta(days=1):
+		if self.enddate > pd.Timestamp(datetime.date.today().replace(day=1) - datetime.timedelta(days=1)):
 			raise ValueError("Enddate must be <= last month")
 	
 	async def __get_param(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
@@ -91,14 +91,14 @@ class HoldingComposition():
 		if self.stockcode != "composite":
 			qry = qry.filter(db.KseiKepemilikanEfek.code == self.stockcode)
 		
-		data_ksei = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date").sort_index() # type: ignore
+		data_ksei = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date").sort_index() # type: ignore
 
 		return data_ksei
 	
 	async def __get_data_scripless(self, list_date:list, dbs:db.Session = next(db.get_dbs())) -> pd.DataFrame:
 		# Query table stockdata: tradebleshares divided by listedshares for filtercode each list_date
 		qry = dbs.query(db.StockData.date, db.StockData.tradebleshares, db.StockData.listedshares).filter(db.StockData.code == self.stockcode).filter(db.StockData.date.in_(list_date)) # type: ignore
-		data_scripless = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date").sort_index() # type: ignore
+		data_scripless = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date").sort_index() # type: ignore
 		
 		data_scripless["scripless_ratio"] = data_scripless["tradebleshares"] / data_scripless["listedshares"]
 		return data_scripless[["scripless_ratio"]]

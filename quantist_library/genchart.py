@@ -146,7 +146,7 @@ async def quantist_stock_chart(
 	# UPDATE AXES
 	# Column 1
 	# Row 1
-	fig.update_yaxes(title_text="Price", row=1, col=1, secondary_y=True, showgrid=True, range=[wf_indicators["low"].min()*0.95,wf_indicators["high"].max()*1.05])
+	fig.update_yaxes(title_text="Price", row=1, col=1, secondary_y=True, showgrid=True, range=[wf_indicators["low"].astype('float').min()*0.95,wf_indicators["high"].astype('float').max()*1.05])
 	fig.update_yaxes(row=1, col=1,secondary_y=False,showgrid=False, zeroline=False)
 	# Row 2
 	fig.update_yaxes(title_text=f"{abv} Proportion %", row=2, col=1, secondary_y=True, showgrid=True, range=[0,101])

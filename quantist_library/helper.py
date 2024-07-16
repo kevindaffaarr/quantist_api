@@ -26,18 +26,21 @@ class Bin():
 		- bins_mid: mid point of each bin: pd.Series
 		- peaks_index: index of peaks and valleys of hist_bar: list
 		"""
+		data_close:pd.Series = self.data['close'].astype(float)
+
 		self.nbins = await self.calc_nbins() if nbins is None else nbins
-		self.size = (self.data['close'].max()-self.data['close'].min())/self.nbins
-		self.bins_range = pd.Series(np.arange(self.data['close'].min()-self.size,self.data['close'].max()+self.size,self.size))
-		self.hist_bar = self.data.groupby(pd.cut(self.data['close'].to_numpy(),bins=self.bins_range))['netval'].sum() # type:ignore
+		self.size = (data_close.max()-data_close.min())/self.nbins
+		self.bins_range = pd.Series(np.arange(data_close.min()-self.size,data_close.max()+self.size,self.size))
+		self.hist_bar = self.data.groupby(pd.cut(data_close.to_numpy(),bins=self.bins_range))['netval'].sum() # type:ignore
 		self.bins_mid = self.bins_range + self.size/2
 		self.peaks_index = await self.calc_peaks_index(self.hist_bar)
 		return self
 	
 	async def calc_nbins(self) -> int:
+		data_close:pd.Series = self.data["close"].astype('float')
 		# Calculate IQR from data["close"]
-		q1 = (self.data["close"]).quantile(0.25)
-		q3 = (self.data["close"]).quantile(0.75)
+		q1 = (data_close).quantile(0.25)
+		q3 = (data_close).quantile(0.75)
 		iqr = q3 - q1
 		# State the number of data
 		n = len(self.data["netval"])
@@ -46,7 +49,7 @@ class Bin():
 		if bin_width == 0:
 			return 1
 		# Calculate the number of nbins
-		data_range = self.data["close"].max() - self.data["close"].min()
+		data_range = data_close.max() - data_close.min()
 		nbins = int(data_range/bin_width)
 		return nbins
 	
