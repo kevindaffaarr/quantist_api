@@ -280,7 +280,7 @@ class StockBFFull():
 			.order_by(db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
-		raw_data_broker_full = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date") # type: ignore
+		raw_data_broker_full = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -327,7 +327,7 @@ class StockBFFull():
 			qry_main = qry.filter(db.StockData.date.between(startdate, enddate)).order_by(db.StockData.date.asc())
 
 		# Main Query Fetching
-		raw_data_main = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date") # type: ignore
+		raw_data_main = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
 
 		# Check how many row is returned
 		if raw_data_main.shape[0] == 0:
@@ -352,7 +352,7 @@ class StockBFFull():
 		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc()) # type: ignore
 
 		# Pre-Data Query Fetching
-		raw_data_pre = pl.read_database(query=qry_pre.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date") # type: ignore
+		raw_data_pre = pl.read_database(query=qry_pre.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
 
 		# Concatenate Pre and Main Query
 		raw_data_full = pd.concat([raw_data_pre,raw_data_main])
@@ -1132,7 +1132,7 @@ class WhaleRadar():
 					(db.ListStock.code.not_in(stockcode_excludes_lower))) # type: ignore
 		
 		# Query Fetching: filtered_stockcodes
-		stockcodes = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True)['code'] # type: ignore
+		stockcodes = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True)['code'] # type: ignore
 		return pd.Series(stockcodes)
 	
 	# Get Net Val Sum Val Broker Transaction
@@ -1173,7 +1173,7 @@ class WhaleRadar():
 		.order_by(db.StockTransaction.code.asc(), db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
-		raw_data_broker_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index(["code","date"]) # type: ignore
+		raw_data_broker_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index(["code","date"]) # type: ignore
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -1194,7 +1194,7 @@ class WhaleRadar():
 			qry = dbs.query(db.StockData.code).filter(db.StockData.code.in_(filtered_stockcodes.to_list())).filter(db.StockData.date.between(startdate, enddate)).group_by(db.StockData.code) # type: ignore
 			
 			# Query Fetching
-			raw_data = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas() # type: ignore
+			raw_data = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True) # type: ignore
 
 			# Check how many row is returned
 			if raw_data.shape[0] == 0:
@@ -1218,7 +1218,7 @@ class WhaleRadar():
 			.order_by(db.StockData.code.asc(), db.StockData.date.asc())
 
 		# Main Query Fetching
-		raw_data_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index(["code","date"]) # type: ignore
+		raw_data_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index(["code","date"]) # type: ignore
 
 		# End of Method: Return or Assign Attribute
 		return raw_data_full
@@ -1424,7 +1424,7 @@ class WhaleRadar():
 			lambda group_df: group_df.with_columns(pl.corr(pl.exclude('code','date','close'), pl.col('close'))).head(1)
 		).drop('close').sort('code')
 		
-		corr_ncum_close = corr.to_pandas().set_index('code').rename_axis('broker', axis='columns')
+		corr_ncum_close = corr.to_pandas(use_pyarrow_extension_array=True).set_index('code').rename_axis('broker', axis='columns')
 		return corr_ncum_close
 	
 	async def _get_bf_parameters(self,
