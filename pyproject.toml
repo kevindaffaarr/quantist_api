@@ -1,12 +1,15 @@
 # uv installation: pip install uv
 # create venv: uv venv
 # compile dependencies: uv pip compile pyproject.toml -o requirements.txt
+# compile dev linux dependencies: uv pip compile pyproject.toml -o requirements_linux.txt --extra dev
 # compile dev windows dependencies: uv pip compile pyproject.toml -o requirements_windows.txt --extra dev --extra windows
 # single installation example: uv pip install fastapi
 # main installation: uv pip install -r requirements.txt
+# dev linux installation: uv pip install -r requirements-linux.txt
+# dev windows installation: uv pip install -r requirements_windows.txt
 # main sync: uv pip sync requirements.txt
-# dev installation: uv pip install -r requirements_windows.txt
-# dev sync: uv pip sync requirements_windows.txt
+# dev linux sync: uv pip sync requirements_linux.txt
+# dev windows sync: uv pip sync requirements_windows.txt
 
 [project]
 name = "quantist_api"
@@ -19,7 +22,7 @@ dependencies = [
     "gunicorn",
     "plotly",
     "kaleido",
-    "sqlalchemy-bigquery @ git+https://github.com/googleapis/python-bigquery-sqlalchemy.git@v1.11.0.dev3",
+    "sqlalchemy-bigquery",
     "google-cloud-bigquery",
     "google-cloud-bigquery-storage",
     "SQLAlchemy",
@@ -32,5 +35,5 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff","uv", "asyncio","psycopg2"]
+dev = ["ruff", "asyncio","psycopg2", "pytest"]
 windows = ["kaleido==0.1.0.post1"]
