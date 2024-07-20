@@ -1413,14 +1413,14 @@ class WhaleRadar():
 		raw_data_close_pl = pl.from_pandas(raw_data_close.reset_index())
 
 		# Get diff for each group by code
-		broker_ncum_pl_diff = broker_ncum_pl.groupby('code').map_groups(lambda group_df: group_df.with_columns(pl.exclude('code','date').diff()))
-		raw_data_close_pl_diff = raw_data_close_pl.groupby('code').map_groups(lambda group_df: group_df.with_columns(pl.exclude('code','date').diff()))
+		broker_ncum_pl_diff = broker_ncum_pl.group_by('code').map_groups(lambda group_df: group_df.with_columns(pl.exclude('code','date').diff()))
+		raw_data_close_pl_diff = raw_data_close_pl.group_by('code').map_groups(lambda group_df: group_df.with_columns(pl.exclude('code','date').diff()))
 
 		# Concat for correlation calculation preparation
 		concated_pl = broker_ncum_pl_diff.join(raw_data_close_pl_diff, on=['code','date'], how='inner')
 
 		# Calculate correlation for each broker to close price
-		corr  = concated_pl.select(pl.exclude('date')).groupby('code').map_groups(
+		corr  = concated_pl.select(pl.exclude('date')).group_by('code').map_groups(
 			lambda group_df: group_df.with_columns(pl.corr(pl.exclude('code','date','close'), pl.col('close'))).head(1)
 		).drop('close').sort('code')
 		
