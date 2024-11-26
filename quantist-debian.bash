@@ -9,7 +9,6 @@ export PATH=/usr/local/bin:$PATH
 export LANG=C.UTF-8
 
 sudo apt-get update && apt-get upgrade -y
-
 apt-get install -y --no-install-recommends ca-certificates netbase tzdata
 apt-get install -y --no-install-recommends dpkg-dev gcc gnupg libbluetooth-dev libbz2-dev libc6-dev libdb-dev libexpat1-dev libffi-dev libgdbm-dev liblzma-dev libncursesw5-dev libreadline-dev libsqlite3-dev libssl-dev make tk-dev uuid-dev wget xz-utils zlib1g-dev
 

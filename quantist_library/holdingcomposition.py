@@ -100,7 +100,7 @@ class HoldingComposition():
 		qry = dbs.query(db.StockData.date, db.StockData.tradebleshares, db.StockData.listedshares).filter(db.StockData.code == self.stockcode).filter(db.StockData.date.in_(list_date)) # type: ignore
 		data_scripless = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date").sort_index() # type: ignore
 		
-		data_scripless["scripless_ratio"] = data_scripless["tradebleshares"] / data_scripless["listedshares"]
+		data_scripless["scripless_ratio"] = data_scripless["tradebleshares"].astype(float) / data_scripless["listedshares"].astype(float)
 		return data_scripless[["scripless_ratio"]]
 
 	async def get(self, dbs:db.Session = next(db.get_dbs())) -> HoldingComposition:
@@ -132,7 +132,7 @@ class HoldingComposition():
 			holding_composition[key] = data_ksei[self.categorization.value[key]].sum(axis=1)
 
 		# Calculate the percentage of total each row
-		holding_composition = holding_composition.div(holding_composition.sum(axis=1), axis=0)
+		holding_composition = holding_composition.astype(float).div(holding_composition.sum(axis=1), axis=0)
 
 		# Append data_scripless[scripless_ratio] column to holding_composition
 		holding_composition = holding_composition.join(data_scripless, how="left")
