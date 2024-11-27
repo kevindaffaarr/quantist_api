@@ -27,8 +27,8 @@ class HoldingComposition():
 	"""
 	def __init__(self,
 		stockcode: str,
-		startdate: datetime.date|None = None,
-		enddate: datetime.date|None = datetime.date.today().replace(day=1) - datetime.timedelta(days=1),
+		startdate: datetime.date|pd.Timestamp|None = None,
+		enddate: datetime.date|pd.Timestamp|None = datetime.date.today().replace(day=1) - datetime.timedelta(days=1),
 		categorization: dp.HoldingSectorsCat|None = dp.HoldingSectorsCat.default,
 		) -> None:
 		"""
@@ -41,6 +41,12 @@ class HoldingComposition():
 		self.startdate: datetime.date | None = startdate
 		self.enddate: datetime.date = enddate
 		self.categorization: dp.HoldingSectorsCat = categorization
+
+		# Type conversion
+		if (type(self.startdate) is pd.Timestamp):
+			self.startdate = self.startdate.date()
+		if (type(self.enddate) is pd.Timestamp):
+			self.enddate = self.enddate.date()
 
 		# Validation startdate and enddate
 		if isinstance(self.startdate, datetime.date) and self.startdate < datetime.date(2015, 1, 1):
@@ -91,16 +97,16 @@ class HoldingComposition():
 		if self.stockcode != "composite":
 			qry = qry.filter(db.KseiKepemilikanEfek.code == self.stockcode)
 		
-		data_ksei = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date").sort_index() # type: ignore
+		data_ksei = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date").sort_index() # type: ignore
 
 		return data_ksei
 	
 	async def __get_data_scripless(self, list_date:list, dbs:db.Session = next(db.get_dbs())) -> pd.DataFrame:
 		# Query table stockdata: tradebleshares divided by listedshares for filtercode each list_date
 		qry = dbs.query(db.StockData.date, db.StockData.tradebleshares, db.StockData.listedshares).filter(db.StockData.code == self.stockcode).filter(db.StockData.date.in_(list_date)) # type: ignore
-		data_scripless = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date").sort_index() # type: ignore
+		data_scripless = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date").sort_index() # type: ignore
 		
-		data_scripless["scripless_ratio"] = data_scripless["tradebleshares"].astype(float) / data_scripless["listedshares"].astype(float)
+		data_scripless["scripless_ratio"] = data_scripless["tradebleshares"] / data_scripless["listedshares"]
 		return data_scripless[["scripless_ratio"]]
 
 	async def get(self, dbs:db.Session = next(db.get_dbs())) -> HoldingComposition:
@@ -132,7 +138,7 @@ class HoldingComposition():
 			holding_composition[key] = data_ksei[self.categorization.value[key]].sum(axis=1)
 
 		# Calculate the percentage of total each row
-		holding_composition = holding_composition.astype(float).div(holding_composition.sum(axis=1), axis=0)
+		holding_composition = holding_composition.div(holding_composition.sum(axis=1), axis=0)
 
 		# Append data_scripless[scripless_ratio] column to holding_composition
 		holding_composition = holding_composition.join(data_scripless, how="left")

@@ -22,7 +22,6 @@ from quantist_library import genchart
 from .helper import Bin
 
 import polars as pl
-# TODO remove to_pandas(use_pyarrow_extension_array=True) from_pandas after polars fully implemented
 
 pd.options.mode.copy_on_write = True
 pd.options.future.infer_string = True # type: ignore
@@ -280,7 +279,7 @@ class StockBFFull():
 			.order_by(db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
-		raw_data_broker_full = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
+		raw_data_broker_full = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date") # type: ignore
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -327,7 +326,7 @@ class StockBFFull():
 			qry_main = qry.filter(db.StockData.date.between(startdate, enddate)).order_by(db.StockData.date.asc())
 
 		# Main Query Fetching
-		raw_data_main = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
+		raw_data_main = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date") # type: ignore
 
 		# Check how many row is returned
 		if raw_data_main.shape[0] == 0:
@@ -352,7 +351,7 @@ class StockBFFull():
 		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc()) # type: ignore
 
 		# Pre-Data Query Fetching
-		raw_data_pre = pl.read_database(query=qry_pre.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
+		raw_data_pre = pl.read_database(query=qry_pre.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date") # type: ignore
 
 		# Concatenate Pre and Main Query
 		raw_data_full = pd.concat([raw_data_pre,raw_data_main])
@@ -1132,7 +1131,7 @@ class WhaleRadar():
 					(db.ListStock.code.not_in(stockcode_excludes_lower))) # type: ignore
 		
 		# Query Fetching: filtered_stockcodes
-		stockcodes = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True)['code'] # type: ignore
+		stockcodes = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True)['code'] # type: ignore
 		return pd.Series(stockcodes)
 	
 	# Get Net Val Sum Val Broker Transaction
@@ -1173,7 +1172,7 @@ class WhaleRadar():
 		.order_by(db.StockTransaction.code.asc(), db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
-		raw_data_broker_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index(["code","date"]) # type: ignore
+		raw_data_broker_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index(["code","date"]) # type: ignore
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -1194,7 +1193,7 @@ class WhaleRadar():
 			qry = dbs.query(db.StockData.code).filter(db.StockData.code.in_(filtered_stockcodes.to_list())).filter(db.StockData.date.between(startdate, enddate)).group_by(db.StockData.code) # type: ignore
 			
 			# Query Fetching
-			raw_data = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True) # type: ignore
+			raw_data = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas() # type: ignore
 
 			# Check how many row is returned
 			if raw_data.shape[0] == 0:
@@ -1218,7 +1217,7 @@ class WhaleRadar():
 			.order_by(db.StockData.code.asc(), db.StockData.date.asc())
 
 		# Main Query Fetching
-		raw_data_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index(["code","date"]) # type: ignore
+		raw_data_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index(["code","date"]) # type: ignore
 
 		# End of Method: Return or Assign Attribute
 		return raw_data_full
@@ -1424,7 +1423,7 @@ class WhaleRadar():
 			lambda group_df: group_df.with_columns(pl.corr(pl.exclude('code','date','close'), pl.col('close'))).head(1)
 		).drop('close').sort('code')
 		
-		corr_ncum_close = corr.to_pandas(use_pyarrow_extension_array=True).set_index('code').rename_axis('broker', axis='columns')
+		corr_ncum_close = corr.to_pandas().set_index('code').rename_axis('broker', axis='columns')
 		return corr_ncum_close
 	
 	async def _get_bf_parameters(self,
@@ -1459,7 +1458,7 @@ class WhaleRadar():
 		raw_data_broker_sumval = raw_data_broker_sumval.loc[transaction_true.index[transaction_true]]
 
 		# Cumulate volume for nvol
-		broker_ncum = raw_data_broker_nval.groupby(by='code').cumsum(axis=0)
+		broker_ncum = raw_data_broker_nval.astype(float).groupby(by='code').cumsum(axis=0)
 		# Get each broker's sum of transaction value
 		broker_sumval = raw_data_broker_sumval.groupby(by='code').sum()
 		# Get correlation between each broker's cumulated transaction and close price
@@ -1650,7 +1649,7 @@ class WhaleRadar():
 
 		# X Axis:
 		if y_axis_type == dp.ListRadarType.correlation:
-			selected_broker_nval_cumsum = selected_broker_nval.groupby(level='code').cumsum()
+			selected_broker_nval_cumsum = selected_broker_nval.astype(float).groupby(level='code').cumsum()
 			radar_indicators[y_axis_type.value] = selected_broker_nval_cumsum.groupby('code').diff().groupby('code')\
 				.corrwith(raw_data_full['close'].groupby('code').diff(),axis=0) # type: ignore
 		elif y_axis_type == dp.ListRadarType.changepercentage:
@@ -1915,11 +1914,11 @@ class ScreenerMoneyFlow(ScreenerBase):
 		if accum_or_distri == dp.ScreenerList.most_distributed:
 			top_stockcodes['mf'] = self.selected_broker_nval.loc[
 				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
-				].groupby("code").sum().nsmallest(n=n_stockcodes, columns="broker_nval")['broker_nval']
+				].groupby("code").sum().astype(float).nsmallest(n=n_stockcodes, columns="broker_nval")['broker_nval']
 		else:
 			top_stockcodes['mf'] = self.selected_broker_nval.loc[
 				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
-				].groupby("code").sum().nlargest(n=n_stockcodes, columns="broker_nval")['broker_nval']
+				].groupby("code").sum().astype(float).nlargest(n=n_stockcodes, columns="broker_nval")['broker_nval']
 
 		# get selected_broker_nval that has level 0 index (code) in top_stockcodes
 		self.selected_broker_nval = self.selected_broker_nval[self.selected_broker_nval.index.get_level_values(0).isin(top_stockcodes.index)]
@@ -1942,7 +1941,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		else:
 			wvalflow = self.selected_broker_nval.loc[
 				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
-				]['broker_nval'].groupby("code").cumsum()
+				]['broker_nval'].astype(float).groupby("code").cumsum()
 			
 			top_stockcodes['pricecorrel'] = wvalflow.groupby("code").diff().groupby('code').corr( # type: ignore
 				self.raw_data_full.loc[
@@ -2085,7 +2084,7 @@ class ScreenerVWAP(ScreenerBase):
 		# Get data from stocklist
 		top_data = self.raw_data_full.loc[self.raw_data_full.index.get_level_values('code').isin(stocklist)]
 		# Sum broker_nval for each code and get top n_stockcodes
-		stocklist = top_data['broker_nval'].groupby(level='code').sum().nlargest(self.n_stockcodes).index.tolist()
+		stocklist = top_data['broker_nval'].groupby(level='code').sum().astype(float).nlargest(self.n_stockcodes).index.tolist()
 
 		# Get data from stocklist
 		top_data = self.raw_data_full.loc[self.raw_data_full.index.get_level_values('code').isin(stocklist)]
@@ -2240,7 +2239,7 @@ class ScreenerVProfile(ScreenerBase):
 		mf = stocklist_selected_broker_nval.groupby(level='code').tail(self.radar_period).groupby(level='code')['broker_nval'].sum()
 
 		# Get top n_stockcodes
-		stocklist = mf.nlargest(n_stockcodes).index.tolist()
+		stocklist = mf.astype(float).nlargest(n_stockcodes).index.tolist()
 
 		# Compile top_stockcodes
 		top_stockcodes:pd.DataFrame

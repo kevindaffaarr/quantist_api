@@ -20,7 +20,7 @@ if env == "DEV":
 	POSTGRES_DB_PASSWORD: str = os.getenv("POSTGRES_DB_PASSWORD","")
 	POSTGRES_DB_HOST: str = os.getenv("POSTGRES_DB_HOST","")
 	POSTGRES_DB_NAME: str = os.getenv("POSTGRES_DB_NAME","")
-	DB_URL: str = f"postgresql://{POSTGRES_DB_USER}:{POSTGRES_DB_PASSWORD}@{POSTGRES_DB_HOST}/{POSTGRES_DB_NAME}"
+	DB_URL: str = f"postgresql+psycopg://{POSTGRES_DB_USER}:{POSTGRES_DB_PASSWORD}@{POSTGRES_DB_HOST}/{POSTGRES_DB_NAME}"
 
 	# Create Engine
 	engine = create_engine(DB_URL)
