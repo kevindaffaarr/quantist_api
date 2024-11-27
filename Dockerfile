@@ -7,6 +7,7 @@ FROM python:3.12.7-slim as base
 # Allow statements and log messages to immediately appear in the Cloud Run logs
 ENV PYTHONUNBUFFERED=1
 ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
 
 # uv installation
 COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /uvx /bin/
@@ -14,16 +15,17 @@ COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /uvx /bin/
 ENV PATH="/root/.local/bin/:$PATH"
 
 # Copy local code to the container image.
-ADD . ./
+ADD . /quantist_api
 # Create and change to the app directory.
-WORKDIR /
+WORKDIR /quantist_api
 
 # Sync the project into a new environment, using the frozen lockfile
-RUN uv sync --frozen --compile-bytecode
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --compile-bytecode
 
 # Clean up
 RUN apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
 # Run the web service on container startup.
-CMD ["uv", "run", "fastapi", "run", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["uv", "run", "fastapi", "run", "main.py", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

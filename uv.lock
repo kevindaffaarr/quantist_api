@@ -856,7 +856,6 @@ dependencies = [
     { name = "pandas", extra = ["performance"] },
     { name = "plotly" },
     { name = "polars" },
-    { name = "psycopg" },
     { name = "pyarrow" },
     { name = "python-dotenv" },
     { name = "scikit-learn" },
@@ -869,6 +868,9 @@ dependencies = [
 dev = [
     { name = "pytest" },
     { name = "ruff" },
+]
+server = [
+    { name = "psycopg" },
 ]
 
 [package.metadata]
@@ -883,7 +885,7 @@ requires-dist = [
     { name = "pandas", extras = ["performance"], specifier = "==2.2.3" },
     { name = "plotly", specifier = "==5.24.1" },
     { name = "polars", specifier = "==1.15.0" },
-    { name = "psycopg", specifier = "==3.2.3" },
+    { name = "psycopg", marker = "extra == 'server'", specifier = "==3.2.3" },
     { name = "pyarrow", specifier = "==18.1.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==8.3.3" },
     { name = "python-dotenv", specifier = "==1.0.1" },
