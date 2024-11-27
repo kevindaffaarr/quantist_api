@@ -16,8 +16,13 @@ PATH = [
     "/whaleanalysis/radar", "/whaleanalysis/radar/foreign", "/whaleanalysis/radar/broker",
     "/whaleanalysis/full-data", "/whaleanalysis/full-data/foreign", "/whaleanalysis/full-data/broker",
     "/whaleanalysis/screener", 
-    "/whaleanalysis/screener/foreign", "/whaleanalysis/screener/foreign/top-money-flow", "/whaleanalysis/screener/foreign/vwap", "/whaleanalysis/screener/foreign/vprofile",
-    "/whaleanalysis/screener/broker/top-money-flow", "/whaleanalysis/screener/broker/vwap", "/whaleanalysis/screener/broker/vprofile"
+    "/whaleanalysis/screener/foreign",
+    "/whaleanalysis/screener/foreign/top-money-flow?accum_or_distri=most_accumulated", "/whaleanalysis/screener/foreign/top-money-flow?accum_or_distri=most_distributed",
+    "/whaleanalysis/screener/foreign/vwap?screener_vwap_criteria=vwap_rally","/whaleanalysis/screener/foreign/vwap?screener_vwap_criteria=vwap_around", "/whaleanalysis/screener/foreign/vwap?screener_vwap_criteria=vwap_breakout", "/whaleanalysis/screener/foreign/vwap?screener_vwap_criteria=vwap_breakdown",
+    "/whaleanalysis/screener/foreign/vprofile",
+    "/whaleanalysis/screener/broker/top-money-flow?accum_or_distri=most_accumulated", "/whaleanalysis/screener/broker/top-money-flow?accum_or_distri=most_distributed",
+    "/whaleanalysis/screener/broker/vwap?screener_vwap_criteria=vwap_rally","/whaleanalysis/screener/broker/vwap?screener_vwap_criteria=vwap_around", "/whaleanalysis/screener/broker/vwap?screener_vwap_criteria=vwap_breakout", "/whaleanalysis/screener/broker/vwap?screener_vwap_criteria=vwap_breakdown",
+    "/whaleanalysis/screener/broker/vprofile",
 ]
 
 # Pytest
