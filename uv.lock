@@ -232,6 +232,21 @@ wheels = [
 ]
 
 [[package]]
+name = "google-cloud-bigquery-storage"
+version = "2.27.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-api-core", extra = ["grpc"] },
+    { name = "google-auth" },
+    { name = "proto-plus" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d3/95/bba26f6cdc3576496cbcaa070627a289f2cbdc39e3f6a2ed47ccdb89f942/google_cloud_bigquery_storage-2.27.0.tar.gz", hash = "sha256:522faba9a68bea7e9857071c33fafce5ee520b7b175da00489017242ade8ec27", size = 240437 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9f/ed/b7a74ae48435854ec2352f58c21e358df14458bafe4b0d237a8649326f9c/google_cloud_bigquery_storage-2.27.0-py2.py3-none-any.whl", hash = "sha256:3bfa8f74a61ceaffd3bfe90be5bbef440ad81c1c19ac9075188cccab34bffc2b", size = 240016 },
+]
+
+[[package]]
 name = "google-cloud-core"
 version = "2.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -834,6 +849,7 @@ dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "future" },
     { name = "google-cloud-bigquery" },
+    { name = "google-cloud-bigquery-storage" },
     { name = "jinja2" },
     { name = "kaleido" },
     { name = "orjson" },
@@ -860,6 +876,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = "==0.115.5" },
     { name = "future", specifier = "==1.0.0" },
     { name = "google-cloud-bigquery", specifier = "==3.27.0" },
+    { name = "google-cloud-bigquery-storage", specifier = ">=2.27.0" },
     { name = "jinja2", specifier = "==3.1.4" },
     { name = "kaleido", specifier = "==0.2.1" },
     { name = "orjson", specifier = "==3.10.12" },
@@ -867,7 +884,7 @@ requires-dist = [
     { name = "plotly", specifier = "==5.24.1" },
     { name = "polars", specifier = "==1.15.0" },
     { name = "psycopg", specifier = "==3.2.3" },
-    { name = "pyarrow", specifier = ">=18.1.0" },
+    { name = "pyarrow", specifier = "==18.1.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==8.3.3" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.8.0" },

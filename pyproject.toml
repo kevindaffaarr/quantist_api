@@ -7,6 +7,7 @@ requires-python = "==3.12.*"
 dependencies = [
     "fastapi[standard]==0.115.5",
     "future==1.0.0",
+    "google-cloud-bigquery-storage==2.27.0",
     "google-cloud-bigquery==3.27.0",
     "jinja2==3.1.4",
     "kaleido==0.2.1",

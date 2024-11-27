@@ -1,12 +1,12 @@
 steps:
 # Build the container image
-- name: 'gcr.io/cloud-builders/docker'
+- name: 'asia.gcr.io/cloud-builders/docker'
   args: ['build', '-t', 'asia.gcr.io/quantist/quantist-api:$COMMIT_SHA', '.']
 # Push the container image to Artifact Registry
-- name: 'gcr.io/cloud-builders/docker'
+- name: 'asia.gcr.io/cloud-builders/docker'
   args: ['push', 'asia.gcr.io/quantist/quantist-api:$COMMIT_SHA']
 # Deploy container image to Cloud Run
-- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+- name: 'asia.gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: gcloud
   args: ['run', 'deploy', 'quantist-api', '--image', 'asia.gcr.io/quantist/quantist-api:$COMMIT_SHA', '--region', 'asia-southeast2']
 images:

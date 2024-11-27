@@ -2,11 +2,7 @@
 
 # Use the official lightweight Python image.
 # https://hub.docker.com/_/python
-# FROM python:3.10.7-slim as base
-
-# Use optimized uvicorn-gunicorn-fastapi image from tiangolo
-# https://github.com/tiangolo/uvicorn-gunicorn-fastapi-docker
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11-slim as base
+FROM python:3.12.7-slim as base
 
 # Allow statements and log messages to immediately appear in the Cloud Run logs
 ENV PYTHONUNBUFFERED 1
@@ -16,7 +12,6 @@ WORKDIR /
 
 # Install Git
 RUN apt-get update && \
-    apt-get install -y git && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy application dependency manifests to the container image.
@@ -35,6 +30,5 @@ RUN apt-get purge -y git && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
-# Already using tiangolo/uvicorn-gunicorn-fastapi image, so no need to specify
 # Run the web service on container startup.
-# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["fastapi", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
