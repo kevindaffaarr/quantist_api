@@ -20,8 +20,7 @@ ADD . /quantist_api
 WORKDIR /quantist_api
 
 # Sync the project into a new environment, using the frozen lockfile
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --compile-bytecode
+RUN uv sync --compile-bytecode
 
 # Clean up
 RUN apt-get autoremove -y && \
