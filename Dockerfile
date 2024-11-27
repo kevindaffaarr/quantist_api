@@ -26,4 +26,4 @@ RUN apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
 # Run the web service on container startup.
-CMD ["uv", "run", "fastapi", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["uv", "run", "fastapi", "run", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
