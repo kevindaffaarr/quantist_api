@@ -876,7 +876,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = "==0.115.5" },
     { name = "future", specifier = "==1.0.0" },
     { name = "google-cloud-bigquery", specifier = "==3.27.0" },
-    { name = "google-cloud-bigquery-storage", specifier = ">=2.27.0" },
+    { name = "google-cloud-bigquery-storage", specifier = "==2.27.0" },
     { name = "jinja2", specifier = "==3.1.4" },
     { name = "kaleido", specifier = "==0.2.1" },
     { name = "orjson", specifier = "==3.10.12" },

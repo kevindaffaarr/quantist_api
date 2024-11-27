@@ -1,17 +1,16 @@
-env
-env311
 __pycache__
-testing_*
-.git
-.vscode
-temp/*
-profiler_*
+.pytest_cache
 .ruff_cache
+.venv
+env
+build
 node_modules
+temp
+.env
+.git
 
-.gitignore
 .github
+.vscode
+.gitignore
 proj_docs
 README.md
-requirements_*
-pages/src/*

@@ -5,30 +5,25 @@
 FROM python:3.12.7-slim as base
 
 # Allow statements and log messages to immediately appear in the Cloud Run logs
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONUNBUFFERED=1
+ENV UV_COMPILE_BYTECODE=1
 
+# uv installation
+COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /uvx /bin/
+# Ensure the installed binary is on the `PATH`
+ENV PATH="/root/.local/bin/:$PATH"
+
+# Copy local code to the container image.
+ADD . ./
 # Create and change to the app directory.
 WORKDIR /
 
-# Install Git
-RUN apt-get update && \
-    rm -rf /var/lib/apt/lists/*
+# Sync the project into a new environment, using the frozen lockfile
+RUN uv sync --frozen --compile-bytecode
 
-# Copy application dependency manifests to the container image.
-# Copying this separately prevents re-running pip install on every code change.
-COPY requirements.txt ./
-
-# Install dependencies.
-RUN python -m pip install --upgrade pip
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
-
-# Copy local code to the container image.
-COPY . ./
-
-# Uninstall Git and clean up
-RUN apt-get purge -y git && \
-    apt-get autoremove -y && \
+# Clean up
+RUN apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
 # Run the web service on container startup.
-CMD ["fastapi", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["uv", "run", "fastapi", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
