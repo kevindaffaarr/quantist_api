@@ -97,14 +97,14 @@ class HoldingComposition():
 		if self.stockcode != "composite":
 			qry = qry.filter(db.KseiKepemilikanEfek.code == self.stockcode)
 		
-		data_ksei = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date").sort_index() # type: ignore
+		data_ksei = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date").sort_index() # type: ignore
 
 		return data_ksei
 	
 	async def __get_data_scripless(self, list_date:list, dbs:db.Session = next(db.get_dbs())) -> pd.DataFrame:
 		# Query table stockdata: tradebleshares divided by listedshares for filtercode each list_date
 		qry = dbs.query(db.StockData.date, db.StockData.tradebleshares, db.StockData.listedshares).filter(db.StockData.code == self.stockcode).filter(db.StockData.date.in_(list_date)) # type: ignore
-		data_scripless = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas().reset_index(drop=True).set_index("date").sort_index() # type: ignore
+		data_scripless = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date").sort_index() # type: ignore
 		
 		data_scripless["scripless_ratio"] = data_scripless["tradebleshares"] / data_scripless["listedshares"]
 		return data_scripless[["scripless_ratio"]]

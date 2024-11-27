@@ -4,6 +4,10 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
+# ===
+# Run with: pytest -s -v test_api.py
+# ===
+
 URL = os.getenv("TESTING_API_URL", "http://127.0.0.1:8000")
 HEADERS = {"X-API-KEY": os.getenv("TESTING_API_KEY")}
 
