@@ -33,6 +33,7 @@ DEBUG_STATUS = True if ENV_PROD_DEV == "DEV" else False
 FAST API APP
 Start the server by run this code in terminal
 uvicorn main:app --reload
+fastapi run --workers 8 main.py --port 8000
 =============================
 """
 
