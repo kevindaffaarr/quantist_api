@@ -1821,7 +1821,14 @@ class ScreenerBase(WhaleRadar):
 				raw_data_broker_nval=raw_data_broker_nval,
 				raw_data_broker_sumval=raw_data_broker_sumval,
 			)
-		
+
+		# Drop codes that were removed by the correlation filter above, otherwise
+		# _sum_selected_broker_transaction() KeyErrors looking them up in the filtered data
+		self.selected_broker = {
+			code: brokers for code, brokers in self.selected_broker.items()
+			if code in set(self.filtered_stockcodes)
+		}
+
 		# Adjust plusmin of raw_data_broker_nvol, raw_data_broker_nval, raw_data_broker_sumval
 		raw_data_broker_nvol = raw_data_broker_nvol.groupby(level="code", group_keys=False).apply(
 			lambda x: pd.concat(
