@@ -1576,10 +1576,30 @@ class WhaleRadar():
 		selected_broker: dict,
 		) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 		
-		selected_broker_nvol = pd.DataFrame(raw_data_broker_nvol.groupby(level="code").apply(lambda x: x.loc[:,selected_broker[x.name]].sum(axis=1)).reset_index(level=0, drop=True)).rename(columns={0:'broker_nvol'})
-		selected_broker_nval = pd.DataFrame(raw_data_broker_nval.groupby(level="code").apply(lambda x: x.loc[:,selected_broker[x.name]].sum(axis=1)).reset_index(level=0, drop=True)).rename(columns={0:'broker_nval'})
-		selected_broker_sumval = pd.DataFrame(raw_data_broker_sumval.groupby(level="code").apply(lambda x: x.loc[:,selected_broker[x.name]].sum(axis=1)).reset_index(level=0, drop=True)).rename(columns={0:'broker_sumval'})
+		# selected_broker_nvol = pd.DataFrame(raw_data_broker_nvol.groupby(level="code", group_keys=False).apply(lambda x: x.loc[:,selected_broker[x.name]].sum(axis=1))).rename(columns={0:'broker_nvol'})
+		# selected_broker_nval = pd.DataFrame(raw_data_broker_nval.groupby(level="code", group_keys=False).apply(lambda x: x.loc[:,selected_broker[x.name]].sum(axis=1))).rename(columns={0:'broker_nval'})
+		# selected_broker_sumval = pd.DataFrame(raw_data_broker_sumval.groupby(level="code", group_keys=False).apply(lambda x: x.loc[:,selected_broker[x.name]].sum(axis=1))).rename(columns={0:'broker_sumval'})
 		
+		list_nvol = []
+		list_nval = []
+		list_sumval = []
+		for code, brokers in selected_broker.items():
+			nvol = raw_data_broker_nvol.loc[code, brokers].sum(axis=1)
+			nvol = pd.concat({code: nvol}, names=['code'])
+			list_nvol.append(nvol)
+
+			nval = raw_data_broker_nval.loc[code, brokers].sum(axis=1)
+			nval = pd.concat({code: nval}, names=['code'])
+			list_nval.append(nval)
+
+			sumval = raw_data_broker_sumval.loc[code, brokers].sum(axis=1)
+			sumval = pd.concat({code: sumval}, names=['code'])
+			list_sumval.append(sumval)
+		
+		selected_broker_nvol = pd.concat(list_nvol).to_frame('broker_nvol')
+		selected_broker_nval = pd.concat(list_nval).to_frame('broker_nval')
+		selected_broker_sumval = pd.concat(list_sumval).to_frame('broker_sumval')
+
 		return selected_broker_nvol, selected_broker_nval, selected_broker_sumval
 	
 	async def _get_filtered_stockcodes_by_corr(self,
@@ -1644,19 +1664,26 @@ class WhaleRadar():
 
 		radar_indicators = pd.DataFrame()
 		
+		# Radar data subset
+		startdate_ts = pd.to_datetime(self.startdate).date() if isinstance(self.startdate, (datetime.date, datetime.datetime)) else self.startdate
+		radar_data_nval = selected_broker_nval[selected_broker_nval.index.get_level_values('date') >= startdate_ts]
+		radar_data_full = raw_data_full[raw_data_full.index.get_level_values('date') >= startdate_ts]
+
 		# Y Axis: WMF
-		radar_indicators["mf"] = selected_broker_nval.groupby("code").sum()
+		radar_indicators["mf"] = radar_data_nval.groupby("code").sum()
 
 		# X Axis:
 		if y_axis_type == dp.ListRadarType.correlation:
 			selected_broker_nval_cumsum = selected_broker_nval.astype(float).groupby(level='code').cumsum()
-			radar_indicators[y_axis_type.value] = selected_broker_nval_cumsum.groupby('code').diff().groupby('code')\
-				.corrwith(raw_data_full['close'].groupby('code').diff(),axis=0) # type: ignore
+			nval_diff = selected_broker_nval_cumsum.groupby('code').diff()
+			close_diff = raw_data_full['close'].groupby('code').diff()
+			radar_indicators[y_axis_type.value] = nval_diff[nval_diff.index.get_level_values('date') > startdate_ts].groupby('code')\
+				.corrwith(close_diff[close_diff.index.get_level_values('date') > startdate_ts],axis=0) # type: ignore
 		elif y_axis_type == dp.ListRadarType.changepercentage:
 			radar_indicators[y_axis_type.value] = \
-				(raw_data_full.groupby('code')['close'].nth([-1]) \
-				-raw_data_full.groupby('code')['close'].nth([0])) \
-				/raw_data_full.groupby('code')['close'].nth([0])
+				(radar_data_full.groupby('code')['close'].last() \
+				-radar_data_full.groupby('code')['close'].first()) \
+				/radar_data_full.groupby('code')['close'].first()
 		else:
 			raise ValueError("Not a valid radar type")
 

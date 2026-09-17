@@ -562,7 +562,14 @@ class ForeignRadar():
 		# Y axis: mf
 		stocks_raw_data['netval'] = stocks_raw_data['close']*\
 			(stocks_raw_data['foreignbuy']-stocks_raw_data['foreignsell'])
-		radar_indicators['mf'] = stocks_raw_data.groupby(by='code')['netval'].sum()
+		
+		# Radar data subset
+		if self.period_mf is not None:
+			radar_data = stocks_raw_data.groupby('code').tail(self.period_mf)
+		else:
+			radar_data = stocks_raw_data
+
+		radar_indicators['mf'] = radar_data.groupby(by='code')['netval'].sum()
 
 		# X axis:
 		if y_axis_type == dp.ListRadarType.correlation:
@@ -575,9 +582,9 @@ class ForeignRadar():
 				
 		elif y_axis_type == dp.ListRadarType.changepercentage:
 			radar_indicators[y_axis_type] = \
-				(stocks_raw_data.groupby(by='code')['close'].nth([-1])- \
-				stocks_raw_data.groupby(by='code')['close'].nth([0]))/ \
-				stocks_raw_data.groupby(by='code')['close'].nth([0])
+				(radar_data.groupby(by='code')['close'].last()- \
+				radar_data.groupby(by='code')['close'].first())/ \
+				radar_data.groupby(by='code')['close'].first()
 		else:
 			raise ValueError("Not a valid radar type")
 		
