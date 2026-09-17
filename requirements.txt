@@ -135,8 +135,6 @@ protobuf==4.25.3
     #   googleapis-common-protos
     #   grpcio-status
     #   proto-plus
-psycopg==3.2.3
-    # via quantist-api (pyproject.toml)
 pyarrow==18.1.0
     # via quantist-api (pyproject.toml)
 pyasn1==0.5.1
@@ -202,7 +200,6 @@ typer==0.13.1
 typing-extensions==4.9.0
     # via
     #   fastapi
-    #   psycopg
     #   pydantic
     #   pydantic-core
     #   sqlalchemy

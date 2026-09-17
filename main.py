@@ -11,6 +11,8 @@ from fastapi.responses import ORJSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi_globals import g, GlobalsMiddleware
 
+load_dotenv()
+
 from routers import whaleanalysis, param, web
 from dependencies import Tags
 
@@ -18,8 +20,6 @@ from auth import get_api_key
 from lib import timeit
 
 import database as db
-
-load_dotenv()
 
 # Ignore FutureWarning, DeprecationWarning
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -111,4 +111,4 @@ async def home():
 	return RedirectResponse(url="/web")
 
 if __name__ == "__main__":
-	uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+	uvicorn.run("main:app", host="127.0.0.1", port=8000)
