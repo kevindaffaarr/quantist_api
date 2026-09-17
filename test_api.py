@@ -13,9 +13,11 @@ HEADERS = {"X-API-KEY": os.getenv("TESTING_API_KEY")}
 
 # Create api list from method inside files in routes folder
 PATH = [
-    "/param/dataparam",
-    "/param/list/stock",
     "/",
+    "/web", "/web/",
+    "/param/dataparam",
+    "/param/list/stock", "/param/list/broker", "/param/list/index",
+    "/whaleanalysis", "/whaleanalysis/",
     "/whaleanalysis/chart", "/whaleanalysis/chart/foreign", "/whaleanalysis/chart/broker",
     "/whaleanalysis/radar", "/whaleanalysis/radar/foreign", "/whaleanalysis/radar/broker",
     "/whaleanalysis/full-data", "/whaleanalysis/full-data/foreign", "/whaleanalysis/full-data/broker",
