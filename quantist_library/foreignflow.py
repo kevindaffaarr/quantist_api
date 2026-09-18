@@ -15,8 +15,6 @@ import dependencies as dp
 from quantist_library import genchart
 from .helper import Bin
 
-pd.options.mode.copy_on_write = True
-pd.options.future.infer_string = True # type: ignore
 
 class StockFFFull():
 	def __init__(self,

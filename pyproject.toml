@@ -3,31 +3,31 @@ name = "quantist_api"
 version = "1.1.0"
 description = "Backend of Quantist.io"
 readme = "README.md"
-requires-python = "==3.12.*"
+requires-python = "==3.14.*"
 dependencies = [
-    "fastapi[standard]==0.115.5",
-    "future==1.0.0",
-    "google-cloud-bigquery-storage==2.27.0",
-    "google-cloud-bigquery==3.27.0",
-    "jinja2==3.1.4",
-    "kaleido==0.2.1",
-    "orjson==3.10.12",
-    "pandas[performance]==2.2.3",
-    "plotly==5.24.1",
-    "polars==1.15.0",
-    "pyarrow==18.1.0",
-    "python-dotenv==1.0.1",
-    "scikit-learn==1.5.2",
-    "sqlalchemy==2.0.36",
-    "sqlalchemy-bigquery==1.12.0",
-    "uvicorn[standard]==0.32.1",
+    "fastapi[standard-no-fastapi-cloud-cli]==0.141.1",
+    "google-cloud-bigquery-storage==2.41.0",
+    "google-cloud-bigquery==3.45.1",
+    "jinja2==3.1.6",
+    "kaleido==1.4.0",
+    "orjson==3.12.0",
+    "pandas[performance]==3.0.5",
+    "plotly==7.1.0",
+    "polars==1.44.2",
+    "pyarrow==25.0.1",
+    "python-dotenv==1.2.3",
+    "scikit-learn==1.9.1",
+    "sqlalchemy==2.0.54",
+    "sqlalchemy-bigquery==1.17.2",
+    "uvicorn[standard]==0.53.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest==8.3.3",
-    "ruff==0.8.0",
+    "pytest==9.1.1",
+    "requests==2.34.2",
+    "ruff==0.16.8",
 ]
 server = [
-    "psycopg==3.2.3",
+    "psycopg[binary]==3.3.5",
 ]

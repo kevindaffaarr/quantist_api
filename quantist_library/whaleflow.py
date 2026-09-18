@@ -9,8 +9,6 @@ from quantist_library import foreignflow as ff, brokerflow as bf, holdingcomposi
 from quantist_library import genchart
 from .helper import Bin
 
-pd.options.mode.copy_on_write = True
-pd.options.future.infer_string = True # type: ignore
 
 class WhaleFlow():
 	def __init__(self,
