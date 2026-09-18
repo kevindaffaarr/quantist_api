@@ -1156,6 +1156,8 @@ class ScreenerVProfile(ScreenerBase):
 		top_stockcodes = raw_data[['close']].groupby(level='code').last()
 		top_stockcodes['mf'] = mf.loc[stocklist]
 		top_stockcodes['corr'] = self.close_valflow_corr.loc[stocklist]
+		# Additive: how each code sits against its own foreign net-value zone.
+		top_stockcodes = top_stockcodes.join(await sc.vprofile_annotations(raw_data, self.radar_period))
 		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
 
 		return stocklist, top_stockcodes

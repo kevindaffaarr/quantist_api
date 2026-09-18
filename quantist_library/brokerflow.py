@@ -1998,6 +1998,9 @@ class ScreenerVProfile(ScreenerBase):
 		top_stockcodes = self.raw_data_full.loc[self.raw_data_full.index.get_level_values('code').isin(stocklist)][['close']].groupby(level='code').last()
 		top_stockcodes['mf'] = mf.loc[mf.index.isin(stocklist)]
 		top_stockcodes['corr'] = self.optimum_corr.loc[self.optimum_corr.index.isin(stocklist)]
+		# Additive: how each code sits against its own selected-broker net-value zone.
+		vprofile_data = self.wf_indicators.loc[self.wf_indicators.index.get_level_values('code').isin(stocklist)]
+		top_stockcodes = top_stockcodes.join(await sc.vprofile_annotations(vprofile_data, self.radar_period))
 		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
 
 		return stocklist, top_stockcodes
