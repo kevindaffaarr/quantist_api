@@ -1940,6 +1940,11 @@ class ScreenerVProfile(ScreenerBase):
 		splitted_max_n_cluster: int | None = None,
 		stepup_n_cluster_threshold: int | None = None,
 		filter_opt_corr: int | None = None,
+		screener_vprofile_criteria: Literal[
+			dp.ScreenerList.vprofile_inside,
+			dp.ScreenerList.vprofile_breakout,
+			dp.ScreenerList.vprofile_cross_down,
+			] = dp.ScreenerList.vprofile_inside,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
 		super().__init__(
@@ -1966,7 +1971,9 @@ class ScreenerVProfile(ScreenerBase):
 
 		self.n_stockcodes: int = n_stockcodes
 		self.radar_period: int | None = radar_period
-	
+		# Which reading of the profile selects the stocklist; the annotations stay the same either way.
+		self.screener_vprofile_criteria = screener_vprofile_criteria
+
 	async def screen(self) -> ScreenerVProfile:
 		await super()._fit_base(predata="vprofile")
 		self.wf_indicators:pd.DataFrame = await self._calc_wf_indicators_vprofile()
@@ -1980,7 +1987,7 @@ class ScreenerVProfile(ScreenerBase):
 
 	async def _get_vprofile_stocklist(self)->list[str]:
 		assert isinstance(self.radar_period, int)
-		return await sc.vprofile_stocklist(self.wf_indicators, self.radar_period)
+		return await sc.vprofile_criteria_stocklist(self.wf_indicators, self.radar_period, self.screener_vprofile_criteria)
 
 	async def _get_data_from_stocklist(self,n_stockcodes: int) -> tuple[list[str], pd.DataFrame]:
 		assert isinstance(self.radar_period, int), 'radar_period must be int'

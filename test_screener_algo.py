@@ -5,14 +5,18 @@ the shipped implementation against the straightforward reference it replaced.
 """
 import asyncio
 import datetime
+import inspect
 
 import numpy as np
 import pandas as pd
 import pytest
+from fastapi.openapi.utils import get_openapi
 
+import dependencies as dp
 from quantist_library import brokerflow as bf
 from quantist_library import foreignflow as ff
 from quantist_library import screener as sc
+from routers import whaleanalysis
 
 
 def _vwap_frame() -> pd.DataFrame:
@@ -80,9 +84,9 @@ def test_both_families_agree_on_vwap_criteria(criteria):
 		assert getattr(foreign, fn)(data) == getattr(whale, fn)(data)
 
 
-def _vprofile_frame(code: str = "aaa") -> pd.DataFrame:
+def _vprofile_frame(code: str = "aaa", tail: tuple[float, ...] = ()) -> pd.DataFrame:
 	close = [100.0, 104.0, 101.0, 108.0, 103.0, 112.0, 105.0, 118.0, 102.0, 109.0,
-		101.0, 115.0, 103.0, 120.0, 106.0, 111.0, 100.0, 107.0, 104.0, 102.0]
+		101.0, 115.0, 103.0, 120.0, 106.0, 111.0, 100.0, 107.0, 104.0, 102.0] + list(tail)
 	netval = [(-1.0) ** i * (i + 1) * 1000.0 for i in range(len(close))]
 	dates = pd.bdate_range("2024-01-01", periods=len(close))
 	return pd.DataFrame(
@@ -250,6 +254,119 @@ def test_broker_vprofile_screener_annotates_its_top_stockcodes():
 	assert set(stocklist) == {"aaa", "bbb"}
 	assert {"close", "mf", "corr"} <= set(top.columns)
 	assert _annotation_columns() <= set(top.columns)
+
+
+# ==========
+# Volume profile behavior criteria: breakout / cross down
+# ==========
+def _behavior_annotations() -> pd.DataFrame:
+	"""One hand-written reading per behavior the criteria have to tell apart."""
+	rows = {
+		"brk": ("resistance", "breakout_up"),
+		"dwn": ("support", "breakdown"),
+		"acc": ("resistance", "acceptance"),
+		"tst": ("support", "test"),
+		"rej": ("support", "rejection"),		# role, but price never left the zone
+		"und": ("resistance", "undetermined"),	# role, nothing else observed
+	}
+	return pd.DataFrame(
+		[{"vprofile_in_zone": True, "vprofile_zone_role": role, "vprofile_zone_behavior": behavior}
+			for role, behavior in rows.values()],
+		index=pd.Index(rows, name="code"),
+	)
+
+
+@pytest.mark.parametrize("behavior, expected", [("breakout_up", ["brk"]), ("breakdown", ["dwn"])])
+def test_vprofile_behavior_codes_selects_only_the_named_behavior(behavior, expected):
+	selected = sc.vprofile_behavior_codes(_behavior_annotations(), behavior)
+	assert selected == expected
+	# Sitting in a zone is not a signal, and neither is carrying a role on its own.
+	assert not {"acc", "tst", "rej", "und"} & set(selected)
+
+
+def _behavior_universe() -> pd.DataFrame:
+	"""Four codes on the same profile, each leaving (or not leaving) its zone differently."""
+	tails = {
+		"brk": (108.0, 118.0, 130.0),	# came up into the zone and left above it
+		"dwn": (100.0, 88.0, 80.0),		# came down onto the zone and left below it
+		"acc": (),						# still sitting inside its zone
+		"rej": (104.0, 125.0, 140.0),	# touched and turned back: role only, no break
+	}
+	return pd.concat([_vprofile_frame(code, tail) for code, tail in tails.items()])
+
+
+def test_vprofile_criteria_read_the_behavior_not_the_membership():
+	data = _behavior_universe()
+	annotations = asyncio.run(sc.vprofile_annotations(data, 3))
+	breakout = asyncio.run(sc.vprofile_breakout(data, 3))
+	cross_down = asyncio.run(sc.vprofile_cross_down(data, 3))
+
+	assert breakout == ["brk"]
+	assert cross_down == ["dwn"]
+	assert annotations.loc[breakout + cross_down, "vprofile_zone_behavior"].tolist() == ["breakout_up", "breakdown"]
+	# All four touched a zone: membership is the wider set the signals are read out of.
+	assert set(asyncio.run(sc.vprofile_stocklist(data, 3))) == {"brk", "dwn", "acc", "rej"}
+
+
+@pytest.mark.parametrize("criteria, expected", [
+	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
+	(dp.ScreenerList.vprofile_breakout, ["brk"]),
+	(dp.ScreenerList.vprofile_cross_down, ["dwn"]),
+])
+def test_vprofile_criteria_stocklist_dispatches_on_the_enum(criteria, expected):
+	assert sorted(asyncio.run(sc.vprofile_criteria_stocklist(_behavior_universe(), 3, criteria))) == expected
+
+
+def test_vprofile_criteria_stocklist_rejects_an_unknown_criterion():
+	with pytest.raises(ValueError):
+		asyncio.run(sc.vprofile_criteria_stocklist(_behavior_universe(), 3, dp.ScreenerList.vwap_rally))
+
+
+@pytest.mark.parametrize("criteria, expected", [
+	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
+	(dp.ScreenerList.vprofile_breakout, ["brk"]),
+	(dp.ScreenerList.vprofile_cross_down, ["dwn"]),
+])
+def test_foreign_vprofile_screener_selects_on_the_requested_criterion(criteria, expected):
+	screener = object.__new__(ff.ScreenerVProfile)
+	screener.radar_period = 3
+	screener.screener_vprofile_criteria = criteria
+	stocklist = asyncio.run(screener._get_vprofile_stocklist(raw_data=_behavior_universe()))
+	assert sorted(stocklist) == expected
+
+
+@pytest.mark.parametrize("criteria, expected", [
+	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
+	(dp.ScreenerList.vprofile_breakout, ["brk"]),
+	(dp.ScreenerList.vprofile_cross_down, ["dwn"]),
+])
+def test_broker_vprofile_screener_selects_on_the_requested_criterion(criteria, expected):
+	screener = object.__new__(bf.ScreenerVProfile)
+	screener.radar_period = 3
+	screener.screener_vprofile_criteria = criteria
+	screener.wf_indicators = _behavior_universe()
+	assert sorted(asyncio.run(screener._get_vprofile_stocklist())) == expected
+
+
+@pytest.mark.parametrize("cls", [ff.ScreenerVProfile, bf.ScreenerVProfile])
+def test_vprofile_screener_constructors_default_to_membership(cls):
+	parameter = inspect.signature(cls.__init__).parameters["screener_vprofile_criteria"]
+	assert parameter.default == dp.ScreenerList.vprofile_inside
+
+
+@pytest.mark.parametrize("path", [
+	"/whaleanalysis/screener/foreign/vprofile",
+	"/whaleanalysis/screener/broker/vprofile",
+])
+def test_vprofile_routes_expose_the_criterion_as_an_optional_query_parameter(path):
+	"""OpenAPI only: no server, no database, just the route signatures FastAPI reads."""
+	schema = get_openapi(title="test", version="test", routes=whaleanalysis.router.routes)
+	parameters = {p["name"]: p for p in schema["paths"][path]["get"]["parameters"]}
+	criterion = parameters["screener_vprofile_criteria"]
+	assert criterion["in"] == "query"
+	assert criterion["required"] is False
+	assert criterion["schema"]["default"] == "vprofile_inside"
+	assert set(criterion["schema"]["enum"]) == {"vprofile_inside", "vprofile_breakout", "vprofile_cross_down"}
 
 
 def _broker_frame() -> tuple[pd.DataFrame, pd.DataFrame]:

@@ -251,3 +251,57 @@ async def vprofile_stocklist(data: pd.DataFrame, checking_period: int) -> list[s
 	])
 	inside = pd.Series(dict(results))
 	return inside[inside].index.tolist()
+
+
+def vprofile_behavior_codes(annotations: pd.DataFrame, behavior: str) -> list[str]:
+	"""Codes whose current reading observed exactly this behavior. Pure, frame in, codes out."""
+	return annotations.index[annotations["vprofile_zone_behavior"] == behavior].tolist()
+
+
+async def vprofile_breakout(data: pd.DataFrame, checking_period: int) -> list[str]:
+	"""
+	Codes that broke out above the zone they were working on.
+
+	Same per-code profile vprofile_inside/vprofile_annotations read, filtered to
+	the "breakout_up" behavior: within the last checking_period the closes
+	touched the selected net-value peak zone, price had approached it from
+	below (so the zone was acting as resistance), and the last close now sits
+	above it. Point-in-time - only the window's own closes decide.
+
+	Membership is not the signal: a code still inside its zone (acceptance,
+	test) or one that touched and turned back (rejection) is not selected, and
+	no signal is read off the zone's role alone.
+	"""
+	return vprofile_behavior_codes(await vprofile_annotations(data, checking_period), "breakout_up")
+
+
+async def vprofile_cross_down(data: pd.DataFrame, checking_period: int) -> list[str]:
+	"""
+	Codes that crossed down out of the zone they were working on.
+
+	The mirror of vprofile_breakout, filtered to the "breakdown" behavior: the
+	window touched the selected zone, price had approached it from above (so the
+	zone was acting as support), and the last close now sits below it. Same
+	exclusions - membership, an isolated test, a rejection, or a bare role is
+	never a signal.
+	"""
+	return vprofile_behavior_codes(await vprofile_annotations(data, checking_period), "breakdown")
+
+
+# Keyed by dp.ScreenerList value; screener.py stays free of the dependencies import.
+VPROFILE_CRITERIA = {
+	"vprofile_inside": vprofile_stocklist,
+	"vprofile_breakout": vprofile_breakout,
+	"vprofile_cross_down": vprofile_cross_down,
+}
+
+
+async def vprofile_criteria_stocklist(
+	data: pd.DataFrame,
+	checking_period: int,
+	criteria: str = "vprofile_inside",
+	) -> list[str]:
+	"""Select codes with the requested volume profile criterion, membership by default."""
+	if criteria not in VPROFILE_CRITERIA:
+		raise ValueError(f"Invalid screener_vprofile_criteria: {criteria}")
+	return await VPROFILE_CRITERIA[criteria](data, checking_period)
