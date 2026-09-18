@@ -31,7 +31,11 @@ def getenv(default:str, key: str) -> str:
 	return os.getenv(key, default)
 
 # Template Initiation
-templates = Jinja2Templates(directory="pages", autoescape= True, auto_reload= True)
+# Starlette >=1.0 dropped the env kwargs passthrough; its default autoescape is
+# select_autoescape(), so keep escaping unconditional as before.
+templates = Jinja2Templates(directory="pages")
+templates.env.autoescape = True
+templates.env.auto_reload = True
 templates.env.filters['getenv'] = getenv
 
 # ==========

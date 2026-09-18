@@ -10,6 +10,7 @@ load_dotenv()
 
 URL = os.getenv("TESTING_API_URL", "http://127.0.0.1:8000")
 HEADERS = {"X-API-KEY": os.getenv("TESTING_API_KEY")}
+REQUEST_TIMEOUT_SECONDS = 240
 
 # Create api list from method inside files in routes folder
 PATH = [
@@ -34,5 +35,9 @@ PATH = [
 # Pytest
 @pytest.mark.parametrize("api", PATH)
 def test_api(api):
-    response = requests.get(f"{URL}{api}", headers=HEADERS)
+    response = requests.get(
+        f"{URL}{api}",
+        headers=HEADERS,
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
     assert response.status_code == 200, f"Error: {response.text}"

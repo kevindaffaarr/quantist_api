@@ -103,12 +103,12 @@ async def get_foreign_chart(
 		headers = {
 			"stockcode": wf_obj.stockcode,
 			"last_date": wf_obj.wf_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
-			"last_mf": wf_obj.wf_indicators['mf'][-1].astype(str),
-			"last_prop": wf_obj.wf_indicators['prop'][-1].astype(str),
-			"last_pricecorrel": wf_obj.wf_indicators['pricecorrel'][-1].astype(str),
-			"last_mapricecorrel": wf_obj.wf_indicators['mapricecorrel'][-1].astype(str),
-			"last_vwap": wf_obj.wf_indicators['vwap'][-1].astype(str),
-			"last_close": wf_obj.wf_indicators['close'][-1].astype(str),
+			"last_mf": wf_obj.wf_indicators['mf'].iloc[-1].astype(str),
+			"last_prop": wf_obj.wf_indicators['prop'].iloc[-1].astype(str),
+			"last_pricecorrel": wf_obj.wf_indicators['pricecorrel'].iloc[-1].astype(str),
+			"last_mapricecorrel": wf_obj.wf_indicators['mapricecorrel'].iloc[-1].astype(str),
+			"last_vwap": wf_obj.wf_indicators['vwap'].iloc[-1].astype(str),
+			"last_close": wf_obj.wf_indicators['close'].iloc[-1].astype(str),
 		}
 		
 		# Define content
@@ -230,12 +230,12 @@ async def get_broker_chart(
 		headers = {
 			"stockcode": wf_obj.stockcode,
 			"last_date": wf_obj.wf_indicators.index[-1].strftime("%Y-%m-%d"), # type: ignore
-			"last_mf": str(wf_obj.wf_indicators['mf'][-1]),
-			"last_prop": str(wf_obj.wf_indicators['prop'][-1]),
-			"last_pricecorrel": str(wf_obj.wf_indicators['pricecorrel'][-1]),
-			"last_mapricecorrel": str(wf_obj.wf_indicators['mapricecorrel'][-1]),
-			"last_vwap": str(wf_obj.wf_indicators['vwap'][-1]),
-			"last_close": str(wf_obj.wf_indicators['close'][-1]),
+			"last_mf": str(wf_obj.wf_indicators['mf'].iloc[-1]),
+			"last_prop": str(wf_obj.wf_indicators['prop'].iloc[-1]),
+			"last_pricecorrel": str(wf_obj.wf_indicators['pricecorrel'].iloc[-1]),
+			"last_mapricecorrel": str(wf_obj.wf_indicators['mapricecorrel'].iloc[-1]),
+			"last_vwap": str(wf_obj.wf_indicators['vwap'].iloc[-1]),
+			"last_close": str(wf_obj.wf_indicators['close'].iloc[-1]),
 		}
 
 		# Define content

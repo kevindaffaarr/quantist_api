@@ -19,12 +19,10 @@ from sqlalchemy.sql import func
 import database as db
 import dependencies as dp
 from quantist_library import genchart
-from .helper import Bin
+from .helper import Bin, pl_to_pandas
 
 import polars as pl
 
-pd.options.mode.copy_on_write = True
-pd.options.future.infer_string = True # type: ignore
 
 class StockBFFull():
 	"""
@@ -279,7 +277,7 @@ class StockBFFull():
 			.order_by(db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
-		raw_data_broker_full = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
+		raw_data_broker_full = pl_to_pandas(pl.read_database(query=qry_main.statement, connection=dbs.bind)).reset_index(drop=True).set_index("date") # type: ignore
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -326,7 +324,7 @@ class StockBFFull():
 			qry_main = qry.filter(db.StockData.date.between(startdate, enddate)).order_by(db.StockData.date.asc())
 
 		# Main Query Fetching
-		raw_data_main = pl.read_database(query=qry_main.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
+		raw_data_main = pl_to_pandas(pl.read_database(query=qry_main.statement, connection=dbs.bind)).reset_index(drop=True).set_index("date") # type: ignore
 
 		# Check how many row is returned
 		if raw_data_main.shape[0] == 0:
@@ -351,7 +349,7 @@ class StockBFFull():
 		qry_pre = dbs.query(qry_pre).order_by(qry_pre.c.date.asc()) # type: ignore
 
 		# Pre-Data Query Fetching
-		raw_data_pre = pl.read_database(query=qry_pre.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index("date") # type: ignore
+		raw_data_pre = pl_to_pandas(pl.read_database(query=qry_pre.statement, connection=dbs.bind)).reset_index(drop=True).set_index("date") # type: ignore
 
 		# Concatenate Pre and Main Query
 		raw_data_full = pd.concat([raw_data_pre,raw_data_main])
@@ -1138,7 +1136,7 @@ class WhaleRadar():
 					(db.ListStock.code.not_in(stockcode_excludes_lower))) # type: ignore
 		
 		# Query Fetching: filtered_stockcodes
-		stockcodes = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True)['code'] # type: ignore
+		stockcodes = pl_to_pandas(pl.read_database(query=qry.statement, connection=dbs.bind)).reset_index(drop=True)['code'] # type: ignore
 		return pd.Series(stockcodes)
 	
 	# Get Net Val Sum Val Broker Transaction
@@ -1179,7 +1177,7 @@ class WhaleRadar():
 		.order_by(db.StockTransaction.code.asc(), db.StockTransaction.date.asc(), db.StockTransaction.broker.asc())
 
 		# Main Query Fetching
-		raw_data_broker_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index(["code","date"]) # type: ignore
+		raw_data_broker_full = pl_to_pandas(pl.read_database(query=qry.statement, connection=dbs.bind)).reset_index(drop=True).set_index(["code","date"]) # type: ignore
 
 		# Data Cleansing: fillna
 		raw_data_broker_full.fillna(value=0, inplace=True)
@@ -1200,7 +1198,7 @@ class WhaleRadar():
 			qry = dbs.query(db.StockData.code).filter(db.StockData.code.in_(filtered_stockcodes.to_list())).filter(db.StockData.date.between(startdate, enddate)).group_by(db.StockData.code) # type: ignore
 			
 			# Query Fetching
-			raw_data = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True) # type: ignore
+			raw_data = pl_to_pandas(pl.read_database(query=qry.statement, connection=dbs.bind)) # type: ignore
 
 			# Check how many row is returned
 			if raw_data.shape[0] == 0:
@@ -1224,7 +1222,7 @@ class WhaleRadar():
 			.order_by(db.StockData.code.asc(), db.StockData.date.asc())
 
 		# Main Query Fetching
-		raw_data_full = pl.read_database(query=qry.statement, connection=dbs.bind).to_pandas(use_pyarrow_extension_array=True).reset_index(drop=True).set_index(["code","date"]) # type: ignore
+		raw_data_full = pl_to_pandas(pl.read_database(query=qry.statement, connection=dbs.bind)).reset_index(drop=True).set_index(["code","date"]) # type: ignore
 
 		# End of Method: Return or Assign Attribute
 		return raw_data_full
@@ -1430,7 +1428,7 @@ class WhaleRadar():
 			lambda group_df: group_df.with_columns(pl.corr(pl.exclude('code','date','close'), pl.col('close'))).head(1)
 		).drop('close').sort('code')
 		
-		corr_ncum_close = corr.to_pandas(use_pyarrow_extension_array=True).set_index('code').rename_axis('broker', axis='columns')
+		corr_ncum_close = pl_to_pandas(corr).set_index('code').rename_axis('broker', axis='columns')
 		return corr_ncum_close
 	
 	async def _get_bf_parameters(self,
@@ -1465,7 +1463,7 @@ class WhaleRadar():
 		raw_data_broker_sumval = raw_data_broker_sumval.loc[transaction_true.index[transaction_true]]
 
 		# Cumulate volume for nvol
-		broker_ncum = raw_data_broker_nval.astype(float).groupby(by='code').cumsum(axis=0)
+		broker_ncum = raw_data_broker_nval.astype(float).groupby(by='code').cumsum()
 		# Get each broker's sum of transaction value
 		broker_sumval = raw_data_broker_sumval.groupby(by='code').sum()
 		# Get correlation between each broker's cumulated transaction and close price
@@ -1672,7 +1670,7 @@ class WhaleRadar():
 		radar_indicators = pd.DataFrame()
 		
 		# Radar data subset
-		startdate_ts = pd.to_datetime(self.startdate).date() if isinstance(self.startdate, (datetime.date, datetime.datetime)) else self.startdate
+		startdate_ts = pd.to_datetime(self.startdate) if isinstance(self.startdate, (datetime.date, datetime.datetime)) else self.startdate
 		radar_data_nval = selected_broker_nval[selected_broker_nval.index.get_level_values('date') >= startdate_ts]
 		radar_data_full = raw_data_full[raw_data_full.index.get_level_values('date') >= startdate_ts]
 
@@ -1685,7 +1683,7 @@ class WhaleRadar():
 			nval_diff = selected_broker_nval_cumsum.groupby('code').diff()
 			close_diff = raw_data_full['close'].groupby('code').diff()
 			radar_indicators[y_axis_type.value] = nval_diff[nval_diff.index.get_level_values('date') > startdate_ts].groupby('code')\
-				.corrwith(close_diff[close_diff.index.get_level_values('date') > startdate_ts],axis=0) # type: ignore
+				.corrwith(close_diff[close_diff.index.get_level_values('date') > startdate_ts]) # type: ignore
 		elif y_axis_type == dp.ListRadarType.changepercentage:
 			radar_indicators[y_axis_type.value] = \
 				(radar_data_full.groupby('code')['close'].last() \

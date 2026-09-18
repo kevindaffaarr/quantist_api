@@ -10,8 +10,6 @@ from plotly.subplots import make_subplots
 import dependencies as dp
 from .helper import Bin
 
-pd.options.mode.copy_on_write = True
-pd.options.future.infer_string = True # type: ignore
 
 def html_wrap(text:str, width:int = 16, n_lines:int = 2):
 	text_arr = textwrap.wrap(text=text, width=width)
@@ -199,10 +197,10 @@ async def quantist_stock_chart(
 	
 	fig.add_annotation(xref="x domain",yref="paper",xanchor="left",yanchor="bottom",x=0,y=1,
 		text = f"<b>Date: {end_temp.strftime('%Y-%m-%d')}</b> \
-			<b>Close</b>: {'{:0.0f}'.format(wf_indicators.close[-1])}\
-			<b>{abv}-VWAP({period_vwap if period_vwap is not None else ''})</b>: {'{:0.0f}'.format(wf_indicators.vwap[-1])}\
-			<b>{abv}-Prop({period_prop if period_prop is not None else ''})</b>: {'{:.2f}%'.format(wf_indicators.prop[-1]*100)}\
-			<b>{abv}-NetProp({period_prop if period_prop is not None else ''})</b>: {'{:.2f}%'.format(wf_indicators.netprop[-1]*100)}\
+			<b>Close</b>: {'{:0.0f}'.format(wf_indicators.close.iloc[-1])}\
+			<b>{abv}-VWAP({period_vwap if period_vwap is not None else ''})</b>: {'{:0.0f}'.format(wf_indicators.vwap.iloc[-1])}\
+			<b>{abv}-Prop({period_prop if period_prop is not None else ''})</b>: {'{:.2f}%'.format(wf_indicators.prop.iloc[-1]*100)}\
+			<b>{abv}-NetProp({period_prop if period_prop is not None else ''})</b>: {'{:.2f}%'.format(wf_indicators.netprop.iloc[-1]*100)}\
 			<br><b>{abv}-Corr({period_pricecorrel if period_pricecorrel is not None else ''})</b>: <span style='color:{pricecorrel_color}'>{pricecorrel}</span>\
 			<b>MA {abv}-Corr({period_mapricecorrel if period_mapricecorrel is not None else ''})</b>: <span style='color:{mapricecorrel_color}'>{mapricecorrel}</span>\
 			<b>{abv}-Power</b>: {pow_text}",
@@ -482,4 +480,4 @@ async def fig_to_image(fig:go.Figure,format:str = "jpeg"):
 	# File Export:
 	# fig.write_image("img.jpeg", engine="kaleido", width=1920, height=1080)
 	# Bytes Export:
-	return fig.to_image(format=format, engine="kaleido", scale=5, width=1280, height=720)
+	return fig.to_image(format=format, scale=5, width=1280, height=720)

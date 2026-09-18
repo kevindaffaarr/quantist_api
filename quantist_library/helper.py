@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
 from sklearn.preprocessing import MinMaxScaler
+import polars as pl
 
 class Bin():
 	def __init__(self, data:pd.DataFrame) -> None:
@@ -87,3 +88,13 @@ class Bin():
 
 		# Return the sorted peaks and valleys
 		return sorted(peaks_ori + valleys_ori)
+
+def pl_to_pandas(df: pl.DataFrame) -> pd.DataFrame:
+	"""
+	Convert a polars frame read from the database into native pandas dtypes.
+
+	SQL NUMERIC columns arrive as Decimal(38, 0). Left as Arrow decimal128 they
+	blow past Arrow's 38-digit limit on divide (precision 77) and reject cumsum
+	outright, so cast them to float64 before handing pandas numpy-backed columns.
+	"""
+	return df.cast({pl.Decimal: pl.Float64}).to_pandas(use_pyarrow_extension_array=False)

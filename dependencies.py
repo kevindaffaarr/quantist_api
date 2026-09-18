@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from enum import Enum
 from decimal import Decimal
 
@@ -10,8 +10,7 @@ class DataParam(BaseModel):
 	param: str
 	value: str
 
-	class Config:
-		from_attributes = True
+	model_config = ConfigDict(from_attributes=True)
 
 class ListCode(BaseModel):
 	index: int
@@ -21,8 +20,7 @@ class ListCode(BaseModel):
 	foreignsellval: Decimal | None = None
 	foreignbuyval: Decimal | None = None
 
-	class Config:
-		from_attributes = True
+	model_config = ConfigDict(from_attributes=True)
 
 # ==========
 # Metadata Tags
