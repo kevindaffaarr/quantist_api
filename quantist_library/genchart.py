@@ -399,13 +399,16 @@ async def broker_cluster_timeseries_chart(
 	# Convert pyarrow index to datetime64[ns]
 	broker_ncum.index = broker_ncum.index.astype('datetime64[ns]')
 
-	# Count number of clusters
-	n_clusters = broker_cluster['cluster'].nunique()
-
-	# Sort broker_cluster by correlation
-	broker_cluster = broker_cluster.sort_values(by='corr_cluster_abs', ascending=False)
-	# Rank correlation (same value will have same rank)
-	broker_cluster['rank'] = broker_cluster['corr_cluster_abs'].rank(method='dense', ascending=False)-1
+	# Sort clusters by their correlation with price. Ranking individual brokers
+	# with dense ranks can produce fewer ranks than clusters when two clusters
+	# have the same correlation, leaving an empty subplot and a KeyError.
+	cluster_corr = (
+		broker_cluster.groupby('cluster', sort=False)['corr_cluster_abs']
+		.first()
+		.sort_values(ascending=False)
+	)
+	cluster_ids = cluster_corr.index.tolist()
+	n_clusters = len(cluster_ids)
 
 	# Make subplots with max 3 columns with total n_clusters subplots with secondary_y
 	n_cols = 3
@@ -413,12 +416,12 @@ async def broker_cluster_timeseries_chart(
 	n_rows = n_rows + 1 if n_clusters % n_cols != 0 else n_rows
 	fig = make_subplots(rows=n_rows, cols=n_cols, shared_xaxes=True,
 		specs=[[{'secondary_y': True}]*n_cols]*n_rows,
-		subplot_titles=[f"Cluster {i} (corr:{round(broker_cluster[broker_cluster['rank'] == i]['corr_cluster'][0], 4)})" for i in range(n_clusters)],
+		subplot_titles=[f"Cluster {i} (corr:{round(cluster_corr.loc[cluster_id], 4)})" for i, cluster_id in enumerate(cluster_ids)],
 		vertical_spacing=0.1, horizontal_spacing=0.1)
 	# Add traces to subplots
-	for i in range(n_clusters):
+	for i, cluster_id in enumerate(cluster_ids):
 		# Get brokers from a cluster
-		incluster_brokers = broker_cluster[broker_cluster['rank'] == i].index
+		incluster_brokers = broker_cluster[broker_cluster['cluster'] == cluster_id].index
 		incluster_broker_ncum = broker_ncum[incluster_brokers]
 		# Plot line all column of incluster_broker_ncum to subplot
 		col_idx = 0
@@ -447,7 +450,10 @@ async def broker_cluster_timeseries_chart(
 		fig.update_yaxes(title_text="Price", row=i//n_cols+1, col=i%n_cols+1, secondary_y=True)
 
 	# List the brokers in each cluster from broker_cluster index
-	cluster_brokers = [broker_cluster[broker_cluster['rank'] == i].index.tolist() for i in range(n_clusters)]
+	cluster_brokers = [
+		broker_cluster[broker_cluster['cluster'] == cluster_id].index.tolist()
+		for cluster_id in cluster_ids
+	]
 	# List down the brokers in each cluster below the subplot
 	for i in range(n_clusters):
 		fig.add_annotation(xref="x domain",yref="y domain",x=0,y=0,
