@@ -275,9 +275,9 @@ async def vprofile_breakout(data: pd.DataFrame, checking_period: int) -> list[st
 	return vprofile_behavior_codes(await vprofile_annotations(data, checking_period), "breakout_up")
 
 
-async def vprofile_cross_down(data: pd.DataFrame, checking_period: int) -> list[str]:
+async def vprofile_breakdown(data: pd.DataFrame, checking_period: int) -> list[str]:
 	"""
-	Codes that crossed down out of the zone they were working on.
+	Codes that broke down out of the zone they were working on.
 
 	The mirror of vprofile_breakout, filtered to the "breakdown" behavior: the
 	window touched the selected zone, price had approached it from above (so the
@@ -292,7 +292,7 @@ async def vprofile_cross_down(data: pd.DataFrame, checking_period: int) -> list[
 VPROFILE_CRITERIA = {
 	"vprofile_inside": vprofile_stocklist,
 	"vprofile_breakout": vprofile_breakout,
-	"vprofile_cross_down": vprofile_cross_down,
+	"vprofile_breakdown": vprofile_breakdown,
 }
 
 

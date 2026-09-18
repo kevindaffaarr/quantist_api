@@ -1943,7 +1943,7 @@ class ScreenerVProfile(ScreenerBase):
 		screener_vprofile_criteria: Literal[
 			dp.ScreenerList.vprofile_inside,
 			dp.ScreenerList.vprofile_breakout,
-			dp.ScreenerList.vprofile_cross_down,
+			dp.ScreenerList.vprofile_breakdown,
 			] = dp.ScreenerList.vprofile_inside,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:

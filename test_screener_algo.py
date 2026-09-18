@@ -257,7 +257,7 @@ def test_broker_vprofile_screener_annotates_its_top_stockcodes():
 
 
 # ==========
-# Volume profile behavior criteria: breakout / cross down
+# Volume profile behavior criteria: breakout / breakdown
 # ==========
 def _behavior_annotations() -> pd.DataFrame:
 	"""One hand-written reading per behavior the criteria have to tell apart."""
@@ -299,11 +299,11 @@ def test_vprofile_criteria_read_the_behavior_not_the_membership():
 	data = _behavior_universe()
 	annotations = asyncio.run(sc.vprofile_annotations(data, 3))
 	breakout = asyncio.run(sc.vprofile_breakout(data, 3))
-	cross_down = asyncio.run(sc.vprofile_cross_down(data, 3))
+	breakdown = asyncio.run(sc.vprofile_breakdown(data, 3))
 
 	assert breakout == ["brk"]
-	assert cross_down == ["dwn"]
-	assert annotations.loc[breakout + cross_down, "vprofile_zone_behavior"].tolist() == ["breakout_up", "breakdown"]
+	assert breakdown == ["dwn"]
+	assert annotations.loc[breakout + breakdown, "vprofile_zone_behavior"].tolist() == ["breakout_up", "breakdown"]
 	# All four touched a zone: membership is the wider set the signals are read out of.
 	assert set(asyncio.run(sc.vprofile_stocklist(data, 3))) == {"brk", "dwn", "acc", "rej"}
 
@@ -311,7 +311,7 @@ def test_vprofile_criteria_read_the_behavior_not_the_membership():
 @pytest.mark.parametrize("criteria, expected", [
 	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
 	(dp.ScreenerList.vprofile_breakout, ["brk"]),
-	(dp.ScreenerList.vprofile_cross_down, ["dwn"]),
+	(dp.ScreenerList.vprofile_breakdown, ["dwn"]),
 ])
 def test_vprofile_criteria_stocklist_dispatches_on_the_enum(criteria, expected):
 	assert sorted(asyncio.run(sc.vprofile_criteria_stocklist(_behavior_universe(), 3, criteria))) == expected
@@ -325,7 +325,7 @@ def test_vprofile_criteria_stocklist_rejects_an_unknown_criterion():
 @pytest.mark.parametrize("criteria, expected", [
 	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
 	(dp.ScreenerList.vprofile_breakout, ["brk"]),
-	(dp.ScreenerList.vprofile_cross_down, ["dwn"]),
+	(dp.ScreenerList.vprofile_breakdown, ["dwn"]),
 ])
 def test_foreign_vprofile_screener_selects_on_the_requested_criterion(criteria, expected):
 	screener = object.__new__(ff.ScreenerVProfile)
@@ -338,7 +338,7 @@ def test_foreign_vprofile_screener_selects_on_the_requested_criterion(criteria, 
 @pytest.mark.parametrize("criteria, expected", [
 	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
 	(dp.ScreenerList.vprofile_breakout, ["brk"]),
-	(dp.ScreenerList.vprofile_cross_down, ["dwn"]),
+	(dp.ScreenerList.vprofile_breakdown, ["dwn"]),
 ])
 def test_broker_vprofile_screener_selects_on_the_requested_criterion(criteria, expected):
 	screener = object.__new__(bf.ScreenerVProfile)
@@ -366,7 +366,7 @@ def test_vprofile_routes_expose_the_criterion_as_an_optional_query_parameter(pat
 	assert criterion["in"] == "query"
 	assert criterion["required"] is False
 	assert criterion["schema"]["default"] == "vprofile_inside"
-	assert set(criterion["schema"]["enum"]) == {"vprofile_inside", "vprofile_breakout", "vprofile_cross_down"}
+	assert set(criterion["schema"]["enum"]) == {"vprofile_inside", "vprofile_breakout", "vprofile_breakdown"}
 
 
 def _broker_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
