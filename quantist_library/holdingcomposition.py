@@ -9,7 +9,7 @@ from sqlalchemy.sql import func
 
 import database as db
 import dependencies as dp
-from .helper import pl_to_pandas
+from .helper import date_only, pl_to_pandas
 
 
 class HoldingComposition():
@@ -37,15 +37,14 @@ class HoldingComposition():
 		assert isinstance(categorization, dp.HoldingSectorsCat)
 
 		self.stockcode: str = stockcode.lower()
-		self.startdate: datetime.date | None = startdate
-		self.enddate: datetime.date = enddate
+		self.startdate: datetime.date | None = date_only(startdate)
+		normalized_enddate = date_only(enddate)
+		assert normalized_enddate is not None
+		self.enddate: datetime.date = normalized_enddate
 		self.categorization: dp.HoldingSectorsCat = categorization
 
-		# Type conversion
-		if (type(self.startdate) is pd.Timestamp):
-			self.startdate = self.startdate.date()
-		if (type(self.enddate) is pd.Timestamp):
-			self.enddate = self.enddate.date()
+		# BigQuery DATE parameters must remain date-only values, even when the
+		# driver returned a datetime or pandas Timestamp from a DATE column.
 
 		# Validation startdate and enddate
 		if isinstance(self.startdate, datetime.date) and self.startdate < datetime.date(2015, 1, 1):
@@ -125,7 +124,7 @@ class HoldingComposition():
 		data_ksei = await self.__get_data_ksei(dbs=dbs)
 
 		# Get data scripless ratio for each date from data_ksei and convert to datetime.date
-		list_date = data_ksei.index.tolist() # type: ignore
+		list_date = [date_only(value) for value in data_ksei.index.tolist()]
 		data_scripless = await self.__get_data_scripless(list_date=list_date, dbs=dbs)
 
 		# ==========

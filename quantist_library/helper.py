@@ -4,6 +4,26 @@ import pandas as pd
 from scipy.signal import find_peaks
 from sklearn.preprocessing import MinMaxScaler
 import polars as pl
+import datetime
+
+
+def date_only(value: datetime.date | datetime.datetime | pd.Timestamp | None) -> datetime.date | None:
+	"""Return a date-only value suitable for SQL DATE parameters.
+
+	BigQuery rejects datetime values such as ``2025-09-30T00:00:00`` when
+	binding them to a DATE column. Database drivers may expose DATE columns as
+	Python datetimes or pandas timestamps, so normalize both forms here.
+	"""
+	if value is None:
+		return None
+	if isinstance(value, pd.Timestamp):
+		return datetime.date(value.year, value.month, value.day)
+	if isinstance(value, datetime.datetime):
+		return value.date()
+	if isinstance(value, datetime.date):
+		return value
+	raise TypeError(f"Expected a date-like value, got {type(value).__name__}")
+
 
 class Bin():
 	def __init__(self, data:pd.DataFrame) -> None:
