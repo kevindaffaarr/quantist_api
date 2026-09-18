@@ -98,6 +98,7 @@ class WhaleFlow():
 			return fig
 
 class ForeignFlow(WhaleFlow, ff.StockFFFull):
+	"""StockFFFull plus the holding-composition panel the full chart draws."""
 	def __init__(self,
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
@@ -133,37 +134,13 @@ class ForeignFlow(WhaleFlow, ff.StockFFFull):
 			pow_medium_mapricecorrel=pow_medium_mapricecorrel,
 			dbs=dbs)
 	
-	async def __get_wf_obj(self) -> ForeignFlow:
-		# ForeignFlow
-		ff.StockFFFull(
-			stockcode = self.stockcode,
-			startdate = self.startdate,
-			enddate = self.enddate,
-			period_mf = self.period_mf,
-			period_prop = self.period_prop,
-			period_pricecorrel = self.period_pricecorrel,
-			period_mapricecorrel = self.period_mapricecorrel,
-			period_vwap = self.period_vwap,
-			pow_high_prop = self.pow_high_prop,
-			pow_high_pricecorrel = self.pow_high_pricecorrel,
-			pow_high_mapricecorrel = self.pow_high_mapricecorrel,
-			pow_medium_prop = self.pow_medium_prop,
-			pow_medium_pricecorrel = self.pow_medium_pricecorrel,
-			pow_medium_mapricecorrel = self.pow_medium_mapricecorrel,
-			dbs = self.dbs,
-		)
+	async def fit(self) -> ForeignFlow:
 		await ff.StockFFFull.fit(self)
-		# Update Attribute of ForeignFlow from wf_obj
-		# self.__dict__.update(vars(wf_obj))
+		await self._full_data_processing()
 		return self
 
-	async def fit(self) -> ForeignFlow:
-		await self.__get_wf_obj()
-		await WhaleFlow._full_data_processing(self)
-		return self
-	
 	async def chart(self, media_type: dp.ListMediaType | None = None):
-		return await WhaleFlow._gen_full_chart(self,
+		return await self._gen_full_chart(
 			wf_indicators=self.wf_indicators,
 			media_type=media_type,
 			bin_obj = self.bin_obj,
@@ -171,6 +148,7 @@ class ForeignFlow(WhaleFlow, ff.StockFFFull):
 
 
 class BrokerFlow(WhaleFlow, bf.StockBFFull):
+	"""StockBFFull plus the holding-composition panel the full chart draws."""
 	def __init__(self,
 		stockcode: str | None = None,
 		startdate: datetime.date | None = None,
@@ -224,46 +202,13 @@ class BrokerFlow(WhaleFlow, bf.StockBFFull):
 		self.splitted_max_n_cluster: int | None = splitted_max_n_cluster
 		self.stepup_n_cluster_threshold: int | None = stepup_n_cluster_threshold
 	
-	async def __get_wf_obj(self) -> BrokerFlow:
-		# BrokerFlow
-		bf.StockBFFull(
-			stockcode = self.stockcode,
-			startdate = self.startdate,
-			enddate = self.enddate,
-			clustering_method=self.clustering_method,
-			n_selected_cluster = self.n_selected_cluster,
-			period_mf = self.period_mf,
-			period_prop = self.period_prop,
-			period_pricecorrel = self.period_pricecorrel,
-			period_mapricecorrel = self.period_mapricecorrel,
-			period_vwap = self.period_vwap,
-			pow_high_prop = self.pow_high_prop,
-			pow_high_pricecorrel = self.pow_high_pricecorrel,
-			pow_high_mapricecorrel = self.pow_high_mapricecorrel,
-			pow_medium_prop = self.pow_medium_prop,
-			pow_medium_pricecorrel = self.pow_medium_pricecorrel,
-			pow_medium_mapricecorrel = self.pow_medium_mapricecorrel,
-			training_start_index = self.training_start_index,
-			training_end_index = self.training_end_index,
-			min_n_cluster = self.min_n_cluster,
-			max_n_cluster = self.max_n_cluster,
-			splitted_min_n_cluster = self.splitted_min_n_cluster,
-			splitted_max_n_cluster = self.splitted_max_n_cluster,
-			stepup_n_cluster_threshold = self.stepup_n_cluster_threshold,
-			dbs = self.dbs,
-		)
-		await bf.StockBFFull.fit(self)
-		# Update Attribute of ForeignFlow from wf_obj
-		# self.__dict__.update(vars(wf_obj))
-		return self
-	
 	async def fit(self) -> BrokerFlow:
-		await self.__get_wf_obj()
-		await WhaleFlow._full_data_processing(self)
+		await bf.StockBFFull.fit(self)
+		await self._full_data_processing()
 		return self
 
 	async def chart(self, media_type: dp.ListMediaType | None = None):
-		return await WhaleFlow._gen_full_chart(self,
+		return await self._gen_full_chart(
 			wf_indicators=self.wf_indicators,
 			media_type=media_type,
 			selected_broker=self.selected_broker,

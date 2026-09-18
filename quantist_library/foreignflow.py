@@ -9,10 +9,10 @@ from dateutil.relativedelta import relativedelta
 import pandas as pd
 import numpy as np
 from sqlalchemy.sql import func, desc, asc
-import asyncio
 import database as db
 import dependencies as dp
 from quantist_library import genchart
+from . import screener as sc
 from .helper import Bin
 
 
@@ -336,7 +336,83 @@ class StockFFFull():
 		else:
 			return fig
 	
-class ForeignRadar():
+class ForeignFlowBase():
+	"""
+	Lifecycle shared by the foreign radar and the foreign screeners.
+
+	Both start the same way — resolve the dataparam defaults, then narrow the
+	universe to stocks with enough value, frequency and foreign proportion —
+	and only then diverge on what they load and how they rank it. Keeping those
+	two steps here is what guarantees radar and screener screen the same
+	universe; everything below them is deliberately family-private.
+	"""
+	def __init__(self,
+		startdate: datetime.date | None = None,
+		enddate: datetime.date = datetime.date.today(),
+		radar_period: int | None = None,
+		stockcode_excludes: set[str] = set(),
+		screener_min_value: int | None = None,
+		screener_min_frequency: int | None = None,
+		screener_min_prop:int | None = None,
+		period_mf: int | None = None,
+		period_pricecorrel: int | None = None,
+		dbs: db.Session = next(db.get_dbs())
+		) -> None:
+		self.startdate:datetime.date | ScalarSelect | None = startdate
+		self.enddate:datetime.date = enddate
+		self.radar_period: int | None = radar_period
+		self.stockcode_excludes: set[str] = stockcode_excludes
+		self.screener_min_value: int | None = screener_min_value
+		self.screener_min_frequency: int | None = screener_min_frequency
+		self.screener_min_prop: int | None = screener_min_prop
+		self.period_mf: int | None = period_mf
+		self.period_pricecorrel: int | None = period_pricecorrel
+		self.dbs: db.Session = dbs
+
+	async def _get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
+		# Check does g.DEFAULT_PARAM is available and is a pandas series
+		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
+			default_radar = g.DEFAULT_PARAM
+		else:
+			default_radar = await db.get_default_param()
+
+		self.period_mf = int(default_radar['default_radar_period_mf']) if self.startdate is None else None # type: ignore
+		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.startdate is None else None # type: ignore
+		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value # type: ignore
+		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency # type: ignore
+		self.screener_min_prop = int(default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop # type: ignore
+
+		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else self.radar_period # type: ignore
+
+		return default_radar
+
+	async def _get_stockcodes(self,
+		screener_min_value: int = 5000000000,
+		screener_min_frequency: int = 1000,
+		screener_min_prop:int = 0,
+		stockcode_excludes: set[str] = set(),
+		dbs: db.Session = next(db.get_dbs())
+		) -> pd.Series:
+		"""
+		Get filtered stockcodes
+		Filtered by:value>screener_min_value, frequency>screener_min_frequency
+					foreignbuyval>0, foreignsellval>0,
+					stockcode_excludes
+		"""
+		# Query Definition
+		stockcode_excludes_lower = set(x.lower() for x in stockcode_excludes) if stockcode_excludes is not None else set()
+		qry = dbs.query(db.ListStock.code)\
+			.filter((db.ListStock.value > screener_min_value) &
+					(db.ListStock.frequency > screener_min_frequency) &
+					(db.ListStock.foreignbuyval > 0) &
+					(db.ListStock.foreignsellval > 0) &
+					(((db.ListStock.foreignsellval+db.ListStock.foreignbuyval)/(db.ListStock.value*2)) > (screener_min_prop/100)) &
+					(db.ListStock.code.not_in(stockcode_excludes_lower))) # type: ignore
+
+		# Query Fetching: filtered_stockcodes
+		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code']) # type: ignore
+
+class ForeignRadar(ForeignFlowBase):
 	def __init__(self,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
@@ -351,18 +427,20 @@ class ForeignRadar():
 		period_pricecorrel: int | None = None,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
-		self.startdate:datetime.date | ScalarSelect | None = startdate
-		self.enddate:datetime.date = enddate
-		self.radar_period: int | None = radar_period
+		super().__init__(
+			startdate=startdate,
+			enddate=enddate,
+			radar_period=radar_period,
+			stockcode_excludes=stockcode_excludes,
+			screener_min_value=screener_min_value,
+			screener_min_frequency=screener_min_frequency,
+			screener_min_prop=screener_min_prop,
+			period_mf=period_mf,
+			period_pricecorrel=period_pricecorrel,
+			dbs=dbs,
+		)
 		self.y_axis_type: dp.ListRadarType = y_axis_type
-		self.stockcode_excludes: set[str] = stockcode_excludes
 		self.include_composite: bool = include_composite
-		self.screener_min_value: int | None = screener_min_value
-		self.screener_min_frequency: int | None = screener_min_frequency
-		self.screener_min_prop: int | None = screener_min_prop
-		self.period_mf: int | None = period_mf
-		self.period_pricecorrel: int | None = period_pricecorrel
-		self.dbs: db.Session = dbs
 
 		self.radar_indicators:pd.DataFrame =  pd.DataFrame()
 
@@ -424,50 +502,6 @@ class ForeignRadar():
 		# self.chart(media_type="json")
 
 		return self
-
-	async def _get_default_radar(self, dbs:db.Session = next(db.get_dbs())) -> pd.Series:
-		# Check does g.DEFAULT_PARAM is available and is a pandas series
-		if "g" in globals() and hasattr(g, "DEFAULT_PARAM") and isinstance(g.DEFAULT_PARAM, pd.Series):
-			default_radar = g.DEFAULT_PARAM
-		else:
-			default_radar = await db.get_default_param()
-		
-		self.period_mf = int(default_radar['default_radar_period_mf']) if self.startdate is None else None # type: ignore
-		self.period_pricecorrel = int(default_radar['default_radar_period_pricecorrel']) if self.startdate is None else None # type: ignore
-		self.screener_min_value = int(default_radar['default_screener_min_value']) if self.screener_min_value is None else self.screener_min_value # type: ignore
-		self.screener_min_frequency = int(default_radar['default_screener_min_frequency']) if self.screener_min_frequency is None else self.screener_min_frequency # type: ignore
-		self.screener_min_prop = int(default_radar['default_screener_min_prop']) if self.screener_min_prop is None else self.screener_min_prop # type: ignore
-		
-		self.radar_period = int(default_radar['default_radar_period']) if self.radar_period is None else self.radar_period # type: ignore
-
-		return default_radar
-		
-	
-	async def _get_stockcodes(self,
-		screener_min_value: int = 5000000000,
-		screener_min_frequency: int = 1000,
-		screener_min_prop:int = 0,
-		stockcode_excludes: set[str] = set(),
-		dbs: db.Session = next(db.get_dbs())
-		) -> pd.Series:
-		"""
-		Get filtered stockcodes
-		Filtered by:value>screener_min_value, frequency>screener_min_frequency 
-					foreignbuyval>0, foreignsellval>0,
-					stockcode_excludes
-		"""
-		# Query Definition
-		stockcode_excludes_lower = set(x.lower() for x in stockcode_excludes) if stockcode_excludes is not None else set()
-		qry = dbs.query(db.ListStock.code)\
-			.filter((db.ListStock.value > screener_min_value) &
-					(db.ListStock.frequency > screener_min_frequency) &
-					(db.ListStock.foreignbuyval > 0) &
-					(db.ListStock.foreignsellval > 0) &
-					(((db.ListStock.foreignsellval+db.ListStock.foreignbuyval)/(db.ListStock.value*2)) > (screener_min_prop/100)) &
-					(db.ListStock.code.not_in(stockcode_excludes_lower))) # type: ignore
-		
-		# Query Fetching: filtered_stockcodes
-		return pd.Series(pd.read_sql(sql=qry.statement,con=dbs.bind).reset_index(drop=True)['code']) # type: ignore
 
 	async def __get_stocks_raw_data(self,
 		filtered_stockcodes:pd.Series,
@@ -605,7 +639,8 @@ class ForeignRadar():
 		else:
 			return fig
 
-class ScreenerBase(ForeignRadar):
+class ScreenerBase(ForeignFlowBase, sc.WhaleScreener):
+	"""Foreign screeners: same universe as ForeignRadar, different ranking."""
 	def __init__(self,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
@@ -616,12 +651,13 @@ class ScreenerBase(ForeignRadar):
 		screener_min_prop:int | None = None,
 		period_mf: int | None = None,
 		period_pricecorrel: int | None = None,
-		dbs: db.Session = next(db.get_dbs())		
+		dbs: db.Session = next(db.get_dbs())
 		) -> None:
 
 		super().__init__(
 			startdate = startdate,
 			enddate = enddate,
+			radar_period = radar_period,
 			stockcode_excludes = stockcode_excludes,
 			screener_min_value = screener_min_value,
 			screener_min_frequency = screener_min_frequency,
@@ -630,8 +666,6 @@ class ScreenerBase(ForeignRadar):
 			period_pricecorrel = period_pricecorrel,
 			dbs = dbs,
 		)
-
-		self.radar_period:int | None = radar_period
 
 	async def _fit_base(self, predata: str | None = None) -> ScreenerBase:
 		# get default param radar
@@ -899,13 +933,13 @@ class ScreenerVWAP(ScreenerBase):
 		# Go to get top codes for each screener_vwap_criteria
 		stocklist:list
 		if self.screener_vwap_criteria == dp.ScreenerList.vwap_rally:
-			stocklist = await self._get_vwap_rally(raw_data=self.raw_data)
+			stocklist = self._get_vwap_rally(self.raw_data)
 		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_around:
-			stocklist = await self._get_vwap_around(raw_data=self.raw_data, percentage_range=self.percentage_range)
+			stocklist = self._get_vwap_around(self.raw_data, self.percentage_range)
 		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_breakout:
-			stocklist = await self._get_vwap_breakout(raw_data=self.raw_data)
+			stocklist = self._get_vwap_breakout(self.raw_data)
 		elif self.screener_vwap_criteria == dp.ScreenerList.vwap_breakdown:
-			stocklist = await self._get_vwap_breakdown(raw_data=self.raw_data)
+			stocklist = self._get_vwap_breakdown(self.raw_data)
 		else:
 			raise ValueError(f'Invalid screener_vwap_criteria: {self.screener_vwap_criteria}')
 		
@@ -1007,57 +1041,11 @@ class ScreenerVWAP(ScreenerBase):
 		
 		return stocklist, top_data
 
-	async def _get_vwap_rally(self, raw_data: pd.DataFrame) -> list:
-		"""Rally (always close > vwap within n days)"""
-		# Get stockcodes with raw_data['close'] always raw_data['vwap']
-		stocklist = (raw_data['close'] >= raw_data['vwap']).groupby(level='code').all()
-		stocklist = stocklist[stocklist].index.tolist()
-
-		return stocklist
-
-	async def _get_vwap_around(self, raw_data: pd.DataFrame, percentage_range: float) -> list:
-		"""Around VWAP (close around x% of vwap)"""
-		# Get stockcodes with last raw_data['close'] around last raw_data['vwap'], within percentage_range
-		last_data = raw_data[['close','vwap']].groupby(level='code').last()
-		stocklist = last_data[(last_data['close'] >= last_data['vwap']*(1-percentage_range)) & (last_data['close'] <= last_data['vwap']*(1+percentage_range))].index.tolist()
-
-		return stocklist
-
-	async def _get_vwap_breakout(self, raw_data: pd.DataFrame) -> list:
-		"""Breakout (t_(x-1): close < vwap, t_(x): close > vwap, within n days, and now close > vwap)"""
-		# Get stockcodes with now close > vwap
-		last_data = raw_data[['close','vwap']].groupby(level='code').last()
-		stocklist = last_data[last_data['close'] >= last_data['vwap']].index.tolist()
-
-		# Define breakout
-		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
-		top_data['close_morethan_vwap'] = top_data['close'] >= top_data['vwap']
-		top_data['breakout'] = top_data.groupby(level='code').rolling(window=2)['close_morethan_vwap']\
-			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0)  # noqa: E712
-		
-		# Get stockcodes with breakout
-		stocklist = top_data['breakout'].groupby(level='code').any()
-		stocklist = stocklist[stocklist].index.tolist()
-
-		return stocklist
-
-	async def _get_vwap_breakdown(self, raw_data: pd.DataFrame) -> list:
-		"""Breakdown (t_x: close > vwap, t_y: close < vwap, within n days, and now close < vwap)"""
-		# Get stockcodes with now close < vwap
-		last_data = raw_data[['close','vwap']].groupby(level='code').last()
-		stocklist = last_data[last_data['close'] <= last_data['vwap']].index.tolist()
-
-		# Define breakdown
-		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
-		top_data['close_lessthan_vwap'] = top_data['close'] <= top_data['vwap']
-		top_data['breakdown'] = top_data.groupby(level='code').rolling(window=2)['close_lessthan_vwap']\
-			.apply(lambda x: (x.iloc[0] == False) & (x.iloc[1] == True)).droplevel(0) # noqa: E712
-		
-		# Get stockcodes with breakdown
-		stocklist = top_data['breakdown'].groupby(level='code').any()
-		stocklist = stocklist[stocklist].index.tolist()
-
-		return stocklist
+	# Criteria maths is shared with the whale screeners; only the columns differ.
+	_get_vwap_rally = staticmethod(sc.vwap_rally)
+	_get_vwap_around = staticmethod(sc.vwap_around)
+	_get_vwap_breakout = staticmethod(sc.vwap_breakout)
+	_get_vwap_breakdown = staticmethod(sc.vwap_breakdown)
 
 class ScreenerVProfile(ScreenerBase):
 	def __init__ (
@@ -1149,31 +1137,8 @@ class ScreenerVProfile(ScreenerBase):
 	
 	async def _get_vprofile_stocklist(self, raw_data: pd.DataFrame) -> list[str]:
 		assert isinstance(self.radar_period, int)
-		results = await asyncio.gather(*[self._get_vprofile_inside(self.radar_period, data_group) for code, data_group in raw_data.groupby(level='code', group_keys=False)])
-		results_series = pd.Series(dict(results))
-		stocklist = results_series[results_series].index.tolist()
-		return stocklist
-	
-	async def _get_vprofile_inside(self, checking_period:int, data:pd.DataFrame) -> tuple[str, bool]:
-		# Get code from level 0 index of data
-		code:str = data.index.get_level_values('code')[0] # type: ignore
+		return await sc.vprofile_stocklist(raw_data, self.radar_period)
 
-		# Get last n(checking_period) close
-		last_close = data["close"].iloc[-checking_period:]
-
-		# Check important price by hist_bar peaks
-		bin_obj:Bin = Bin(data=data)
-		bin_obj = await bin_obj.fit()
-		trading_zone = bin_obj.hist_bar.index[bin_obj.peaks_index]
-
-		if bin_obj.nbins <= 2:
-			return code, False
-
-		# Check does any last close in trading zone
-		is_inside_interval = any(last_close.apply(lambda x: any(x in interval for interval in trading_zone)))
-
-		return code, is_inside_interval
-	
 	async def _get_data_from_stocklist(self,n_stockcodes: int) -> tuple[list[str], pd.DataFrame]:
 		assert isinstance(self.radar_period, int), 'radar_period must be int'
 		# Get raw_data that has level 0 index (code) in self.stocklist
