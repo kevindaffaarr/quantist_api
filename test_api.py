@@ -20,6 +20,8 @@ PATH = [
     "/param/list/stock", "/param/list/broker", "/param/list/index",
     "/whaleanalysis", "/whaleanalysis/",
     "/whaleanalysis/chart", "/whaleanalysis/chart/foreign", "/whaleanalysis/chart/broker",
+    "/whaleanalysis/chart/broker?media_type=png&api_type=brokercluster&enddate=2026-09-18&clustering_method=correlation",
+    "/whaleanalysis/chart/broker?media_type=png&api_type=brokercluster&enddate=2026-09-18&clustering_method=timeseries",
     "/whaleanalysis/radar", "/whaleanalysis/radar/foreign", "/whaleanalysis/radar/broker",
     "/whaleanalysis/full-data", "/whaleanalysis/full-data/foreign", "/whaleanalysis/full-data/broker",
     "/whaleanalysis/screener", 
