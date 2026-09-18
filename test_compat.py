@@ -12,7 +12,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from quantist_library.helper import pl_to_pandas
+from quantist_library.helper import date_only, pl_to_pandas
 
 
 def _sample() -> pl.DataFrame:
@@ -47,6 +47,13 @@ def test_date_column_compares_against_timestamp():
 	assert isinstance(df.index[-1], pd.Timestamp)
 	# The radar path filters the date index with pd.to_datetime(startdate).
 	assert (df.index >= pd.to_datetime(datetime.date(2024, 1, 2))).sum() == 2
+
+
+def test_bigquery_datetime_values_are_normalized_before_date_filters():
+	values = pl_to_pandas(_sample()).set_index("date").index.tolist()
+	assert values
+	assert all(type(date_only(value)) is datetime.date for value in values)
+	assert date_only(datetime.datetime(2025, 9, 30, 0, 0)) == datetime.date(2025, 9, 30)
 
 
 def test_last_row_needs_iloc_not_negative_label():
