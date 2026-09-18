@@ -19,7 +19,7 @@ from sqlalchemy.sql import func
 import database as db
 import dependencies as dp
 from quantist_library import genchart
-from .helper import Bin, pl_to_pandas
+from .helper import Bin, date_only, pl_to_pandas
 
 import polars as pl
 
@@ -330,9 +330,14 @@ class StockBFFull():
 		if raw_data_main.shape[0] == 0:
 			raise ValueError("No data available inside date range")
 		
-		# Update self.startdate and self.enddate to available date in database
-		self.startdate = raw_data_main.index[0] # type: ignore
-		self.enddate = raw_data_main.index[-1] # type: ignore
+		# Update self.startdate and self.enddate to available date in database.
+		# Polars/Pandas may expose a BigQuery DATE column as Timestamp; keep
+		# follow-up SQL DATE parameters date-only.
+		normalized_startdate = date_only(raw_data_main.index[0])
+		normalized_enddate = date_only(raw_data_main.index[-1])
+		assert normalized_startdate is not None and normalized_enddate is not None
+		self.startdate = normalized_startdate
+		self.enddate = normalized_enddate
 
 		# Pre-Data Query
 		startdate = self.startdate
@@ -355,7 +360,8 @@ class StockBFFull():
 		raw_data_full = pd.concat([raw_data_pre,raw_data_main])
 		
 		if len(raw_data_pre) > 0:
-			preoffset_startdate = raw_data_pre.index[0] # type: ignore
+			preoffset_startdate = date_only(raw_data_pre.index[0])
+			assert preoffset_startdate is not None
 		else:
 			preoffset_startdate = startdate
 
