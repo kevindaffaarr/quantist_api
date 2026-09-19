@@ -109,14 +109,43 @@ VPROFILE_ROLES = ("support", "resistance", "undetermined")
 VPROFILE_BEHAVIORS = ("acceptance", "rejection", "test", "breakout_up", "breakdown", "undetermined")
 
 
-def vprofile_reading(closes: pd.Series, zones: pd.IntervalIndex, checking_period: int) -> dict[str, Any]:
+def _vprofile_iso_date(value: Any) -> str | None:
+	"""Convert a date-like event value to the API's JSON-safe date scalar."""
+	if value is None or value is pd.NaT:
+		return None
+	if isinstance(value, str):
+		return pd.Timestamp(value).date().isoformat()
+	if isinstance(value, pd.Timestamp):
+		return value.date().isoformat()
+	if isinstance(value, datetime.datetime):
+		return value.date().isoformat()
+	if isinstance(value, datetime.date):
+		return value.isoformat()
+	return None
+
+
+def _vprofile_ratio(value: float, denominator: float) -> float | None:
+	"""Return a bounded native float for an explainability ratio."""
+	if denominator <= 0 or not math.isfinite(value) or not math.isfinite(denominator):
+		return None
+	return float(min(1.0, max(0.0, value / denominator)))
+
+
+def vprofile_reading(
+	closes: pd.Series,
+	zones: pd.IntervalIndex,
+	checking_period: int,
+	zone_metrics: list[dict[str, float]] | None = None,
+	event_date: Any = None,
+) -> dict[str, Any]:
 	"""
 	Read the net-value peak zone the last checking_period closes are working on.
 
 	Pure and deterministic: zones in, closes in, native scalars out. Both
 	families feed it their own profile, and every label below is read off the
 	observed closes alone - nothing is inferred from the size or sign of the
-	flow, and anything not positively observed stays "undetermined".
+	flow, and anything not positively observed stays "undetermined". Optional
+	zone_metrics are aligned with zones; event_date is serialized as ISO date.
 
 	Zone: the one holding the most recent close of the window; if the window
 	touched none, the zone whose mid is nearest the last close, reported with
@@ -156,6 +185,10 @@ def vprofile_reading(closes: pd.Series, zones: pd.IntervalIndex, checking_period
 		"vprofile_zone_mid": None,
 		"vprofile_distance_to_mid_pct": None,
 		"vprofile_touch_count": 0,
+		"vprofile_zone_strength": None,
+		"vprofile_zone_prominence": None,
+		"vprofile_zone_flow_share": None,
+		"vprofile_event_date": None,
 	}
 	values = closes.to_numpy(dtype="float64")
 	if len(zones) == 0 or len(values) == 0:
@@ -189,6 +222,25 @@ def vprofile_reading(closes: pd.Series, zones: pd.IntervalIndex, checking_period
 	if math.isnan(last):
 		return reading
 	reading["vprofile_distance_to_mid_pct"] = round((last - mid) / mid * 100, 4) if mid else None
+	if event_date is not None:
+		reading["vprofile_event_date"] = _vprofile_iso_date(event_date)
+
+	# Metrics are aligned one-for-one with ``zones``. Only the selected
+	# interval's metric is used for the annotation; the denominators are carried
+	# by each metric from the complete histogram so nearest-zone selection cannot
+	# accidentally borrow another node's values.
+	if zone_metrics is not None and 0 <= selected < len(zone_metrics):
+		selected_metric = zone_metrics[selected]
+		flow = abs(float(selected_metric["flow"]))
+		node_flows = [abs(float(metric["flow"])) for metric in zone_metrics]
+		strongest_node = max(node_flows, default=0.0)
+		strongest_histogram_flow = float(selected_metric.get("strongest_abs_flow", strongest_node))
+		total_profile_flow = float(selected_metric.get("total_abs_flow", sum(node_flows)))
+		reading["vprofile_zone_strength"] = _vprofile_ratio(flow, strongest_node)
+		reading["vprofile_zone_prominence"] = _vprofile_ratio(
+			float(selected_metric["prominence"]), strongest_histogram_flow
+		)
+		reading["vprofile_zone_flow_share"] = _vprofile_ratio(flow, total_profile_flow)
 
 	# Where price came from: the last close outside the zone, at or before the touch.
 	approached = np.flatnonzero(~inside[:anchor + 1] & ~np.isnan(values[:anchor + 1]))
@@ -216,11 +268,24 @@ async def vprofile_annotate(data: pd.DataFrame, checking_period: int) -> tuple[s
 	code: str = data.index.get_level_values("code")[0]  # type: ignore
 
 	bin_obj: Bin = await Bin(data=data).fit()
+	peaks_index = bin_obj.peaks_index
 	zones = pd.IntervalIndex.from_tuples([]) \
 		if bin_obj.nbins <= 2 or len(bin_obj.peaks_index) == 0 \
-		else pd.IntervalIndex(bin_obj.hist_bar.index[bin_obj.peaks_index])
+		else pd.IntervalIndex(bin_obj.hist_bar.index[peaks_index])
+	zone_metrics = bin_obj.peaks_metrics if len(bin_obj.peaks_metrics) == len(peaks_index) else None
+	event_date = (
+		data.index.get_level_values("date")[-1]
+		if isinstance(data.index, pd.MultiIndex) and "date" in data.index.names and len(data)
+		else None
+	)
 
-	return code, vprofile_reading(data["close"].astype(float), zones, checking_period)  # type: ignore
+	return code, vprofile_reading(
+		data["close"].astype(float),
+		zones,
+		checking_period,
+		zone_metrics=zone_metrics,
+		event_date=event_date,
+	)  # type: ignore
 
 
 async def vprofile_annotations(data: pd.DataFrame, checking_period: int) -> pd.DataFrame:
@@ -281,7 +346,9 @@ async def vprofile_breakout(data: pd.DataFrame, checking_period: int) -> list[st
 	test) or one that touched and turned back (rejection) is not selected, and
 	no signal is read off the zone's role alone.
 	"""
-	return vprofile_behavior_codes(await vprofile_annotations(data, checking_period), "breakout_up")
+	return vprofile_role_behavior_codes(
+		await vprofile_annotations(data, checking_period), "resistance", "breakout_up"
+	)
 
 
 async def vprofile_breakdown(data: pd.DataFrame, checking_period: int) -> list[str]:
@@ -294,7 +361,9 @@ async def vprofile_breakdown(data: pd.DataFrame, checking_period: int) -> list[s
 	exclusions - membership, an isolated test, a rejection, or a bare role is
 	never a signal.
 	"""
-	return vprofile_behavior_codes(await vprofile_annotations(data, checking_period), "breakdown")
+	return vprofile_role_behavior_codes(
+		await vprofile_annotations(data, checking_period), "support", "breakdown"
+	)
 
 
 async def vprofile_support_bounce(data: pd.DataFrame, checking_period: int) -> list[str]:

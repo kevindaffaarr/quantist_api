@@ -31,7 +31,28 @@ def test_volume_profile_keeps_sign_separators_in_peak_mapping():
 def test_volume_profile_falls_back_to_dominant_node_without_local_extrema():
     histogram = [5.0, 10.0, 15.0]
 
-    assert _peaks(histogram) == [2]
+    fitted = Bin(pd.DataFrame())
+    assert asyncio.run(fitted.calc_peaks_index(pd.Series(histogram))) == [2]
+    assert fitted.peaks_metrics == [{
+        "flow": 15.0,
+        "prominence": 15.0,
+        "strongest_abs_flow": 15.0,
+        "total_abs_flow": 30.0,
+    }]
+
+
+def test_volume_profile_retains_metrics_aligned_with_significant_peak_indices():
+    fitted = Bin(pd.DataFrame())
+
+    assert asyncio.run(fitted.calc_peaks_index(pd.Series(
+        [0.0, 100.0, 0.0, 12.0, 10.0, 12.0, 0.0]
+    ))) == [1]
+    assert fitted.peaks_metrics == [{
+        "flow": 100.0,
+        "prominence": 100.0,
+        "strongest_abs_flow": 100.0,
+        "total_abs_flow": 134.0,
+    }]
 
 
 def test_volume_profile_fit_handles_zero_range_and_zero_calculated_bins():

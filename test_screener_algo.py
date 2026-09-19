@@ -130,12 +130,16 @@ def test_vprofile_role_is_undetermined_without_outside_context():
 
 
 def test_vprofile_role_never_invents_a_zone_without_a_profile():
+	"""Every observed close sits in the zone: there is no approach to read."""
 	reading = _reading([102.0, 104.0, 105.0], zones=pd.IntervalIndex.from_tuples([]))
 	assert reading["vprofile_zone_role"] == "undetermined"
 	assert reading["vprofile_zone_behavior"] == "undetermined"
 	assert reading["vprofile_in_zone"] is False
 	assert reading["vprofile_zone_mid"] is None
-
+	assert reading["vprofile_zone_strength"] is None
+	assert reading["vprofile_zone_prominence"] is None
+	assert reading["vprofile_zone_flow_share"] is None
+	assert reading["vprofile_event_date"] is None
 
 def test_vprofile_behavior_acceptance_needs_consecutive_closes_inside():
 	assert _reading([90.0, 104.0, 105.0])["vprofile_zone_behavior"] == "acceptance"
@@ -155,7 +159,8 @@ def test_vprofile_behavior_test_is_one_isolated_touch():
 	# came down onto the zone and left below it: support broken
 	([125.0, 105.0, 95.0], "support", "breakdown"),
 ])
-def test_vprofile_behavior_reads_the_exit_against_the_approach(closes, role, behavior):
+def test_vprofile_chart_sequences_map_approach_touch_exit_to_role_and_behavior(closes, role, behavior):
+	"""The four chart analogies are deterministic approach -> touch -> close paths."""
 	reading = _reading(closes)
 	assert (reading["vprofile_zone_role"], reading["vprofile_zone_behavior"]) == (role, behavior)
 	assert reading["vprofile_in_zone"] is True, "the window still touched the zone"
@@ -192,11 +197,47 @@ def test_vprofile_reading_is_json_safe():
 	assert reading["vprofile_zone_behavior"] in sc.VPROFILE_BEHAVIORS
 
 
+def test_vprofile_reading_uses_metrics_for_the_selected_zone_and_event_date():
+	metrics = [
+		{"flow": 10.0, "prominence": 5.0, "strongest_abs_flow": 100.0, "total_abs_flow": 200.0},
+		{"flow": 40.0, "prominence": 25.0, "strongest_abs_flow": 100.0, "total_abs_flow": 200.0},
+	]
+	reading = sc.vprofile_reading(
+		pd.Series([120.0, 135.0], dtype="float64"),
+		_ZONES,
+		checking_period=1,
+		zone_metrics=metrics,
+		event_date=datetime.date(2024, 1, 31),
+	)
+
+	assert reading["vprofile_zone_low"] == 130.0
+	assert reading["vprofile_zone_strength"] == pytest.approx(1.0)
+	assert reading["vprofile_zone_prominence"] == pytest.approx(0.25)
+	assert reading["vprofile_zone_flow_share"] == pytest.approx(0.2)
+	assert reading["vprofile_event_date"] == "2024-01-31"
+	for name in ("vprofile_zone_strength", "vprofile_zone_prominence", "vprofile_zone_flow_share"):
+		assert type(reading[name]) is float
+		assert 0.0 <= reading[name] <= 1.0
+	for value in reading.values():
+		assert type(value) in (bool, str, float, int, type(None)), type(value)
+
+
+def test_vprofile_annotate_exposes_latest_close_date_as_iso_date():
+	data = _vprofile_frame()
+	_, reading = asyncio.run(sc.vprofile_annotate(data, 3))
+
+	assert reading["vprofile_event_date"] == data.index.get_level_values("date")[-1].date().isoformat()
+
+
 def test_vprofile_reading_says_nothing_about_now_when_the_last_close_is_missing():
 	reading = _reading([90.0, 105.0, float("nan")])
 	assert reading["vprofile_zone_role"] == "undetermined"
 	assert reading["vprofile_zone_behavior"] == "undetermined"
 	assert reading["vprofile_distance_to_mid_pct"] is None
+	assert reading["vprofile_zone_strength"] is None
+	assert reading["vprofile_zone_prominence"] is None
+	assert reading["vprofile_zone_flow_share"] is None
+	assert reading["vprofile_event_date"] is None
 
 
 def test_vprofile_annotate_agrees_with_the_membership_it_annotates():
@@ -291,6 +332,19 @@ def test_vprofile_role_behavior_codes_selects_only_the_exact_role_and_behavior()
 	assert sc.vprofile_role_behavior_codes(annotations, "resistance", "rejection") == ["resrej"]
 
 
+def test_vprofile_directional_criteria_require_exact_role_and_behavior(monkeypatch):
+	annotations = _behavior_annotations().copy()
+	annotations.loc["wrongbrk"] = {"vprofile_in_zone": True, "vprofile_zone_role": "support", "vprofile_zone_behavior": "breakout_up"}
+	annotations.loc["wrongdwn"] = {"vprofile_in_zone": True, "vprofile_zone_role": "resistance", "vprofile_zone_behavior": "breakdown"}
+
+	async def fake_annotations(*args, **kwargs):
+		return annotations
+
+	monkeypatch.setattr(sc, "vprofile_annotations", fake_annotations)
+	assert asyncio.run(sc.vprofile_breakout(pd.DataFrame(), 3)) == ["brk"]
+	assert asyncio.run(sc.vprofile_breakdown(pd.DataFrame(), 3)) == ["dwn"]
+
+
 def _behavior_universe() -> pd.DataFrame:
 	"""Four codes on the same profile, each leaving (or not leaving) its zone differently."""
 	tails = {
@@ -331,6 +385,16 @@ def test_vprofile_support_bounce_and_resistance_rejection_select_exact_readings(
 ])
 def test_vprofile_criteria_stocklist_dispatches_on_the_enum(criteria, expected):
 	assert sorted(asyncio.run(sc.vprofile_criteria_stocklist(_behavior_universe(), 3, criteria))) == expected
+
+
+def test_vprofile_criteria_contract_has_exactly_five_frozen_names():
+	assert tuple(sc.VPROFILE_CRITERIA) == (
+		"vprofile_inside",
+		"vprofile_breakout",
+		"vprofile_breakdown",
+		"vprofile_support_bounce",
+		"vprofile_resistance_rejection",
+	)
 
 
 def test_vprofile_criteria_stocklist_rejects_an_unknown_criterion():
