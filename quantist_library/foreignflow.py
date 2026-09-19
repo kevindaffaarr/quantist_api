@@ -780,9 +780,9 @@ class ScreenerMoneyFlow(ScreenerBase):
 		).filter(db.StockData.date.between(startdate,enddate)
 		).group_by(db.StockData.code)
 		if accum_or_distri == dp.ScreenerList.most_distributed:
-			sub_qry_1 = sub_qry_1.order_by(asc('mf')).limit(n_stockcodes).subquery()
+			sub_qry_1 = sub_qry_1.order_by(asc('mf'), asc(db.StockData.code)).limit(n_stockcodes).subquery()
 		else:
-			sub_qry_1 = sub_qry_1.order_by(desc('mf')).limit(n_stockcodes).subquery()
+			sub_qry_1 = sub_qry_1.order_by(desc('mf'), asc(db.StockData.code)).limit(n_stockcodes).subquery()
 
 		# Get the raw data (just for calculate the pricecorrel)
 		qry = dbs.query(
@@ -836,11 +836,12 @@ class ScreenerMoneyFlow(ScreenerBase):
 		# replace nan with none
 		top_stockcodes = top_stockcodes.replace({np.nan: None})
 
-		# Order by MF
-		if accum_or_distri == dp.ScreenerList.most_distributed:
-			top_stockcodes = top_stockcodes.sort_values(by='mf', ascending=True)
-		else:
-			top_stockcodes = top_stockcodes.sort_values(by='mf', ascending=False)
+		# Order by total flow; code is the deterministic tie-break.
+		top_stockcodes = sc.rank_flow_candidates(
+			top_stockcodes,
+			n_stockcodes=len(top_stockcodes),
+			ascending=accum_or_distri == dp.ScreenerList.most_distributed,
+		)
 		
 		# Update startdate and enddate based on raw_data
 		startdate = raw_data.index.get_level_values('date').min()
@@ -952,7 +953,8 @@ class ScreenerVWAP(ScreenerBase):
 		self.top_stockcodes:pd.DataFrame
 		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
 		self.top_stockcodes['mf'] = self.top_data['netval'].groupby(level='code').sum()
-		self.top_stockcodes = self.top_stockcodes.sort_values('mf', ascending=False)
+		# Preserve the price-based VWAP ranking selected before truncation.
+		self.top_stockcodes = self.top_stockcodes.reindex(self.stocklist)
 		
 		return self
 
@@ -1033,8 +1035,13 @@ class ScreenerVWAP(ScreenerBase):
 		) -> tuple[list, pd.DataFrame]:
 		# Get data from stocklist
 		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
-		# Sum netval for each code and get top n_stockcodes
-		stocklist = top_data['netval'].groupby(level='code').sum().nlargest(n_stockcodes).index.tolist()
+		# Rank members by flow; the criteria decide direction, not membership.
+		stocklist = sc.rank_vwap_candidates(
+			top_data,
+			stocklist,
+			n_stockcodes,
+			self.screener_vwap_criteria,
+		).copy()
 
 		# Get data from stocklist
 		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
@@ -1156,17 +1163,17 @@ class ScreenerVProfile(ScreenerBase):
 		# Sum netval in the last self.radar_period for each code
 		mf = raw_data.groupby(level='code').tail(self.radar_period).groupby(level='code')['netval'].sum()
 		
-		# Get top n_stockcodes
-		stocklist = mf.nlargest(n_stockcodes).index.tolist()
-		raw_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
-		
-		# Compile top_stockcodes
-		top_stockcodes:pd.DataFrame
-		top_stockcodes = raw_data[['close']].groupby(level='code').last()
-		top_stockcodes['mf'] = mf.loc[stocklist]
-		top_stockcodes['corr'] = self.close_valflow_corr.loc[stocklist]
-		# Additive: how each code sits against its own foreign net-value zone.
+		# Annotate every candidate before ranking/truncating: the signal evidence
+		# decides the top n, rather than the raw money-flow total.
+		top_stockcodes:pd.DataFrame = raw_data[['close']].groupby(level='code').last()
+		top_stockcodes['mf'] = mf.reindex(top_stockcodes.index)
+		top_stockcodes['corr'] = self.close_valflow_corr.reindex(top_stockcodes.index)
 		top_stockcodes = top_stockcodes.join(await sc.vprofile_annotations(raw_data, self.radar_period))
-		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
+		top_stockcodes = sc.rank_vprofile_candidates(
+			top_stockcodes,
+			getattr(self, 'screener_vprofile_criteria', 'vprofile_inside'),
+			n_stockcodes,
+		)
+		stocklist = top_stockcodes.index.tolist()
 
 		return stocklist, top_stockcodes
