@@ -37,8 +37,10 @@ zone levels, role, behavior, distance, and touch count remain unchanged.
 
 Money-flow accumulated results rank by total flow descending; distributed results
 rank ascending, so the strongest negative flow is first. Ties use ascending stock
-code. VWAP rally, around, and breakout use descending net flow; VWAP breakdown
-uses ascending net flow. Volume-profile rankings use prominence, then strength,
+code. VWAP rally ranks by the largest positive close-to-VWAP gap. VWAP around ranks
+by the smallest absolute gap. VWAP breakout and breakdown rank by the freshest valid
+cross first, then the smallest distance from VWAP, then price follow-through. Flow
+is not used for VWAP ordering. Volume-profile rankings use prominence, then strength,
 then flow in the event direction (inside/upward descending, downward ascending),
 with ascending stock code as the final tie-break. Volume-profile annotations are
 computed for every criterion member before the requested limit is applied.

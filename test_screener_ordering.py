@@ -26,32 +26,52 @@ def test_money_flow_ranking_is_directional_and_code_deterministic():
     ]
 
 
-@pytest.mark.parametrize("criteria", ["vwap_rally", "vwap_around", "vwap_breakout"])
-def test_vwap_positive_criteria_rank_strongest_positive_flow_first(criteria):
+def test_vwap_rally_ranks_largest_positive_price_gap_first():
     data = pd.DataFrame(
-        {"netval": [4.0, 2.0, -1.0, 8.0]},
+        {"close": [101.0, 120.0], "vwap": [100.0, 100.0], "netval": [-100.0, 100.0]},
         index=pd.MultiIndex.from_tuples(
-            [("low", 1), ("low", 2), ("high", 1), ("high", 2)],
+            [("near", 1), ("far", 1)],
             names=["code", "date"],
         ),
     )
 
-    assert rank_vwap_candidates(data, ["low", "high"], 2, criteria) == ["high", "low"]
+    assert rank_vwap_candidates(data, ["near", "far"], 2, "vwap_rally") == ["far", "near"]
 
 
-def test_vwap_breakdown_ranks_strongest_negative_flow_first():
+def test_vwap_around_ranks_closest_price_gap_first():
     data = pd.DataFrame(
-        {"netval": [-3.0, -7.0, -8.0, -9.0]},
+        {"close": [101.0, 104.0], "vwap": [100.0, 100.0], "netval": [-100.0, 100.0]},
         index=pd.MultiIndex.from_tuples(
-            [("mild", 1), ("mild", 2), ("strong", 1), ("strong", 2)],
+            [("near", 1), ("far", 1)],
             names=["code", "date"],
         ),
     )
 
-    assert rank_vwap_candidates(data, ["mild", "strong"], 2, "vwap_breakdown") == [
-        "strong",
-        "mild",
-    ]
+    assert rank_vwap_candidates(data, ["near", "far"], 2, "vwap_around") == ["near", "far"]
+
+
+def test_vwap_breakout_ranks_fresh_cross_before_larger_gap():
+    data = pd.DataFrame(
+        {"close": [90.0, 101.0, 110.0, 101.0], "vwap": [100.0] * 4, "netval": [1.0] * 4},
+        index=pd.MultiIndex.from_tuples(
+            [("fresh", 1), ("fresh", 2), ("stale", 1), ("stale", 2)],
+            names=["code", "date"],
+        ),
+    )
+
+    assert rank_vwap_candidates(data, ["fresh", "stale"], 2, "vwap_breakout") == ["fresh", "stale"]
+
+
+def test_vwap_breakdown_ranks_fresh_cross_before_larger_gap():
+    data = pd.DataFrame(
+        {"close": [110.0, 99.0, 90.0, 99.0], "vwap": [100.0] * 4, "netval": [1.0] * 4},
+        index=pd.MultiIndex.from_tuples(
+            [("fresh", 1), ("fresh", 2), ("stale", 1), ("stale", 2)],
+            names=["code", "date"],
+        ),
+    )
+
+    assert rank_vwap_candidates(data, ["fresh", "stale"], 2, "vwap_breakdown") == ["fresh", "stale"]
 
 
 def test_vprofile_ranking_uses_annotations_before_truncation_and_ties_by_code():

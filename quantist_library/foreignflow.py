@@ -953,11 +953,8 @@ class ScreenerVWAP(ScreenerBase):
 		self.top_stockcodes:pd.DataFrame
 		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
 		self.top_stockcodes['mf'] = self.top_data['netval'].groupby(level='code').sum()
-		self.top_stockcodes = sc.rank_flow_candidates(
-			self.top_stockcodes,
-			n_stockcodes=len(self.top_stockcodes),
-			ascending=self.screener_vwap_criteria == dp.ScreenerList.vwap_breakdown,
-		)
+		# Preserve the price-based VWAP ranking selected before truncation.
+		self.top_stockcodes = self.top_stockcodes.reindex(self.stocklist)
 		
 		return self
 

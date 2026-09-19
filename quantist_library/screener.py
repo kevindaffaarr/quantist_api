@@ -138,6 +138,25 @@ def rank_flow_candidates(
 	return _stable_sort_frame(candidates, ["mf"], [ascending]).head(n_stockcodes)
 
 
+def _vwap_event_metrics(data: pd.DataFrame, above: bool) -> pd.DataFrame:
+	"""Return recency and follow-through metrics for in-window VWAP crosses."""
+	flag = data["close"] >= data["vwap"] if above else data["close"] <= data["vwap"]
+	previous = flag.groupby(level="code").shift(1, fill_value=True)
+	crossed = flag & ~previous
+	position = data.groupby(level="code").cumcount()
+	last_position = position.groupby(level="code").max()
+	last_cross_position = position.where(crossed).groupby(level="code").max()
+	cross_age = (last_position - last_cross_position).rename("cross_age")
+	cross_close = data["close"].where(crossed).groupby(level="code").last()
+	latest_close = data["close"].groupby(level="code").last()
+	follow_through = (
+		(latest_close - cross_close) / cross_close
+		if above
+		else (cross_close - latest_close) / cross_close
+	).rename("follow_through")
+	return pd.concat([cross_age, follow_through], axis=1)
+
+
 def rank_vwap_candidates(
 	data: pd.DataFrame,
 	stocklist: list,
@@ -145,20 +164,31 @@ def rank_vwap_candidates(
 	criteria: Any,
 	flow_column: str = "netval",
 	) -> list[str]:
-	"""Rank VWAP members by net flow direction without changing membership."""
+	"""Rank VWAP members by price location or event freshness, not money flow."""
+	# ``flow_column`` remains accepted for caller compatibility; VWAP ordering is
+	# intentionally based on close/vwap price data only.
+	_ = flow_column
+	criteria_value = _criteria_value(criteria)
 	candidate_data = data.loc[data.index.get_level_values("code").isin(stocklist)]
-	flow = (
-		candidate_data[flow_column]
-		.groupby(level="code")
-		.sum()
-		.astype(float)
-		.to_frame("mf")
-	)
-	return rank_flow_candidates(
-		flow,
-		n_stockcodes,
-		ascending=_criteria_value(criteria) == "vwap_breakdown",
-	).index.tolist()
+	latest = candidate_data[["close", "vwap"]].groupby(level="code").last()
+	latest["price_gap_pct"] = (latest["close"] - latest["vwap"]) / latest["vwap"] * 100
+
+	if criteria_value == "vwap_rally":
+		return _stable_sort_frame(latest, ["price_gap_pct"], [False]).head(n_stockcodes).index.tolist()
+	if criteria_value == "vwap_around":
+		latest["abs_price_gap_pct"] = latest["price_gap_pct"].abs()
+		return _stable_sort_frame(latest, ["abs_price_gap_pct"], [True]).head(n_stockcodes).index.tolist()
+	if criteria_value not in {"vwap_breakout", "vwap_breakdown"}:
+		raise ValueError(f"Invalid screener_vwap_criteria: {criteria}")
+
+	metrics = _vwap_event_metrics(candidate_data, above=criteria_value == "vwap_breakout")
+	ranked = latest.join(metrics)
+	ranked["abs_price_gap_pct"] = ranked["price_gap_pct"].abs()
+	return _stable_sort_frame(
+		ranked,
+		["cross_age", "abs_price_gap_pct", "follow_through"],
+		[True, True, False],
+	).head(n_stockcodes).index.tolist()
 
 
 VPROFILE_UPWARD_EVENTS = {"vprofile_breakout", "vprofile_support_bounce"}
