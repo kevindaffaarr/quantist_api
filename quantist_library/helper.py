@@ -32,6 +32,8 @@ class Bin():
 		self.bins_range:pd.Series
 		self.hist_bar:pd.Series
 		self.bins_mid:pd.Series
+		self.peaks_index: list[int] = []
+		self.peaks_metrics: list[dict[str, float]] = []
 
 	async def fit(self, nbins:int | None = None) -> Bin:
 		"""
@@ -102,14 +104,20 @@ class Bin():
 		values = values.fillna(0.0).to_numpy(dtype=float, copy=True)
 		values[~np.isfinite(values)] = 0.0
 		if len(values) == 0:
+			self.peaks_index = []
+			self.peaks_metrics = []
 			return []
 
 		absolute_values = np.abs(values)
 		strongest = float(absolute_values.max())
+		total_abs_flow = float(absolute_values.sum())
 		if strongest <= 0:
+			self.peaks_index = []
+			self.peaks_metrics = []
 			return []
 		minimum_prominence = strongest * 0.1
 		candidates: list[int] = []
+		metrics: dict[int, dict[str, float]] = {}
 		has_local_extrema = False
 		for flow in (
 			np.where(values > 0, values, 0.0),
@@ -122,16 +130,36 @@ class Bin():
 			if len(local):
 				has_local_extrema = True
 				prominences = properties["prominences"] if "prominences" in properties else np.zeros(len(local))
-				candidates.extend(
-					int(index)
-					for index, prominence in zip(local, prominences)
-					if prominence >= prominence_threshold
-				)
+				for index, prominence in zip(local, prominences):
+					if prominence < prominence_threshold:
+						continue
+					index = int(index)
+					candidates.append(index)
+					metrics[index] = {
+						"flow": float(abs(values[index])),
+						"prominence": float(prominence),
+						"strongest_abs_flow": strongest,
+						"total_abs_flow": total_abs_flow,
+					}
 
 		if candidates:
-			return sorted(set(candidates))
+			self.peaks_index = sorted(set(candidates))
+			self.peaks_metrics = [metrics[index] for index in self.peaks_index]
+			return self.peaks_index
 		if not has_local_extrema:
-			return [int(np.argmax(absolute_values))]
+			index = int(np.argmax(absolute_values))
+			self.peaks_index = [index]
+			# A monotonic histogram has no scipy prominence. Use the strongest
+			# node itself as a deterministic fallback metric.
+			self.peaks_metrics = [{
+				"flow": strongest,
+				"prominence": strongest,
+				"strongest_abs_flow": strongest,
+				"total_abs_flow": total_abs_flow,
+			}]
+			return self.peaks_index
+		self.peaks_index = []
+		self.peaks_metrics = []
 		return []
 
 def pl_to_pandas(df: pl.DataFrame) -> pd.DataFrame:
