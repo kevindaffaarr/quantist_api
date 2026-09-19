@@ -841,6 +841,7 @@ async def get_screener_broker_vwap(
 @router.get("/screener/foreign/vprofile", status_code=status.HTTP_200_OK, tags=[Tags.screener.name])
 @timeit
 async def get_screener_foreign_vprofile(
+	screener_vprofile_criteria: Literal[dp.ScreenerList.vprofile_inside,dp.ScreenerList.vprofile_breakout,dp.ScreenerList.vprofile_breakdown] = dp.ScreenerList.vprofile_inside,
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date = datetime.date.today(),
@@ -852,6 +853,7 @@ async def get_screener_foreign_vprofile(
 	):
 	try:
 		screener_vprofile_object = ff.ScreenerVProfile(
+			screener_vprofile_criteria = screener_vprofile_criteria,
 			n_stockcodes = n_stockcodes,
 			startdate = startdate,
 			enddate = enddate,
@@ -874,7 +876,7 @@ async def get_screener_foreign_vprofile(
 		# Define screener_metadata
 		screener_metadata = {
 			"analysis_method": dp.AnalysisMethod.foreign,
-			"screener_method": dp.ScreenerList.vprofile_inside,
+			"screener_method": screener_vprofile_criteria,
 			"bar_range": screener_vprofile_object.radar_period,
 			"enddate": screener_vprofile_object.enddate.strftime("%Y-%m-%d"), # type: ignore
 		}
@@ -892,6 +894,7 @@ async def get_screener_foreign_vprofile(
 @router.get("/screener/broker/vprofile", status_code=status.HTTP_200_OK, tags=[Tags.screener.name])
 @timeit
 async def get_screener_broker_vprofile(
+	screener_vprofile_criteria: Literal[dp.ScreenerList.vprofile_inside,dp.ScreenerList.vprofile_breakout,dp.ScreenerList.vprofile_breakdown] = dp.ScreenerList.vprofile_inside,
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date = datetime.date.today(),
@@ -914,6 +917,7 @@ async def get_screener_broker_vprofile(
 	):
 	try:
 		screener_vprofile_object = bf.ScreenerVProfile(
+			screener_vprofile_criteria = screener_vprofile_criteria,
 			n_stockcodes = n_stockcodes,
 			startdate = startdate,
 			enddate = enddate,
@@ -947,7 +951,7 @@ async def get_screener_broker_vprofile(
 		# Define screener_metadata
 		screener_metadata = {
 			"analysis_method": dp.AnalysisMethod.broker,
-			"screener_method": dp.ScreenerList.vprofile_inside,
+			"screener_method": screener_vprofile_criteria,
 			"bar_range": screener_vprofile_object.radar_period,
 			"enddate": screener_vprofile_object.enddate.strftime("%Y-%m-%d"), # type: ignore
 		}

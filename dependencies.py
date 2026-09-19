@@ -97,6 +97,8 @@ class ScreenerList(str, Enum):
 	vwap_breakout = "vwap_breakout"
 	vwap_breakdown = "vwap_breakdown"
 	vprofile_inside = "vprofile_inside"
+	vprofile_breakout = "vprofile_breakout"
+	vprofile_breakdown = "vprofile_breakdown"
 
 class HoldingSectors(str, Enum):
 	# Dictionary:

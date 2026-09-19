@@ -30,8 +30,10 @@ from __future__ import annotations
 import abc
 import asyncio
 import datetime
+import math
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from .helper import Bin
@@ -103,19 +105,142 @@ def vwap_breakdown(data: pd.DataFrame, close: str = "close", vwap: str = "vwap")
 # ==========
 # Volume profile criteria
 # ==========
-async def vprofile_inside(data: pd.DataFrame, checking_period: int) -> tuple[str, bool]:
-	"""Is any of the last checking_period closes sitting in a net-value peak zone?"""
+VPROFILE_ROLES = ("support", "resistance", "undetermined")
+VPROFILE_BEHAVIORS = ("acceptance", "rejection", "test", "breakout_up", "breakdown", "undetermined")
+
+
+def vprofile_reading(closes: pd.Series, zones: pd.IntervalIndex, checking_period: int) -> dict[str, Any]:
+	"""
+	Read the net-value peak zone the last checking_period closes are working on.
+
+	Pure and deterministic: zones in, closes in, native scalars out. Both
+	families feed it their own profile, and every label below is read off the
+	observed closes alone - nothing is inferred from the size or sign of the
+	flow, and anything not positively observed stays "undetermined".
+
+	Zone: the one holding the most recent close of the window; if the window
+	touched none, the zone whose mid is nearest the last close, reported with
+	in_zone False so the distance can still be read off it. Bins are (low, high]
+	throughout, matching the pd.cut intervals the profile is built from.
+
+	Role, from the approach direction only. The approach price is the most
+	recent close at or before that touch which sits outside the zone; above the
+	zone means price came down onto it (support), below means price came up
+	into it (resistance). A zone price has never been observed outside of has
+	no approach, so it keeps no role.
+
+	Behavior, first rule that matches:
+	  - no close inside the window              -> undetermined (nothing to read)
+	  - last close inside, previous one too     -> acceptance (>=2 consecutive)
+	  - last close inside, previous one outside -> test (one isolated touch)
+	  - last close outside, window touched:
+	      left above, approached from below     -> breakout_up
+	      left above, approached from above     -> rejection (bounced off support)
+	      left below, approached from above     -> breakdown
+	      left below, approached from below     -> rejection (turned back at resistance)
+	      no role                               -> undetermined
+	"Previous close" is the bar before the last one whether or not the window
+	reaches it, so a one-bar checking_period still sees a streak. touch_count
+	counts the window's closes inside the zone; the distance is signed, positive
+	when the last close sits above the zone mid.
+
+	A missing (NaN) last close says nothing about now: role, behavior and the
+	distance stay empty, while membership still answers for the window.
+	"""
+	reading: dict[str, Any] = {
+		"vprofile_in_zone": False,
+		"vprofile_zone_role": "undetermined",
+		"vprofile_zone_behavior": "undetermined",
+		"vprofile_zone_low": None,
+		"vprofile_zone_high": None,
+		"vprofile_zone_mid": None,
+		"vprofile_distance_to_mid_pct": None,
+		"vprofile_touch_count": 0,
+	}
+	values = closes.to_numpy(dtype="float64")
+	if len(zones) == 0 or len(values) == 0:
+		return reading
+
+	# get_indexer scores a NaN close as -1 ("in no zone"), same as comparing it.
+	window = values[-checking_period:]
+	membership = zones.get_indexer(window)
+	touched = np.flatnonzero(membership >= 0)
+	reading["vprofile_in_zone"] = bool(len(touched))
+
+	anchor = len(values) - len(window) + (touched[-1] if len(touched) else len(window) - 1)
+	last = float(values[-1])
+	if len(touched):
+		selected = int(membership[touched[-1]])
+	elif math.isnan(last):
+		return reading  # never touched, and no price to measure the nearest zone from
+	else:
+		selected = int(np.abs(zones.mid.to_numpy() - last).argmin())
+
+	low = float(zones.left.to_numpy()[selected])
+	high = float(zones.right.to_numpy()[selected])
+	mid = (low + high) / 2
+	inside = (values > low) & (values <= high)
+	reading.update({
+		"vprofile_zone_low": low,
+		"vprofile_zone_high": high,
+		"vprofile_zone_mid": mid,
+		"vprofile_touch_count": int(inside[-checking_period:].sum()),
+	})
+	if math.isnan(last):
+		return reading
+	reading["vprofile_distance_to_mid_pct"] = round((last - mid) / mid * 100, 4) if mid else None
+
+	# Where price came from: the last close outside the zone, at or before the touch.
+	approached = np.flatnonzero(~inside[:anchor + 1] & ~np.isnan(values[:anchor + 1]))
+	if len(approached):
+		reading["vprofile_zone_role"] = "support" if values[approached[-1]] > high else "resistance"
+
+	role = reading["vprofile_zone_role"]
+	if not reading["vprofile_touch_count"]:
+		behavior = "undetermined"
+	elif inside[-1]:
+		behavior = "acceptance" if len(inside) > 1 and inside[-2] else "test"
+	elif role == "undetermined":
+		behavior = "undetermined"
+	elif last > high:
+		behavior = "breakout_up" if role == "resistance" else "rejection"
+	else:
+		behavior = "breakdown" if role == "support" else "rejection"
+	reading["vprofile_zone_behavior"] = behavior
+
+	return reading
+
+
+async def vprofile_annotate(data: pd.DataFrame, checking_period: int) -> tuple[str, dict[str, Any]]:
+	"""One code: fit its volume profile, then read the zone its recent closes work on."""
 	code: str = data.index.get_level_values("code")[0]  # type: ignore
 
 	bin_obj: Bin = await Bin(data=data).fit()
-	if bin_obj.nbins <= 2:
-		return code, False
+	zones = pd.IntervalIndex.from_tuples([]) \
+		if bin_obj.nbins <= 2 or len(bin_obj.peaks_index) == 0 \
+		else pd.IntervalIndex(bin_obj.hist_bar.index[bin_obj.peaks_index])
 
-	trading_zone = bin_obj.hist_bar.index[bin_obj.peaks_index]
-	last_close = data["close"].iloc[-checking_period:]
-	is_inside_interval = any(last_close.apply(lambda x: any(x in interval for interval in trading_zone)))
+	return code, vprofile_reading(data["close"].astype(float), zones, checking_period)  # type: ignore
 
-	return code, is_inside_interval
+
+async def vprofile_annotations(data: pd.DataFrame, checking_period: int) -> pd.DataFrame:
+	"""Per-code zone annotations, indexed by code, ready to join onto top_stockcodes."""
+	results = await asyncio.gather(*[
+		vprofile_annotate(group, checking_period)
+		for _, group in data.groupby(level="code", group_keys=False)
+	])
+	return pd.DataFrame.from_dict(dict(results), orient="index").rename_axis("code")
+
+
+async def vprofile_inside(data: pd.DataFrame, checking_period: int) -> tuple[str, bool]:
+	"""
+	Is any of the last checking_period closes sitting in a net-value peak zone?
+
+	Membership only, unchanged: the annotations that come with it are read off
+	the same profile but this answer stays the one the screeners rank on.
+	"""
+	code, reading = await vprofile_annotate(data, checking_period)
+	return code, reading["vprofile_in_zone"]
 
 
 async def vprofile_stocklist(data: pd.DataFrame, checking_period: int) -> list[str]:
@@ -126,3 +251,57 @@ async def vprofile_stocklist(data: pd.DataFrame, checking_period: int) -> list[s
 	])
 	inside = pd.Series(dict(results))
 	return inside[inside].index.tolist()
+
+
+def vprofile_behavior_codes(annotations: pd.DataFrame, behavior: str) -> list[str]:
+	"""Codes whose current reading observed exactly this behavior. Pure, frame in, codes out."""
+	return annotations.index[annotations["vprofile_zone_behavior"] == behavior].tolist()
+
+
+async def vprofile_breakout(data: pd.DataFrame, checking_period: int) -> list[str]:
+	"""
+	Codes that broke out above the zone they were working on.
+
+	Same per-code profile vprofile_inside/vprofile_annotations read, filtered to
+	the "breakout_up" behavior: within the last checking_period the closes
+	touched the selected net-value peak zone, price had approached it from
+	below (so the zone was acting as resistance), and the last close now sits
+	above it. Point-in-time - only the window's own closes decide.
+
+	Membership is not the signal: a code still inside its zone (acceptance,
+	test) or one that touched and turned back (rejection) is not selected, and
+	no signal is read off the zone's role alone.
+	"""
+	return vprofile_behavior_codes(await vprofile_annotations(data, checking_period), "breakout_up")
+
+
+async def vprofile_breakdown(data: pd.DataFrame, checking_period: int) -> list[str]:
+	"""
+	Codes that broke down out of the zone they were working on.
+
+	The mirror of vprofile_breakout, filtered to the "breakdown" behavior: the
+	window touched the selected zone, price had approached it from above (so the
+	zone was acting as support), and the last close now sits below it. Same
+	exclusions - membership, an isolated test, a rejection, or a bare role is
+	never a signal.
+	"""
+	return vprofile_behavior_codes(await vprofile_annotations(data, checking_period), "breakdown")
+
+
+# Keyed by dp.ScreenerList value; screener.py stays free of the dependencies import.
+VPROFILE_CRITERIA = {
+	"vprofile_inside": vprofile_stocklist,
+	"vprofile_breakout": vprofile_breakout,
+	"vprofile_breakdown": vprofile_breakdown,
+}
+
+
+async def vprofile_criteria_stocklist(
+	data: pd.DataFrame,
+	checking_period: int,
+	criteria: str = "vprofile_inside",
+	) -> list[str]:
+	"""Select codes with the requested volume profile criterion, membership by default."""
+	if criteria not in VPROFILE_CRITERIA:
+		raise ValueError(f"Invalid screener_vprofile_criteria: {criteria}")
+	return await VPROFILE_CRITERIA[criteria](data, checking_period)

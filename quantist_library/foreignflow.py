@@ -1058,6 +1058,11 @@ class ScreenerVProfile(ScreenerBase):
 		screener_min_value: int | None = None,
 		screener_min_frequency: int | None = None,
 		screener_min_prop:int | None = None,
+		screener_vprofile_criteria: Literal[
+			dp.ScreenerList.vprofile_inside,
+			dp.ScreenerList.vprofile_breakout,
+			dp.ScreenerList.vprofile_breakdown,
+			] = dp.ScreenerList.vprofile_inside,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:
 		super().__init__(
@@ -1072,6 +1077,8 @@ class ScreenerVProfile(ScreenerBase):
 		)
 
 		self.n_stockcodes: int = n_stockcodes
+		# Which reading of the profile selects the stocklist; the annotations stay the same either way.
+		self.screener_vprofile_criteria = screener_vprofile_criteria
 	
 	async def screen(self) -> ScreenerVProfile:
 		await super()._fit_base(predata='vprofile')
@@ -1137,7 +1144,7 @@ class ScreenerVProfile(ScreenerBase):
 	
 	async def _get_vprofile_stocklist(self, raw_data: pd.DataFrame) -> list[str]:
 		assert isinstance(self.radar_period, int)
-		return await sc.vprofile_stocklist(raw_data, self.radar_period)
+		return await sc.vprofile_criteria_stocklist(raw_data, self.radar_period, self.screener_vprofile_criteria)
 
 	async def _get_data_from_stocklist(self,n_stockcodes: int) -> tuple[list[str], pd.DataFrame]:
 		assert isinstance(self.radar_period, int), 'radar_period must be int'
@@ -1156,6 +1163,8 @@ class ScreenerVProfile(ScreenerBase):
 		top_stockcodes = raw_data[['close']].groupby(level='code').last()
 		top_stockcodes['mf'] = mf.loc[stocklist]
 		top_stockcodes['corr'] = self.close_valflow_corr.loc[stocklist]
+		# Additive: how each code sits against its own foreign net-value zone.
+		top_stockcodes = top_stockcodes.join(await sc.vprofile_annotations(raw_data, self.radar_period))
 		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
 
 		return stocklist, top_stockcodes

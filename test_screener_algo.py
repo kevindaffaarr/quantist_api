@@ -3,15 +3,20 @@ Deterministic guards for the screener algorithms that were de-duplicated or
 vectorised. No database: every frame here is synthetic, and each test compares
 the shipped implementation against the straightforward reference it replaced.
 """
+import asyncio
 import datetime
+import inspect
 
 import numpy as np
 import pandas as pd
 import pytest
+from fastapi.openapi.utils import get_openapi
 
+import dependencies as dp
 from quantist_library import brokerflow as bf
 from quantist_library import foreignflow as ff
 from quantist_library import screener as sc
+from routers import whaleanalysis
 
 
 def _vwap_frame() -> pd.DataFrame:
@@ -77,6 +82,291 @@ def test_both_families_agree_on_vwap_criteria(criteria):
 	else:
 		fn = f"_get_vwap_{criteria}"
 		assert getattr(foreign, fn)(data) == getattr(whale, fn)(data)
+
+
+def _vprofile_frame(code: str = "aaa", tail: tuple[float, ...] = ()) -> pd.DataFrame:
+	close = [100.0, 104.0, 101.0, 108.0, 103.0, 112.0, 105.0, 118.0, 102.0, 109.0,
+		101.0, 115.0, 103.0, 120.0, 106.0, 111.0, 100.0, 107.0, 104.0, 102.0] + list(tail)
+	netval = [(-1.0) ** i * (i + 1) * 1000.0 for i in range(len(close))]
+	dates = pd.bdate_range("2024-01-01", periods=len(close))
+	return pd.DataFrame(
+		{"close": np.array(close), "netval": np.array(netval)},
+		index=pd.MultiIndex.from_product([[code], dates], names=["code", "date"]),
+	)
+
+
+def test_vprofile_inside_still_answers_membership():
+	"""The zone annotations are additive: the old two-value contract is untouched."""
+	code, inside = asyncio.run(sc.vprofile_inside(_vprofile_frame(), 3))
+	assert code == "aaa"
+	assert isinstance(inside, bool), "vprofile_inside answers one question: is price inside a zone"
+
+
+# ==========
+# Volume profile zone annotations
+# ==========
+_ZONES = pd.IntervalIndex.from_tuples([(100.0, 110.0), (130.0, 140.0)])
+
+
+def _reading(closes: list[float], checking_period: int = 3, zones=_ZONES) -> dict:
+	return sc.vprofile_reading(pd.Series(closes, dtype="float64"), zones, checking_period)
+
+
+def test_vprofile_role_is_resistance_when_price_approaches_from_below():
+	reading = _reading([90.0, 95.0, 105.0])
+	assert reading["vprofile_zone_role"] == "resistance"
+	assert reading["vprofile_in_zone"] is True
+
+
+def test_vprofile_role_is_support_when_price_approaches_from_above():
+	reading = _reading([125.0, 120.0, 105.0])
+	assert reading["vprofile_zone_role"] == "support"
+
+
+def test_vprofile_role_is_undetermined_without_outside_context():
+	"""Every observed close sits in the zone: there is no approach to read."""
+	reading = _reading([102.0, 104.0, 105.0])
+	assert reading["vprofile_zone_role"] == "undetermined"
+
+
+def test_vprofile_role_never_invents_a_zone_without_a_profile():
+	reading = _reading([102.0, 104.0, 105.0], zones=pd.IntervalIndex.from_tuples([]))
+	assert reading["vprofile_zone_role"] == "undetermined"
+	assert reading["vprofile_zone_behavior"] == "undetermined"
+	assert reading["vprofile_in_zone"] is False
+	assert reading["vprofile_zone_mid"] is None
+
+
+def test_vprofile_behavior_acceptance_needs_consecutive_closes_inside():
+	assert _reading([90.0, 104.0, 105.0])["vprofile_zone_behavior"] == "acceptance"
+
+
+def test_vprofile_behavior_test_is_one_isolated_touch():
+	assert _reading([90.0, 95.0, 105.0])["vprofile_zone_behavior"] == "test"
+
+
+@pytest.mark.parametrize("closes, role, behavior", [
+	# came up into the zone, fell back out below it: rejected at resistance
+	([90.0, 105.0, 95.0], "resistance", "rejection"),
+	# came down onto the zone, bounced back above it: held as support
+	([125.0, 105.0, 115.0], "support", "rejection"),
+	# came up into the zone and left above it: resistance broken
+	([90.0, 105.0, 115.0], "resistance", "breakout_up"),
+	# came down onto the zone and left below it: support broken
+	([125.0, 105.0, 95.0], "support", "breakdown"),
+])
+def test_vprofile_behavior_reads_the_exit_against_the_approach(closes, role, behavior):
+	reading = _reading(closes)
+	assert (reading["vprofile_zone_role"], reading["vprofile_zone_behavior"]) == (role, behavior)
+	assert reading["vprofile_in_zone"] is True, "the window still touched the zone"
+
+
+def test_vprofile_behavior_is_undetermined_when_the_window_never_touched():
+	reading = _reading([90.0, 92.0, 95.0])
+	assert reading["vprofile_in_zone"] is False
+	assert reading["vprofile_zone_behavior"] == "undetermined"
+	assert reading["vprofile_touch_count"] == 0
+	# The nearest zone is still reported so the distance can be read off it.
+	assert reading["vprofile_zone_mid"] == pytest.approx(105.0)
+	assert reading["vprofile_distance_to_mid_pct"] < 0
+
+
+def test_vprofile_reading_reports_the_zone_levels_and_the_distance():
+	reading = _reading([90.0, 95.0, 105.0])
+	assert (reading["vprofile_zone_low"], reading["vprofile_zone_high"]) == (100.0, 110.0)
+	assert reading["vprofile_zone_mid"] == pytest.approx(105.0)
+	assert reading["vprofile_distance_to_mid_pct"] == pytest.approx(0.0)
+	assert reading["vprofile_touch_count"] == 1
+
+
+def test_vprofile_reading_selects_the_zone_the_price_is_working_on():
+	reading = _reading([105.0, 120.0, 135.0])
+	assert (reading["vprofile_zone_low"], reading["vprofile_zone_high"]) == (130.0, 140.0)
+
+
+def test_vprofile_reading_is_json_safe():
+	reading = _reading([90.0, 95.0, 105.0])
+	for name, value in reading.items():
+		assert type(value) in (bool, str, float, int, type(None)), f"{name} is {type(value)}"
+	assert reading["vprofile_zone_role"] in sc.VPROFILE_ROLES
+	assert reading["vprofile_zone_behavior"] in sc.VPROFILE_BEHAVIORS
+
+
+def test_vprofile_reading_says_nothing_about_now_when_the_last_close_is_missing():
+	reading = _reading([90.0, 105.0, float("nan")])
+	assert reading["vprofile_zone_role"] == "undetermined"
+	assert reading["vprofile_zone_behavior"] == "undetermined"
+	assert reading["vprofile_distance_to_mid_pct"] is None
+
+
+def test_vprofile_annotate_agrees_with_the_membership_it_annotates():
+	data = _vprofile_frame()
+	code, reading = asyncio.run(sc.vprofile_annotate(data, 3))
+	assert code == "aaa"
+	assert reading["vprofile_in_zone"] == asyncio.run(sc.vprofile_inside(data, 3))[1]
+	assert reading["vprofile_zone_role"] in sc.VPROFILE_ROLES
+	assert reading["vprofile_zone_behavior"] in sc.VPROFILE_BEHAVIORS
+
+
+def test_vprofile_annotations_frame_is_indexed_by_code():
+	data = pd.concat([_vprofile_frame("aaa"), _vprofile_frame("bbb")])
+	frame = asyncio.run(sc.vprofile_annotations(data, 3))
+	assert frame.index.tolist() == ["aaa", "bbb"]
+	assert "vprofile_zone_role" in frame.columns
+	# The serialisation the router hands to orjson keeps native scalars.
+	for values in frame.to_dict(orient="index").values():
+		for value in values.values():
+			assert type(value) in (bool, str, float, int, type(None))
+
+
+def _annotation_columns() -> set[str]:
+	return set(_reading([90.0, 95.0, 105.0]))
+
+
+def test_foreign_vprofile_screener_annotates_its_top_stockcodes():
+	screener = object.__new__(ff.ScreenerVProfile)
+	screener.radar_period = 3
+	screener.raw_data = pd.concat([_vprofile_frame("aaa"), _vprofile_frame("bbb")])
+	screener.stocklist = ["aaa", "bbb"]
+	screener.close_valflow_corr = pd.Series({"aaa": 0.4, "bbb": 0.6})
+
+	stocklist, top = asyncio.run(screener._get_data_from_stocklist(n_stockcodes=2))
+
+	assert set(stocklist) == {"aaa", "bbb"}
+	# The columns the API already serves stay first-class...
+	assert {"close", "mf", "corr"} <= set(top.columns)
+	# ...and the annotations are additive.
+	assert _annotation_columns() <= set(top.columns)
+
+
+def test_broker_vprofile_screener_annotates_its_top_stockcodes():
+	data = pd.concat([_vprofile_frame("aaa"), _vprofile_frame("bbb")])
+	screener = object.__new__(bf.ScreenerVProfile)
+	screener.radar_period = 3
+	screener.raw_data_full = data
+	screener.wf_indicators = data
+	screener.selected_broker_nval = data[["netval"]].rename(columns={"netval": "broker_nval"})
+	screener.stocklist = ["aaa", "bbb"]
+	screener.optimum_corr = pd.Series({"aaa": 0.4, "bbb": 0.6})
+
+	stocklist, top = asyncio.run(screener._get_data_from_stocklist(n_stockcodes=2))
+
+	assert set(stocklist) == {"aaa", "bbb"}
+	assert {"close", "mf", "corr"} <= set(top.columns)
+	assert _annotation_columns() <= set(top.columns)
+
+
+# ==========
+# Volume profile behavior criteria: breakout / breakdown
+# ==========
+def _behavior_annotations() -> pd.DataFrame:
+	"""One hand-written reading per behavior the criteria have to tell apart."""
+	rows = {
+		"brk": ("resistance", "breakout_up"),
+		"dwn": ("support", "breakdown"),
+		"acc": ("resistance", "acceptance"),
+		"tst": ("support", "test"),
+		"rej": ("support", "rejection"),		# role, but price never left the zone
+		"und": ("resistance", "undetermined"),	# role, nothing else observed
+	}
+	return pd.DataFrame(
+		[{"vprofile_in_zone": True, "vprofile_zone_role": role, "vprofile_zone_behavior": behavior}
+			for role, behavior in rows.values()],
+		index=pd.Index(rows, name="code"),
+	)
+
+
+@pytest.mark.parametrize("behavior, expected", [("breakout_up", ["brk"]), ("breakdown", ["dwn"])])
+def test_vprofile_behavior_codes_selects_only_the_named_behavior(behavior, expected):
+	selected = sc.vprofile_behavior_codes(_behavior_annotations(), behavior)
+	assert selected == expected
+	# Sitting in a zone is not a signal, and neither is carrying a role on its own.
+	assert not {"acc", "tst", "rej", "und"} & set(selected)
+
+
+def _behavior_universe() -> pd.DataFrame:
+	"""Four codes on the same profile, each leaving (or not leaving) its zone differently."""
+	tails = {
+		"brk": (108.0, 118.0, 130.0),	# came up into the zone and left above it
+		"dwn": (100.0, 88.0, 80.0),		# came down onto the zone and left below it
+		"acc": (),						# still sitting inside its zone
+		"rej": (104.0, 125.0, 140.0),	# touched and turned back: role only, no break
+	}
+	return pd.concat([_vprofile_frame(code, tail) for code, tail in tails.items()])
+
+
+def test_vprofile_criteria_read_the_behavior_not_the_membership():
+	data = _behavior_universe()
+	annotations = asyncio.run(sc.vprofile_annotations(data, 3))
+	breakout = asyncio.run(sc.vprofile_breakout(data, 3))
+	breakdown = asyncio.run(sc.vprofile_breakdown(data, 3))
+
+	assert breakout == ["brk"]
+	assert breakdown == ["dwn"]
+	assert annotations.loc[breakout + breakdown, "vprofile_zone_behavior"].tolist() == ["breakout_up", "breakdown"]
+	# All four touched a zone: membership is the wider set the signals are read out of.
+	assert set(asyncio.run(sc.vprofile_stocklist(data, 3))) == {"brk", "dwn", "acc", "rej"}
+
+
+@pytest.mark.parametrize("criteria, expected", [
+	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
+	(dp.ScreenerList.vprofile_breakout, ["brk"]),
+	(dp.ScreenerList.vprofile_breakdown, ["dwn"]),
+])
+def test_vprofile_criteria_stocklist_dispatches_on_the_enum(criteria, expected):
+	assert sorted(asyncio.run(sc.vprofile_criteria_stocklist(_behavior_universe(), 3, criteria))) == expected
+
+
+def test_vprofile_criteria_stocklist_rejects_an_unknown_criterion():
+	with pytest.raises(ValueError):
+		asyncio.run(sc.vprofile_criteria_stocklist(_behavior_universe(), 3, dp.ScreenerList.vwap_rally))
+
+
+@pytest.mark.parametrize("criteria, expected", [
+	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
+	(dp.ScreenerList.vprofile_breakout, ["brk"]),
+	(dp.ScreenerList.vprofile_breakdown, ["dwn"]),
+])
+def test_foreign_vprofile_screener_selects_on_the_requested_criterion(criteria, expected):
+	screener = object.__new__(ff.ScreenerVProfile)
+	screener.radar_period = 3
+	screener.screener_vprofile_criteria = criteria
+	stocklist = asyncio.run(screener._get_vprofile_stocklist(raw_data=_behavior_universe()))
+	assert sorted(stocklist) == expected
+
+
+@pytest.mark.parametrize("criteria, expected", [
+	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
+	(dp.ScreenerList.vprofile_breakout, ["brk"]),
+	(dp.ScreenerList.vprofile_breakdown, ["dwn"]),
+])
+def test_broker_vprofile_screener_selects_on_the_requested_criterion(criteria, expected):
+	screener = object.__new__(bf.ScreenerVProfile)
+	screener.radar_period = 3
+	screener.screener_vprofile_criteria = criteria
+	screener.wf_indicators = _behavior_universe()
+	assert sorted(asyncio.run(screener._get_vprofile_stocklist())) == expected
+
+
+@pytest.mark.parametrize("cls", [ff.ScreenerVProfile, bf.ScreenerVProfile])
+def test_vprofile_screener_constructors_default_to_membership(cls):
+	parameter = inspect.signature(cls.__init__).parameters["screener_vprofile_criteria"]
+	assert parameter.default == dp.ScreenerList.vprofile_inside
+
+
+@pytest.mark.parametrize("path", [
+	"/whaleanalysis/screener/foreign/vprofile",
+	"/whaleanalysis/screener/broker/vprofile",
+])
+def test_vprofile_routes_expose_the_criterion_as_an_optional_query_parameter(path):
+	"""OpenAPI only: no server, no database, just the route signatures FastAPI reads."""
+	schema = get_openapi(title="test", version="test", routes=whaleanalysis.router.routes)
+	parameters = {p["name"]: p for p in schema["paths"][path]["get"]["parameters"]}
+	criterion = parameters["screener_vprofile_criteria"]
+	assert criterion["in"] == "query"
+	assert criterion["required"] is False
+	assert criterion["schema"]["default"] == "vprofile_inside"
+	assert set(criterion["schema"]["enum"]) == {"vprofile_inside", "vprofile_breakout", "vprofile_breakdown"}
 
 
 def _broker_frame() -> tuple[pd.DataFrame, pd.DataFrame]:
