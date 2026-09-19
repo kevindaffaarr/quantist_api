@@ -1733,13 +1733,18 @@ class ScreenerMoneyFlow(ScreenerBase):
 		# Sum of selected broker transaction for each stock
 		# Get only self.selected_broker_nval between startdate and enddate based on level 1 date index
 		if accum_or_distri == dp.ScreenerList.most_distributed:
-			top_stockcodes['mf'] = self.selected_broker_nval.loc[
+			mf = self.selected_broker_nval.loc[
 				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
-				].groupby("code").sum().astype(float).nsmallest(n=n_stockcodes, columns="broker_nval")['broker_nval']
+				].groupby("code").sum().astype(float)['broker_nval']
 		else:
-			top_stockcodes['mf'] = self.selected_broker_nval.loc[
+			mf = self.selected_broker_nval.loc[
 				self.selected_broker_nval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
-				].groupby("code").sum().astype(float).nlargest(n=n_stockcodes, columns="broker_nval")['broker_nval']
+				].groupby("code").sum().astype(float)['broker_nval']
+		top_stockcodes = sc.rank_flow_candidates(
+			mf.rename("mf").to_frame(),
+			n_stockcodes,
+			ascending=accum_or_distri == dp.ScreenerList.most_distributed,
+		)
 
 		# get selected_broker_nval that has level 0 index (code) in top_stockcodes
 		self.selected_broker_nval = self.selected_broker_nval[self.selected_broker_nval.index.get_level_values(0).isin(top_stockcodes.index)]
@@ -1877,7 +1882,11 @@ class ScreenerVWAP(ScreenerBase):
 		# Compile data for top_stockcodes from stocklist and top_data
 		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
 		self.top_stockcodes['mf'] = self.top_data['broker_nval'].groupby(level='code').sum()
-		self.top_stockcodes = self.top_stockcodes.sort_values('mf', ascending=False)
+		self.top_stockcodes = sc.rank_flow_candidates(
+			self.top_stockcodes,
+			n_stockcodes=len(self.top_stockcodes),
+			ascending=self.screener_vwap_criteria == dp.ScreenerList.vwap_breakdown,
+		)
 		
 		return self
 
@@ -1904,8 +1913,14 @@ class ScreenerVWAP(ScreenerBase):
 	async def _get_data_from_stocklist(self, stocklist: list) -> tuple[list, pd.DataFrame]:
 		# Get data from stocklist
 		top_data = self.raw_data_full.loc[self.raw_data_full.index.get_level_values('code').isin(stocklist)]
-		# Sum broker_nval for each code and get top n_stockcodes
-		stocklist = top_data['broker_nval'].groupby(level='code').sum().astype(float).nlargest(self.n_stockcodes).index.tolist()
+		# Rank members by flow; the criteria decide direction, not membership.
+		stocklist = sc.rank_vwap_candidates(
+			top_data,
+			stocklist,
+			self.n_stockcodes,
+			self.screener_vwap_criteria,
+			flow_column='broker_nval',
+		)
 
 		# Get data from stocklist
 		top_data = self.raw_data_full.loc[self.raw_data_full.index.get_level_values('code').isin(stocklist)]
@@ -1999,17 +2014,22 @@ class ScreenerVProfile(ScreenerBase):
 		# Sum netval in the last self.radar_period for each code
 		mf = stocklist_selected_broker_nval.groupby(level='code').tail(self.radar_period).groupby(level='code')['broker_nval'].sum()
 
-		# Get top n_stockcodes
-		stocklist = mf.astype(float).nlargest(n_stockcodes).index.tolist()
-
-		# Compile top_stockcodes
-		top_stockcodes:pd.DataFrame
-		top_stockcodes = self.raw_data_full.loc[self.raw_data_full.index.get_level_values('code').isin(stocklist)][['close']].groupby(level='code').last()
-		top_stockcodes['mf'] = mf.loc[mf.index.isin(stocklist)]
-		top_stockcodes['corr'] = self.optimum_corr.loc[self.optimum_corr.index.isin(stocklist)]
-		# Additive: how each code sits against its own selected-broker net-value zone.
-		vprofile_data = self.wf_indicators.loc[self.wf_indicators.index.get_level_values('code').isin(stocklist)]
+		# Annotate every candidate before ranking/truncating: the signal evidence
+		# decides the top n, rather than the raw money-flow total.
+		top_stockcodes:pd.DataFrame = self.raw_data_full.loc[
+			self.raw_data_full.index.get_level_values('code').isin(self.stocklist)
+		][['close']].groupby(level='code').last()
+		top_stockcodes['mf'] = mf.reindex(top_stockcodes.index)
+		top_stockcodes['corr'] = self.optimum_corr.reindex(top_stockcodes.index)
+		vprofile_data = self.wf_indicators.loc[
+			self.wf_indicators.index.get_level_values('code').isin(self.stocklist)
+		]
 		top_stockcodes = top_stockcodes.join(await sc.vprofile_annotations(vprofile_data, self.radar_period))
-		top_stockcodes = top_stockcodes.sort_values('mf', ascending=False)
+		top_stockcodes = sc.rank_vprofile_candidates(
+			top_stockcodes,
+			getattr(self, 'screener_vprofile_criteria', 'vprofile_inside'),
+			n_stockcodes,
+		)
+		stocklist = top_stockcodes.index.tolist()
 
 		return stocklist, top_stockcodes

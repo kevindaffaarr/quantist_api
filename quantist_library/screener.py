@@ -102,6 +102,89 @@ def vwap_breakdown(data: pd.DataFrame, close: str = "close", vwap: str = "vwap")
 	return _vwap_cross(data, close, vwap, above=False)
 
 
+def _criteria_value(criteria: Any) -> str:
+	return str(getattr(criteria, "value", criteria))
+
+
+def _stable_sort_frame(
+	data: pd.DataFrame,
+	sort_columns: list[str],
+	ascending: list[bool],
+	) -> pd.DataFrame:
+	"""Sort a code-indexed frame with numeric keys and an explicit code tie-break."""
+	ranked = data.copy()
+	temporary_columns: list[str] = []
+	for column in sort_columns:
+		temporary = f"__sort_{column}"
+		ranked[temporary] = pd.to_numeric(ranked[column], errors="coerce")
+		temporary_columns.append(temporary)
+	ranked["__sort_code"] = ranked.index.map(str)
+	temporary_columns.append("__sort_code")
+	ranked = ranked.sort_values(
+		by=temporary_columns,
+		ascending=[*ascending, True],
+		kind="mergesort",
+		na_position="last",
+	)
+	return ranked.drop(columns=temporary_columns)
+
+
+def rank_flow_candidates(
+	candidates: pd.DataFrame,
+	n_stockcodes: int,
+	ascending: bool = False,
+	) -> pd.DataFrame:
+	"""Rank total flow, using code ascending as the deterministic tie-break."""
+	return _stable_sort_frame(candidates, ["mf"], [ascending]).head(n_stockcodes)
+
+
+def rank_vwap_candidates(
+	data: pd.DataFrame,
+	stocklist: list,
+	n_stockcodes: int,
+	criteria: Any,
+	flow_column: str = "netval",
+	) -> list[str]:
+	"""Rank VWAP members by net flow direction without changing membership."""
+	candidate_data = data.loc[data.index.get_level_values("code").isin(stocklist)]
+	flow = (
+		candidate_data[flow_column]
+		.groupby(level="code")
+		.sum()
+		.astype(float)
+		.to_frame("mf")
+	)
+	return rank_flow_candidates(
+		flow,
+		n_stockcodes,
+		ascending=_criteria_value(criteria) == "vwap_breakdown",
+	).index.tolist()
+
+
+VPROFILE_UPWARD_EVENTS = {"vprofile_breakout", "vprofile_support_bounce"}
+VPROFILE_DOWNWARD_EVENTS = {"vprofile_breakdown", "vprofile_resistance_rejection"}
+
+
+def rank_vprofile_candidates(
+	candidates: pd.DataFrame,
+	criteria: Any,
+	n_stockcodes: int,
+	) -> pd.DataFrame:
+	"""Rank annotated volume-profile candidates before truncating the result."""
+	criteria_value = _criteria_value(criteria)
+	if criteria_value == "vprofile_inside" or criteria_value in VPROFILE_UPWARD_EVENTS:
+		mf_ascending = False
+	elif criteria_value in VPROFILE_DOWNWARD_EVENTS:
+		mf_ascending = True
+	else:
+		raise ValueError(f"Invalid screener_vprofile_criteria: {criteria}")
+	return _stable_sort_frame(
+		candidates,
+		["vprofile_zone_prominence", "vprofile_zone_strength", "mf"],
+		[False, False, mf_ascending],
+	).head(n_stockcodes)
+
+
 # ==========
 # Volume profile criteria
 # ==========
