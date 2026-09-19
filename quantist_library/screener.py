@@ -258,6 +258,15 @@ def vprofile_behavior_codes(annotations: pd.DataFrame, behavior: str) -> list[st
 	return annotations.index[annotations["vprofile_zone_behavior"] == behavior].tolist()
 
 
+def vprofile_role_behavior_codes(annotations: pd.DataFrame, role: str, behavior: str) -> list[str]:
+	"""Codes whose current reading observed exactly this role and behavior."""
+	selected = (
+		(annotations["vprofile_zone_role"] == role)
+		& (annotations["vprofile_zone_behavior"] == behavior)
+	)
+	return annotations.index[selected].tolist()
+
+
 async def vprofile_breakout(data: pd.DataFrame, checking_period: int) -> list[str]:
 	"""
 	Codes that broke out above the zone they were working on.
@@ -288,11 +297,27 @@ async def vprofile_breakdown(data: pd.DataFrame, checking_period: int) -> list[s
 	return vprofile_behavior_codes(await vprofile_annotations(data, checking_period), "breakdown")
 
 
+async def vprofile_support_bounce(data: pd.DataFrame, checking_period: int) -> list[str]:
+	"""Codes that touched support and closed back above it, confirming a bounce."""
+	return vprofile_role_behavior_codes(
+		await vprofile_annotations(data, checking_period), "support", "rejection"
+	)
+
+
+async def vprofile_resistance_rejection(data: pd.DataFrame, checking_period: int) -> list[str]:
+	"""Codes that touched resistance and closed back below it, confirming rejection."""
+	return vprofile_role_behavior_codes(
+		await vprofile_annotations(data, checking_period), "resistance", "rejection"
+	)
+
+
 # Keyed by dp.ScreenerList value; screener.py stays free of the dependencies import.
 VPROFILE_CRITERIA = {
 	"vprofile_inside": vprofile_stocklist,
 	"vprofile_breakout": vprofile_breakout,
 	"vprofile_breakdown": vprofile_breakdown,
+	"vprofile_support_bounce": vprofile_support_bounce,
+	"vprofile_resistance_rejection": vprofile_resistance_rejection,
 }
 
 

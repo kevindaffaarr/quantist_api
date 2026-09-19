@@ -99,6 +99,8 @@ class ScreenerList(str, Enum):
 	vprofile_inside = "vprofile_inside"
 	vprofile_breakout = "vprofile_breakout"
 	vprofile_breakdown = "vprofile_breakdown"
+	vprofile_support_bounce = "vprofile_support_bounce"
+	vprofile_resistance_rejection = "vprofile_resistance_rejection"
 
 class HoldingSectors(str, Enum):
 	# Dictionary:

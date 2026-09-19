@@ -1062,6 +1062,8 @@ class ScreenerVProfile(ScreenerBase):
 			dp.ScreenerList.vprofile_inside,
 			dp.ScreenerList.vprofile_breakout,
 			dp.ScreenerList.vprofile_breakdown,
+		dp.ScreenerList.vprofile_support_bounce,
+		dp.ScreenerList.vprofile_resistance_rejection,
 			] = dp.ScreenerList.vprofile_inside,
 		dbs: db.Session = next(db.get_dbs())
 		) -> None:

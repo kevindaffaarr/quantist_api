@@ -267,6 +267,7 @@ def _behavior_annotations() -> pd.DataFrame:
 		"acc": ("resistance", "acceptance"),
 		"tst": ("support", "test"),
 		"rej": ("support", "rejection"),		# role, but price never left the zone
+		"resrej": ("resistance", "rejection"),
 		"und": ("resistance", "undetermined"),	# role, nothing else observed
 	}
 	return pd.DataFrame(
@@ -281,7 +282,13 @@ def test_vprofile_behavior_codes_selects_only_the_named_behavior(behavior, expec
 	selected = sc.vprofile_behavior_codes(_behavior_annotations(), behavior)
 	assert selected == expected
 	# Sitting in a zone is not a signal, and neither is carrying a role on its own.
-	assert not {"acc", "tst", "rej", "und"} & set(selected)
+	assert not {"acc", "tst", "rej", "resrej", "und"} & set(selected)
+
+
+def test_vprofile_role_behavior_codes_selects_only_the_exact_role_and_behavior():
+	annotations = _behavior_annotations()
+	assert sc.vprofile_role_behavior_codes(annotations, "support", "rejection") == ["rej"]
+	assert sc.vprofile_role_behavior_codes(annotations, "resistance", "rejection") == ["resrej"]
 
 
 def _behavior_universe() -> pd.DataFrame:
@@ -291,6 +298,7 @@ def _behavior_universe() -> pd.DataFrame:
 		"dwn": (100.0, 88.0, 80.0),		# came down onto the zone and left below it
 		"acc": (),						# still sitting inside its zone
 		"rej": (104.0, 125.0, 140.0),	# touched and turned back: role only, no break
+		"resrej": (90.0, 108.0, 95.0),	# touched resistance and closed back below it
 	}
 	return pd.concat([_vprofile_frame(code, tail) for code, tail in tails.items()])
 
@@ -304,14 +312,22 @@ def test_vprofile_criteria_read_the_behavior_not_the_membership():
 	assert breakout == ["brk"]
 	assert breakdown == ["dwn"]
 	assert annotations.loc[breakout + breakdown, "vprofile_zone_behavior"].tolist() == ["breakout_up", "breakdown"]
-	# All four touched a zone: membership is the wider set the signals are read out of.
-	assert set(asyncio.run(sc.vprofile_stocklist(data, 3))) == {"brk", "dwn", "acc", "rej"}
+	# Every code touched a zone: membership is the wider set the signals are read out of.
+	assert set(asyncio.run(sc.vprofile_stocklist(data, 3))) == {"brk", "dwn", "acc", "rej", "resrej"}
+
+
+def test_vprofile_support_bounce_and_resistance_rejection_select_exact_readings():
+	data = _behavior_universe()
+	assert asyncio.run(sc.vprofile_support_bounce(data, 3)) == ["rej"]
+	assert asyncio.run(sc.vprofile_resistance_rejection(data, 3)) == ["resrej"]
 
 
 @pytest.mark.parametrize("criteria, expected", [
-	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
+	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej", "resrej"]),
 	(dp.ScreenerList.vprofile_breakout, ["brk"]),
 	(dp.ScreenerList.vprofile_breakdown, ["dwn"]),
+	(dp.ScreenerList.vprofile_support_bounce, ["rej"]),
+	(dp.ScreenerList.vprofile_resistance_rejection, ["resrej"]),
 ])
 def test_vprofile_criteria_stocklist_dispatches_on_the_enum(criteria, expected):
 	assert sorted(asyncio.run(sc.vprofile_criteria_stocklist(_behavior_universe(), 3, criteria))) == expected
@@ -323,9 +339,11 @@ def test_vprofile_criteria_stocklist_rejects_an_unknown_criterion():
 
 
 @pytest.mark.parametrize("criteria, expected", [
-	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
+	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej", "resrej"]),
 	(dp.ScreenerList.vprofile_breakout, ["brk"]),
 	(dp.ScreenerList.vprofile_breakdown, ["dwn"]),
+	(dp.ScreenerList.vprofile_support_bounce, ["rej"]),
+	(dp.ScreenerList.vprofile_resistance_rejection, ["resrej"]),
 ])
 def test_foreign_vprofile_screener_selects_on_the_requested_criterion(criteria, expected):
 	screener = object.__new__(ff.ScreenerVProfile)
@@ -336,9 +354,11 @@ def test_foreign_vprofile_screener_selects_on_the_requested_criterion(criteria, 
 
 
 @pytest.mark.parametrize("criteria, expected", [
-	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej"]),
+	(dp.ScreenerList.vprofile_inside, ["acc", "brk", "dwn", "rej", "resrej"]),
 	(dp.ScreenerList.vprofile_breakout, ["brk"]),
 	(dp.ScreenerList.vprofile_breakdown, ["dwn"]),
+	(dp.ScreenerList.vprofile_support_bounce, ["rej"]),
+	(dp.ScreenerList.vprofile_resistance_rejection, ["resrej"]),
 ])
 def test_broker_vprofile_screener_selects_on_the_requested_criterion(criteria, expected):
 	screener = object.__new__(bf.ScreenerVProfile)
@@ -366,7 +386,13 @@ def test_vprofile_routes_expose_the_criterion_as_an_optional_query_parameter(pat
 	assert criterion["in"] == "query"
 	assert criterion["required"] is False
 	assert criterion["schema"]["default"] == "vprofile_inside"
-	assert set(criterion["schema"]["enum"]) == {"vprofile_inside", "vprofile_breakout", "vprofile_breakdown"}
+	assert set(criterion["schema"]["enum"]) == {
+		"vprofile_inside",
+		"vprofile_breakout",
+		"vprofile_breakdown",
+		"vprofile_support_bounce",
+		"vprofile_resistance_rejection",
+	}
 
 
 def _broker_frame() -> tuple[pd.DataFrame, pd.DataFrame]:

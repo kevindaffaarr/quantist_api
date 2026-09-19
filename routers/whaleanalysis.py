@@ -841,7 +841,7 @@ async def get_screener_broker_vwap(
 @router.get("/screener/foreign/vprofile", status_code=status.HTTP_200_OK, tags=[Tags.screener.name])
 @timeit
 async def get_screener_foreign_vprofile(
-	screener_vprofile_criteria: Literal[dp.ScreenerList.vprofile_inside,dp.ScreenerList.vprofile_breakout,dp.ScreenerList.vprofile_breakdown] = dp.ScreenerList.vprofile_inside,
+	screener_vprofile_criteria: Literal[dp.ScreenerList.vprofile_inside,dp.ScreenerList.vprofile_breakout,dp.ScreenerList.vprofile_breakdown,dp.ScreenerList.vprofile_support_bounce,dp.ScreenerList.vprofile_resistance_rejection] = dp.ScreenerList.vprofile_inside,
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date = datetime.date.today(),
@@ -894,7 +894,7 @@ async def get_screener_foreign_vprofile(
 @router.get("/screener/broker/vprofile", status_code=status.HTTP_200_OK, tags=[Tags.screener.name])
 @timeit
 async def get_screener_broker_vprofile(
-	screener_vprofile_criteria: Literal[dp.ScreenerList.vprofile_inside,dp.ScreenerList.vprofile_breakout,dp.ScreenerList.vprofile_breakdown] = dp.ScreenerList.vprofile_inside,
+	screener_vprofile_criteria: Literal[dp.ScreenerList.vprofile_inside,dp.ScreenerList.vprofile_breakout,dp.ScreenerList.vprofile_breakdown,dp.ScreenerList.vprofile_support_bounce,dp.ScreenerList.vprofile_resistance_rejection] = dp.ScreenerList.vprofile_inside,
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
 	enddate: datetime.date = datetime.date.today(),
