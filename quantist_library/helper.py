@@ -2,7 +2,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
-from sklearn.preprocessing import MinMaxScaler
 import polars as pl
 import datetime
 
@@ -49,9 +48,22 @@ class Bin():
 		"""
 		data_close:pd.Series = self.data['close'].astype(float)
 
-		self.nbins = await self.calc_nbins() if nbins is None else nbins
-		self.size = (data_close.max()-data_close.min())/self.nbins
-		self.bins_range = pd.Series(np.arange(data_close.min()-self.size,data_close.max()+self.size,self.size))
+		self.nbins = max(1, int(await self.calc_nbins() if nbins is None else nbins))
+		data_min = float(data_close.min())
+		data_max = float(data_close.max())
+		data_range = data_max - data_min
+		if data_range <= 0 or not np.isfinite(data_range):
+			# A constant price still gets one usable interval for charting and
+			# profile fallback selection; zero-width bins cannot be cut.
+			self.size = max(abs(data_min) * 1e-6, 1e-6)
+			self.bins_range = pd.Series([data_min - self.size, data_max + self.size])
+		else:
+			self.size = data_range / self.nbins
+			self.bins_range = pd.Series(np.arange(
+				data_min - self.size,
+				data_max + self.size,
+				self.size,
+			))
 		self.hist_bar = self.data.groupby(pd.cut(data_close.to_numpy(),bins=self.bins_range))['netval'].sum() # type:ignore
 		self.bins_mid = self.bins_range + self.size/2
 		self.peaks_index = await self.calc_peaks_index(self.hist_bar)
@@ -67,47 +79,60 @@ class Bin():
 		n = len(self.data["netval"])
 		# Calculate the bin width
 		bin_width = 2*iqr/(n**(1/3))
-		if bin_width == 0:
+		if not np.isfinite(bin_width) or bin_width <= 0:
 			return 1
 		# Calculate the number of nbins
 		data_range = data_close.max() - data_close.min()
 		nbins = int(data_range/bin_width)
-		return nbins
+		return max(1, nbins)
 	
 	async def calc_peaks_index(self, hist_bar:pd.Series) -> list:
 		"""
-		Find the maxima and minima of the histogram
-		returns list of maxima and minima
+		Find significant positive peaks and negative-flow valleys.
+
+		Each sign is masked onto the original bin axis, so an empty or
+		opposite-sign bin remains a separator rather than disappearing from
+		the neighbourhood used by ``find_peaks``. A local node is significant
+		when its raw prominence clears both 10% of the strongest absolute
+		histogram value and twice the median absolute deviation of its masked
+		flow. If there are no local extrema, the strongest absolute bin is
+		retained as a deterministic fallback.
 		"""
-		hist_bar = hist_bar.reset_index(drop=True)
-		# Split scaling for positive and negative values
-		hist_bar_pos = hist_bar[hist_bar>=0].to_numpy().reshape(-1,1)
-		hist_bar_neg = hist_bar[hist_bar<0].to_numpy().reshape(-1,1)
-		
-		peaks = []
-		valleys = []
-		scaler = MinMaxScaler()
-		if len(hist_bar_pos)>0:
-			# Scale the data
-			hist_bar_pos = scaler.fit_transform(hist_bar_pos)
-			# Find peaks and valleys
-			peaks, _ = find_peaks(x=hist_bar_pos.flatten(), prominence=0.1)
-			# if peaks or valleys is empty, return max value from hist_bar_pos or hist_bar_neg
-			if len(peaks) == 0:
-				peaks = [np.argmax(hist_bar_pos).item()]
+		values = pd.to_numeric(hist_bar.reset_index(drop=True), errors="coerce")
+		values = values.fillna(0.0).to_numpy(dtype=float, copy=True)
+		values[~np.isfinite(values)] = 0.0
+		if len(values) == 0:
+			return []
 
-		if len(hist_bar_neg)>0:
-			hist_bar_neg = scaler.fit_transform(-hist_bar_neg)
-			valleys, _ = find_peaks(x=hist_bar_neg.flatten(), prominence=0.1)
-			if len(valleys) == 0:
-				valleys = [np.argmax(hist_bar_neg).item()]
-		
-		# Find the index of peaks and valleys from the original data
-		peaks_ori = hist_bar[hist_bar>=0].index[peaks].to_list()
-		valleys_ori = hist_bar[hist_bar<0].index[valleys].to_list()
+		absolute_values = np.abs(values)
+		strongest = float(absolute_values.max())
+		if strongest <= 0:
+			return []
+		minimum_prominence = strongest * 0.1
+		candidates: list[int] = []
+		has_local_extrema = False
+		for flow in (
+			np.where(values > 0, values, 0.0),
+			np.where(values < 0, -values, 0.0),
+		):
+			flow_median = float(np.median(flow))
+			flow_mad = float(np.median(np.abs(flow - flow_median)))
+			prominence_threshold = max(minimum_prominence, 2 * flow_mad)
+			local, properties = find_peaks(flow, prominence=0)
+			if len(local):
+				has_local_extrema = True
+				prominences = properties["prominences"] if "prominences" in properties else np.zeros(len(local))
+				candidates.extend(
+					int(index)
+					for index, prominence in zip(local, prominences)
+					if prominence >= prominence_threshold
+				)
 
-		# Return the sorted peaks and valleys
-		return sorted(peaks_ori + valleys_ori)
+		if candidates:
+			return sorted(set(candidates))
+		if not has_local_extrema:
+			return [int(np.argmax(absolute_values))]
+		return []
 
 def pl_to_pandas(df: pl.DataFrame) -> pd.DataFrame:
 	"""
