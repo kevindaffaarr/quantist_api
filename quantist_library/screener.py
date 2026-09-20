@@ -131,11 +131,19 @@ def _stable_sort_frame(
 
 def rank_flow_candidates(
 	candidates: pd.DataFrame,
-	n_stockcodes: int,
+	n_stockcodes: int | None,
 	ascending: bool = False,
 	) -> pd.DataFrame:
-	"""Rank total flow, using code ascending as the deterministic tie-break."""
-	return _stable_sort_frame(candidates, ["mf"], [ascending]).head(n_stockcodes)
+	"""
+	Rank total flow, using code ascending as the deterministic tie-break.
+
+	``n_stockcodes=None`` means every candidate. The web surface caches a
+	criterion's whole answer; Telegram wants the top ten. Both come through
+	here, so "all" is an explicit value rather than a number large enough to
+	look like all — which is the same truncation bug one order of magnitude
+	later. ``iloc[:None]`` is the whole frame, so the ranking is untouched.
+	"""
+	return _stable_sort_frame(candidates, ["mf"], [ascending]).iloc[:n_stockcodes]
 
 
 def _vwap_event_metrics(data: pd.DataFrame, above: bool) -> pd.DataFrame:
@@ -160,11 +168,15 @@ def _vwap_event_metrics(data: pd.DataFrame, above: bool) -> pd.DataFrame:
 def rank_vwap_candidates(
 	data: pd.DataFrame,
 	stocklist: list,
-	n_stockcodes: int,
+	n_stockcodes: int | None,
 	criteria: Any,
 	flow_column: str = "netval",
 	) -> list[str]:
-	"""Rank VWAP members by price location or event freshness, not money flow."""
+	"""
+	Rank VWAP members by price location or event freshness, not money flow.
+
+	``n_stockcodes=None`` means every member; see rank_flow_candidates.
+	"""
 	# ``flow_column`` remains accepted for caller compatibility; VWAP ordering is
 	# intentionally based on close/vwap price data only.
 	_ = flow_column
@@ -174,10 +186,10 @@ def rank_vwap_candidates(
 	latest["price_gap_pct"] = (latest["close"] - latest["vwap"]) / latest["vwap"] * 100
 
 	if criteria_value == "vwap_rally":
-		return _stable_sort_frame(latest, ["price_gap_pct"], [False]).head(n_stockcodes).index.tolist()
+		return _stable_sort_frame(latest, ["price_gap_pct"], [False]).iloc[:n_stockcodes].index.tolist()
 	if criteria_value == "vwap_around":
 		latest["abs_price_gap_pct"] = latest["price_gap_pct"].abs()
-		return _stable_sort_frame(latest, ["abs_price_gap_pct"], [True]).head(n_stockcodes).index.tolist()
+		return _stable_sort_frame(latest, ["abs_price_gap_pct"], [True]).iloc[:n_stockcodes].index.tolist()
 	if criteria_value not in {"vwap_breakout", "vwap_breakdown"}:
 		raise ValueError(f"Invalid screener_vwap_criteria: {criteria}")
 
@@ -188,7 +200,7 @@ def rank_vwap_candidates(
 		ranked,
 		["cross_age", "abs_price_gap_pct", "follow_through"],
 		[True, True, False],
-	).head(n_stockcodes).index.tolist()
+	).iloc[:n_stockcodes].index.tolist()
 
 
 VPROFILE_UPWARD_EVENTS = {"vprofile_breakout", "vprofile_support_bounce"}
@@ -198,9 +210,13 @@ VPROFILE_DOWNWARD_EVENTS = {"vprofile_breakdown", "vprofile_resistance_rejection
 def rank_vprofile_candidates(
 	candidates: pd.DataFrame,
 	criteria: Any,
-	n_stockcodes: int,
+	n_stockcodes: int | None,
 	) -> pd.DataFrame:
-	"""Rank annotated volume-profile candidates before truncating the result."""
+	"""
+	Rank annotated volume-profile candidates before truncating the result.
+
+	``n_stockcodes=None`` means every candidate; see rank_flow_candidates.
+	"""
 	criteria_value = _criteria_value(criteria)
 	if criteria_value == "vprofile_inside" or criteria_value in VPROFILE_UPWARD_EVENTS:
 		mf_ascending = False
@@ -212,7 +228,7 @@ def rank_vprofile_candidates(
 		candidates,
 		["vprofile_zone_prominence", "vprofile_zone_strength", "mf"],
 		[False, False, mf_ascending],
-	).head(n_stockcodes)
+	).iloc[:n_stockcodes]
 
 
 # ==========

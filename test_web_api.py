@@ -10,6 +10,7 @@ statically. What must not drift:
 	* the web route sits behind the same API key as everything else, so the
 	  browser can never be the direct caller.
 """
+import asyncio
 import datetime
 import json
 from typing import Any
@@ -245,3 +246,127 @@ def test_screener_catalog_is_json_safe():
 	assert json.dumps(raw)
 	assert raw["screeners"][0]["label"] == "Rally"
 	assert raw["screeners"][0]["group"] == "VWAP"
+
+
+# ==========
+# The web screener returns everything
+# ==========
+def test_the_web_screener_route_has_no_row_cap():
+	# The bug this replaces: the route declared `n_stockcodes: int = 10`, so
+	# the browser and the EOD cache only ever saw the top ten of a criterion
+	# that might match hundreds.
+	parameters = {entry["name"]: entry for entry in PATHS["/web-api/v1/screener/{slug}"]["get"]["parameters"]}
+	assert "n_stockcodes" not in parameters, "the web route must not expose a row cap at all"
+
+
+def test_the_legacy_screener_routes_keep_their_top_ten_default():
+	# Telegram depends on these. Widening them would change every command.
+	for path in (
+		"/whaleanalysis/screener/foreign/top-money-flow",
+		"/whaleanalysis/screener/foreign/vwap",
+		"/whaleanalysis/screener/foreign/vprofile",
+		"/whaleanalysis/screener/broker/top-money-flow",
+		"/whaleanalysis/screener/broker/vwap",
+		"/whaleanalysis/screener/broker/vprofile",
+	):
+		parameters = {entry["name"]: entry for entry in PATHS[path]["get"]["parameters"]}
+		assert parameters["n_stockcodes"]["schema"]["default"] == 10
+
+
+@pytest.mark.parametrize("slug", [entry.value for entry in dp.ScreenerList])
+@pytest.mark.parametrize("method", [dp.AnalysisMethod.broker, dp.AnalysisMethod.foreign])
+def test_every_slug_and_method_builds_an_unbounded_screener(slug, method):
+	# _screener_object is the only place the web route can set a cap, and it
+	# must pass None through for every family.
+	screener = web_api._screener_object(slug, method, None, datetime.date(2026, 9, 18))
+	assert screener.n_stockcodes is None
+
+
+def test_the_legacy_default_still_reaches_the_library_when_asked():
+	screener = web_api._screener_object("vwap_rally", dp.AnalysisMethod.broker, 10, datetime.date(2026, 9, 18))
+	assert screener.n_stockcodes == 10
+
+
+# ==========
+# The whole list reaches the browser
+# ==========
+ROWS = 900
+
+
+def _wide_screener_frame(rows: int = ROWS) -> pd.DataFrame:
+	"""A screener answer far wider than the old top ten, already in rank order."""
+	return pd.DataFrame(
+		{
+			"close": [1000.0 + position for position in range(rows)],
+			"mf": [float(rows - position) * 1e9 for position in range(rows)],
+			"prop": [0.5 - position / (rows * 10) for position in range(rows)],
+		},
+		index=pd.Index([f"s{position:04d}" for position in range(rows)], name="code"),
+	)
+
+
+class _StubScreener:
+	"""A screened object: the attributes the route reads, nothing else."""
+
+	def __init__(self, frame: pd.DataFrame):
+		self.top_stockcodes = frame
+		self.startdate = datetime.date(2026, 6, 18)
+		self.enddate = datetime.date(2026, 9, 18)
+		self.bar_range = 5
+
+	async def screen(self):
+		return self
+
+
+def _call_route(monkeypatch, frame: pd.DataFrame, seen: dict[str, Any]):
+	def fake_screener_object(slug, method, n_stockcodes, enddate):
+		seen["n_stockcodes"] = n_stockcodes
+		return _StubScreener(frame)
+
+	monkeypatch.setattr(web_api, "_screener_object", fake_screener_object)
+	return asyncio.run(web_api.get_web_screener_results(dp.ScreenerList.vwap_rally, dp.AnalysisMethod.broker))
+
+
+def test_every_row_of_a_nine_hundred_row_screener_reaches_the_web_response(monkeypatch):
+	# The regression in one test: 900 candidates in, 900 rows out, ranked
+	# 1..900 in the screener's own order. A route that caps at ten fails here
+	# on the first assert.
+	frame = _wide_screener_frame()
+	seen: dict[str, Any] = {}
+
+	payload = _call_route(monkeypatch, frame, seen)
+
+	assert seen["n_stockcodes"] is None, "the web route must ask the library for every candidate"
+	assert payload.count == ROWS
+	assert len(payload.rows) == ROWS
+	assert [row.rank for row in payload.rows] == list(range(1, ROWS + 1))
+	assert [row.code for row in payload.rows] == list(frame.index)
+
+
+@pytest.mark.parametrize("position", [11, 120, 137, 500, ROWS])
+def test_a_row_past_the_old_top_ten_arrives_with_its_rank_intact(monkeypatch, position):
+	frame = _wide_screener_frame()
+	seen: dict[str, Any] = {}
+
+	payload = _call_route(monkeypatch, frame, seen)
+	row = payload.rows[position - 1]
+
+	assert row.rank == position
+	assert row.code == f"s{position - 1:04d}"
+	assert row.money_flow == pytest.approx(frame.iloc[position - 1]["mf"])
+	assert row.close == pytest.approx(frame.iloc[position - 1]["close"])
+
+
+def test_the_serialized_body_carries_the_deep_rows_and_their_ranks(monkeypatch):
+	# Rank has to survive Pydantic serialization too: this is the JSON the
+	# worker caches and the browser reads.
+	frame = _wide_screener_frame()
+	seen: dict[str, Any] = {}
+
+	raw = _call_route(monkeypatch, frame, seen).model_dump(mode="json")
+
+	assert json.dumps(raw)
+	assert raw["count"] == ROWS == len(raw["rows"])
+	assert raw["rows"][119] == {**raw["rows"][119], "rank": 120, "code": "s0119"}
+	assert raw["rows"][-1]["rank"] == ROWS
+	assert [entry["rank"] for entry in raw["rows"]] == sorted(entry["rank"] for entry in raw["rows"])
