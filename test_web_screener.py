@@ -133,3 +133,41 @@ def test_results_serialize_to_json_with_native_scalars():
 def test_an_unknown_slug_is_rejected_rather_than_guessed():
 	with pytest.raises(ValueError):
 		_results(slug="not_a_screener")
+
+
+# ==========
+# Rank preservation
+# ==========
+def test_every_row_carries_its_rank_from_the_screener_order():
+	# The screener already ranked these; the contract records that position so
+	# the browser can sort back to it after the user sorts by something else.
+	rows = _results().rows
+	assert [row.rank for row in rows] == [1, 2]
+	assert [row.code for row in rows] == ["composite", "bbri"]
+
+
+def test_rank_follows_the_source_frame_and_is_never_re_sorted():
+	frame = _frame()
+	# Deliberately out of value order: the screener's own ordering wins.
+	reversed_frame = frame.iloc[::-1]
+	rows = _results(frame=reversed_frame).rows
+
+	assert [row.code for row in rows] == ["bbri", "composite"]
+	assert [row.rank for row in rows] == [1, 2]
+	# bbri is rank 1 here purely because the screener put it first.
+	assert rows[0].money_flow == pytest.approx(4.2e10)
+
+
+def test_rank_starts_at_one_and_has_no_gaps():
+	frame = pd.concat([_frame()] * 3)
+	frame.index = pd.Index([f"code{index}" for index in range(6)], name="code")
+	assert [row.rank for row in _results(frame=frame).rows] == [1, 2, 3, 4, 5, 6]
+
+
+def test_numeric_fields_are_never_preformatted():
+	raw = _results().model_dump(mode="json")
+	for row in raw["rows"]:
+		assert isinstance(row["rank"], int)
+		for field in ("close", "money_flow", "proportion", "price_correlation", "vwap"):
+			assert row[field] is None or isinstance(row[field], (int, float))
+			assert not isinstance(row[field], str)

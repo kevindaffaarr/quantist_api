@@ -218,7 +218,13 @@ class ScreenerRow(BaseModel):
 	every criterion shares are named fields and everything else rides in
 	`extras`. Dropping the rest would lose the volume-profile annotations that
 	are the whole point of those criteria.
+
+	`rank` records the screener's own ordering. The screener already sorted
+	these — by flow, by cross freshness, by node prominence, depending on the
+	criterion — and that ordering is the answer. Recording it means a client
+	can sort by any column and still get back to what the screener said.
 	"""
+	rank: int
 	code: str
 	display_name: str
 	close: float | None = None
@@ -340,7 +346,9 @@ def build_screener_results(
 	info = metadata or {}
 	rows: list[ScreenerRow] = []
 	if frame is not None and not frame.empty:
-		for code, record in frame.to_dict(orient="index").items():
+		# enumerate over the frame as given: the row order IS the ranking, so
+		# nothing here re-sorts and nothing renumbers.
+		for position, (code, record) in enumerate(frame.to_dict(orient="index").items(), start=1):
 			instrument = resolve_instrument(str(code))
 			named: dict[str, float | None] = {}
 			extras: dict[str, float | str | bool | None] = {}
@@ -351,6 +359,7 @@ def build_screener_results(
 				else:
 					extras[str(column)] = _scalar(value)
 			rows.append(ScreenerRow(
+				rank=position,
 				code=instrument.code,
 				display_name=instrument.display_name,
 				extras=extras,
