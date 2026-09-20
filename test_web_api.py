@@ -208,41 +208,22 @@ def test_the_worker_forwards_exactly_the_parameters_this_route_accepts():
 
 
 # ==========
-# Instrument catalogue and screener metadata
+# Screener metadata
 # ==========
-def test_the_catalogue_and_screener_routes_are_registered_behind_the_same_key():
+def test_the_screener_routes_are_registered_behind_the_same_key():
 	def scheme_names(path):
 		return {name for op in PATHS[path].values() for requirement in op.get("security", []) for name in requirement}
 
-	for path in ("/web-api/v1/instruments", "/web-api/v1/screeners"):
+	for path in ("/web-api/v1/screeners", "/web-api/v1/screener/{slug}"):
 		assert path in PATHS
 		assert scheme_names(path) == scheme_names("/whaleanalysis/chart")
 
 
-def test_instrument_list_resolves_display_names_through_the_chart_resolver():
-	listing = wc.build_instrument_list("stock", ["BBRI", "ANTM", "composite"])
-
-	assert listing.category == "stock"
-	assert listing.count == 3
-	# Sorted by code, so the dropdown order does not depend on the query plan.
-	assert [item.code for item in listing.instruments] == ["antm", "bbri", "composite"]
-	composite = listing.instruments[-1]
-	assert composite.display_name == "IHSG / COMPOSITE"
-	assert composite.kind == "index"
-	assert listing.instruments[0].display_name == "ANTM"
-
-
-def test_instrument_list_de_duplicates_through_the_alias_table():
-	listing = wc.build_instrument_list("index", ["IHSG", "composite", "ihsg", "bbri"])
-	assert [item.code for item in listing.instruments] == ["bbri", "composite"]
-	assert listing.count == 2
-
-
-def test_an_empty_instrument_list_is_empty_not_an_error():
-	listing = wc.build_instrument_list("broker", [])
-	assert listing.count == 0
-	assert listing.instruments == []
-	assert listing.schema_version == wc.SCHEMA_VERSION
+def test_the_browser_reads_code_lists_from_the_existing_param_route():
+	# The worker proxies /param/list/{category} for the dropdown; no second
+	# catalogue endpoint is part of that path.
+	assert "/param/list/{list_category}" in PATHS
+	assert "/web-api/v1/instruments" not in PATHS
 
 
 def test_screener_catalog_covers_every_backend_criterion():

@@ -185,23 +185,8 @@ class Meta(BaseModel):
 
 
 # ==========
-# Instrument catalogue and screener metadata
+# Screener metadata and results
 # ==========
-class InstrumentListItem(BaseModel):
-	"""One row of the instrument dropdown, already resolved for display."""
-	code: str
-	symbol: str
-	display_name: str
-	kind: Literal["index", "stock"]
-
-
-class InstrumentList(BaseModel):
-	schema_version: str = SCHEMA_VERSION
-	category: Literal["stock", "index", "broker"]
-	count: int
-	instruments: list[InstrumentListItem] = []
-
-
 class ScreenerDefinition(BaseModel):
 	"""
 	What a screener is, and where its results come from.
@@ -386,38 +371,14 @@ def build_screener_results(
 	)
 
 
-def build_instrument_list(category: str, codes: Iterable[str]) -> InstrumentList:
-	"""
-	Database codes to the dropdown contract. Pure: rows in, models out.
-
-	Every code goes through the same resolver the chart route uses, so the
-	dropdown and the chart agree on COMPOSITE/IHSG without a second table.
-	"""
-	items: list[InstrumentListItem] = []
-	seen: set[str] = set()
-	for raw in codes:
-		instrument = resolve_instrument(str(raw))
-		if instrument.code in seen:
-			continue
-		seen.add(instrument.code)
-		items.append(InstrumentListItem(
-			code=instrument.code,
-			symbol=instrument.symbol,
-			display_name=instrument.display_name,
-			kind=instrument.kind,
-		))
-	items.sort(key=lambda item: item.code)
-	return InstrumentList(category=category, count=len(items), instruments=items)  # type: ignore[arg-type]
-
-
 def build_screener_catalog(slugs: Iterable[str]) -> ScreenerCatalog:
 	"""
 	Screener metadata from the backend's own ScreenerList values.
 
-	Deliberately metadata only: the criteria are real and the legacy endpoint
-	that answers them is named, but `web_results_available` stays False until
-	a typed web-api result contract exists. A client that renders this cannot
-	accidentally present a criterion as a result.
+	Each entry names the browser-facing results route, the legacy route
+	Telegram still uses, and whether the typed results can be fetched. The
+	criteria come from ScreenerList, so this cannot drift from what the
+	backend supports.
 	"""
 	definitions: list[ScreenerDefinition] = []
 	for slug in slugs:
@@ -555,12 +516,10 @@ __all__ = [
 	"DEFAULT_INSTRUMENT",
 	"SCHEMA_VERSION",
 	"Instrument",
-	"InstrumentList",
 	"ScreenerResults",
 	"ScreenerCatalog",
 	"WebChart",
 	"SCREENER_FAMILY",
-	"build_instrument_list",
 	"build_screener_results",
 	"build_screener_catalog",
 	"build_web_chart",
