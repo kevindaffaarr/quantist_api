@@ -55,6 +55,11 @@ class Tags(Enum):
 		description="Return full data of processed indicator from analysis in json format transformed from pandas dataframe",
 		external_docs=None
 		)
+	web = MetadataTag(
+		name="web",
+		description="Versioned semantic chart contract for the Quantist web frontend: layers and metrics as numbers, no chart-library option syntax",
+		external_docs=None
+		)
 
 # ==========
 # Parameter Class

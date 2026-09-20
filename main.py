@@ -12,7 +12,7 @@ from fastapi_globals import g, GlobalsMiddleware
 
 load_dotenv()
 
-from routers import whaleanalysis, param
+from routers import whaleanalysis, param, web_api
 from dependencies import Tags
 
 from auth import get_api_key
@@ -97,6 +97,7 @@ app.add_middleware(GlobalsMiddleware)
 # INCLUDE ROUTER
 app.include_router(whaleanalysis.router, dependencies=[Depends(get_api_key)])
 app.include_router(param.router, dependencies=[Depends(get_api_key)])
+app.include_router(web_api.router, dependencies=[Depends(get_api_key)])
 
 if __name__ == "__main__":
 	uvicorn.run("main:app", host="127.0.0.1", port=8000)
