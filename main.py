@@ -7,18 +7,15 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import ORJSONResponse
 from fastapi_globals import g, GlobalsMiddleware
 
 load_dotenv()
 
-from routers import whaleanalysis, param, web
+from routers import whaleanalysis, param
 from dependencies import Tags
 
 from auth import get_api_key
-from lib import timeit
-
 import database as db
 
 # Ignore FutureWarning, DeprecationWarning
@@ -97,18 +94,9 @@ app.add_middleware(
 )
 app.add_middleware(GlobalsMiddleware)
 
-app.mount("/static", StaticFiles(directory="pages/static"), name="static")
-
 # INCLUDE ROUTER
 app.include_router(whaleanalysis.router, dependencies=[Depends(get_api_key)])
 app.include_router(param.router, dependencies=[Depends(get_api_key)])
-app.include_router(web.router)
-
-@app.get("")
-@app.get("/")
-@timeit
-async def home():
-	return RedirectResponse(url="/web")
 
 if __name__ == "__main__":
 	uvicorn.run("main:app", host="127.0.0.1", port=8000)

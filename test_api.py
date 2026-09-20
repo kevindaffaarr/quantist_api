@@ -14,8 +14,6 @@ REQUEST_TIMEOUT_SECONDS = 240
 
 # Create api list from method inside files in routes folder
 PATH = [
-    "/",
-    "/web", "/web/",
     "/param/dataparam",
     "/param/list/stock", "/param/list/broker", "/param/list/index",
     "/whaleanalysis", "/whaleanalysis/",
