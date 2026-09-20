@@ -34,6 +34,9 @@ router = APIRouter(
 # ==========
 # Router
 # ==========
+# Both spellings reach the same handler: with no code at all the default
+# instrument is COMPOSITE, which is what makes the web root a COMPOSITE page.
+@router.get("/chart", status_code=status.HTTP_200_OK, response_model=wc.WebChart, tags=[Tags.web.name])
 @router.get("/chart/{code}", status_code=status.HTTP_200_OK, response_model=wc.WebChart, tags=[Tags.web.name])
 @timeit
 async def get_web_chart(

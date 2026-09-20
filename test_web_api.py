@@ -52,6 +52,13 @@ def test_the_web_route_is_registered_and_versioned():
 	assert "/web-api/v1/chart/{code}" in PATHS
 
 
+def test_the_code_less_route_defaults_to_composite():
+	# The web root is a COMPOSITE page, so the API answers COMPOSITE when asked
+	# for no instrument at all.
+	assert "/web-api/v1/chart" in PATHS
+	assert wc.resolve_instrument(None).code == wc.DEFAULT_INSTRUMENT == "composite"
+
+
 def test_adding_the_web_route_left_every_existing_path_in_place():
 	assert EXISTING_PATHS <= set(PATHS)
 
