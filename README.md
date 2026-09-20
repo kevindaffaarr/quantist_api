@@ -33,6 +33,40 @@ flow), and `vprofile_event_date` (latest close date as `YYYY-MM-DD`). These are
 JSON-safe scalars; all four are `None` when no profile zone is selected. Existing
 zone levels, role, behavior, distance, and touch count remain unchanged.
 
+### Web chart contract (`/web-api/v1/chart/{code}`)
+
+`web_contract.py` is the single source of truth for the semantic chart payload the
+web frontend consumes. It is versioned (`schema_version`, currently `1.0`) and
+deliberately independent of `/whaleanalysis`, which keeps returning rendered Plotly
+figures for Telegram and the existing public API. Nothing in the web contract is
+coupled to a chart library.
+
+Sections: `instrument`, `period`, `summary`, `price`, `indicators`, `profile_zones`,
+`holding_composition`, `annotations`, `meta`.
+
+Guarantees the frontend relies on, pinned by `test_web_contract.py`:
+
+* **Numbers, never formatted strings.** `proportion` is `0.3342`, not `"33.42%"`;
+  `money_flow` is `-1.0e12`, not `"-1.00T"`. Ratios stay ratios (correlations
+  `-1..1`, proportions `0..1`); money and price stay in their native units.
+* **`null` for missing.** NaN and infinity are normalized to `null`; a column the
+  source never produced comes back as an all-`null` series of the right length.
+* **One date axis.** Every `price.*` and `indicators.*` list is aligned
+  index-for-index with `price.dates`, so the frontend never re-joins on date.
+* **ISO dates, explicit timestamp.** Dates are `YYYY-MM-DD`; `meta.generated_at`
+  is a timezone-aware ISO 8601 datetime.
+* **Explicit profile-zone boundaries.** Each zone carries `low`, `high`, `mid`,
+  `net_value` and `is_peak`; a boundary is never implied by a mid point.
+
+`COMPOSITE` and `IHSG` resolve to the same instrument (backend code `composite`,
+`display_name` `"IHSG / COMPOSITE"`). Resolution is case- and whitespace-insensitive,
+and an empty code falls back to `composite`.
+
+Authentication is unchanged: the route is mounted behind the same `X-API-KEY`
+dependency as every other router, so a browser is never the direct caller. The
+frontend repo's Cloudflare worker is the intended caller and holds the key as a
+worker secret.
+
 ### Screener ordering
 
 Money-flow accumulated results rank by total flow descending; distributed results
