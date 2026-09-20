@@ -184,6 +184,45 @@ class Meta(BaseModel):
 	source: str = "quantist_api"
 
 
+# ==========
+# Instrument catalogue and screener metadata
+# ==========
+class InstrumentListItem(BaseModel):
+	"""One row of the instrument dropdown, already resolved for display."""
+	code: str
+	symbol: str
+	display_name: str
+	kind: Literal["index", "stock"]
+
+
+class InstrumentList(BaseModel):
+	schema_version: str = SCHEMA_VERSION
+	category: Literal["stock", "index", "broker"]
+	count: int
+	instruments: list[InstrumentListItem] = []
+
+
+class ScreenerDefinition(BaseModel):
+	"""
+	What a screener is, not what it currently returns.
+
+	`results_endpoint` names the legacy route that produces the list today;
+	`web_results_available` is False until a typed web-api equivalent exists,
+	so a client can show the criterion without implying it has the results.
+	"""
+	slug: str
+	label: str
+	group: str
+	methods: list[AnalysisMethod]
+	results_endpoint: str
+	web_results_available: bool = False
+
+
+class ScreenerCatalog(BaseModel):
+	schema_version: str = SCHEMA_VERSION
+	screeners: list[ScreenerDefinition] = []
+
+
 class WebChart(BaseModel):
 	schema_version: str = SCHEMA_VERSION
 	instrument: Instrument
@@ -200,6 +239,68 @@ class WebChart(BaseModel):
 # ==========
 # Builders
 # ==========
+_SCREENER_GROUPS: dict[str, tuple[str, str, str]] = {
+	# slug: (label, group, legacy results path under /whaleanalysis/screener/{method})
+	"most_accumulated": ("Most accumulated", "Money flow", "top-money-flow"),
+	"most_distributed": ("Most distributed", "Money flow", "top-money-flow"),
+	"vwap_rally": ("Rally", "VWAP", "vwap"),
+	"vwap_around": ("Around VWAP", "VWAP", "vwap"),
+	"vwap_breakout": ("Breakout", "VWAP", "vwap"),
+	"vwap_breakdown": ("Breakdown", "VWAP", "vwap"),
+	"vprofile_inside": ("Inside zone", "Volume profile", "vprofile"),
+	"vprofile_breakout": ("Zone breakout", "Volume profile", "vprofile"),
+	"vprofile_breakdown": ("Zone breakdown", "Volume profile", "vprofile"),
+	"vprofile_support_bounce": ("Support bounce", "Volume profile", "vprofile"),
+	"vprofile_resistance_rejection": ("Resistance rejection", "Volume profile", "vprofile"),
+}
+
+
+def build_instrument_list(category: str, codes: Iterable[str]) -> InstrumentList:
+	"""
+	Database codes to the dropdown contract. Pure: rows in, models out.
+
+	Every code goes through the same resolver the chart route uses, so the
+	dropdown and the chart agree on COMPOSITE/IHSG without a second table.
+	"""
+	items: list[InstrumentListItem] = []
+	seen: set[str] = set()
+	for raw in codes:
+		instrument = resolve_instrument(str(raw))
+		if instrument.code in seen:
+			continue
+		seen.add(instrument.code)
+		items.append(InstrumentListItem(
+			code=instrument.code,
+			symbol=instrument.symbol,
+			display_name=instrument.display_name,
+			kind=instrument.kind,
+		))
+	items.sort(key=lambda item: item.code)
+	return InstrumentList(category=category, count=len(items), instruments=items)  # type: ignore[arg-type]
+
+
+def build_screener_catalog(slugs: Iterable[str]) -> ScreenerCatalog:
+	"""
+	Screener metadata from the backend's own ScreenerList values.
+
+	Deliberately metadata only: the criteria are real and the legacy endpoint
+	that answers them is named, but `web_results_available` stays False until
+	a typed web-api result contract exists. A client that renders this cannot
+	accidentally present a criterion as a result.
+	"""
+	definitions: list[ScreenerDefinition] = []
+	for slug in slugs:
+		label, group, path = _SCREENER_GROUPS.get(slug, (slug.replace("_", " ").capitalize(), "Other", ""))
+		definitions.append(ScreenerDefinition(
+			slug=slug,
+			label=label,
+			group=group,
+			methods=["foreign", "broker"],
+			results_endpoint=f"/whaleanalysis/screener/{{method}}/{path}" if path else "",
+		))
+	return ScreenerCatalog(screeners=definitions)
+
+
 def resolve_instrument(code: str | None) -> Instrument:
 	"""Canonicalize a requested code. Empty/unknown-case input falls back to COMPOSITE."""
 	requested = (code or "").strip().lower()
@@ -319,7 +420,11 @@ __all__ = [
 	"DEFAULT_INSTRUMENT",
 	"SCHEMA_VERSION",
 	"Instrument",
+	"InstrumentList",
+	"ScreenerCatalog",
 	"WebChart",
+	"build_instrument_list",
+	"build_screener_catalog",
 	"build_web_chart",
 	"resolve_instrument",
 ]

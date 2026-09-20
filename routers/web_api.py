@@ -13,13 +13,15 @@ serves the browser from KV/R2 and its own cache.
 """
 import datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+import database as db
 import dependencies as dp
 import web_contract as wc
 from dependencies import Tags
 from lib import timeit
 from quantist_library import whaleflow as wf
+from routers.param import get_list_code
 
 # ==========
 # Router Initiation
@@ -89,3 +91,46 @@ def build_payload(flow, requested_code: str | None = None) -> wc.WebChart:
 		optimum_n_selected_cluster=getattr(flow, "optimum_n_selected_cluster", None),
 		optimum_corr=getattr(flow, "optimum_corr", None),
 	)
+
+
+# ==========
+# Instrument catalogue and screener metadata
+# ==========
+@router.get("/instruments", status_code=status.HTTP_200_OK, response_model=wc.InstrumentList, tags=[Tags.web.name])
+@timeit
+async def get_web_instruments(
+	category: dp.ListCategory = dp.ListCategory.stock,
+	dbs: db.Session = Depends(db.get_dbs),
+	) -> wc.InstrumentList:
+	"""
+	Typed instrument list for the web dropdown.
+
+	Backed by the same table as /param/list/{category}, which keeps its own
+	response shape for existing callers. This route adds the display
+	resolution the dropdown needs — symbol, display name, index-vs-stock —
+	through the same resolver the chart route uses, so COMPOSITE and IHSG
+	cannot disagree between the list and the chart.
+	"""
+	try:
+		rows = await get_list_code(dbs=dbs, list_category=category)
+		# SQLAlchemy rows type as Column; the codes are strings on the wire.
+		codes = [str(row.code) for row in rows] if isinstance(rows, list) else []
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err.args[0]) from err
+
+	return wc.build_instrument_list(category=category.value, codes=codes)
+
+
+@router.get("/screeners", status_code=status.HTTP_200_OK, response_model=wc.ScreenerCatalog, tags=[Tags.web.name])
+@timeit
+async def get_web_screeners() -> wc.ScreenerCatalog:
+	"""
+	Screener metadata, from the backend's own ScreenerList values.
+
+	Metadata only, and it says so: every entry carries
+	`web_results_available: false` and names the legacy endpoint that answers
+	it today. Normalizing screener *results* into a typed web contract is the
+	next step — see docs/eod-cache-contract.md. Until then a client can render
+	the criteria honestly without implying it has the results.
+	"""
+	return wc.build_screener_catalog(slug.value for slug in dp.ScreenerList)

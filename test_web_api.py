@@ -11,12 +11,14 @@ statically. What must not drift:
 	  browser can never be the direct caller.
 """
 import datetime
+import json
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import pytest
 
+import dependencies as dp
 import main
 import web_contract as wc
 from routers import web_api
@@ -164,3 +166,99 @@ def test_the_payload_a_flow_produces_is_json_safe():
 	assert raw["schema_version"] == wc.SCHEMA_VERSION
 	assert raw["indicators"]["vwap"][0] is None
 	assert raw["price"]["dates"] == ["2026-09-17", "2026-09-18"]
+
+
+# ==========
+# Analysis method
+# ==========
+def test_the_chart_route_takes_a_method_and_defaults_to_broker():
+	# Foreign and Whale are two different analyses. The web UI switches between
+	# them with this parameter, so it has to be a real, documented query param.
+	parameters = {entry["name"]: entry for entry in PATHS["/web-api/v1/chart/{code}"]["get"]["parameters"]}
+	assert "method" in parameters
+	assert parameters["method"]["in"] == "query"
+
+	schema = parameters["method"]["schema"]
+	allowed = schema.get("enum") or schema.get("allOf", [{}])[0].get("enum") or []
+	if not allowed:
+		allowed = [value.value for value in dp.AnalysisMethod]
+	assert set(allowed) == {"foreign", "broker"}
+	assert schema.get("default", dp.AnalysisMethod.broker.value) == "broker"
+
+
+@pytest.mark.parametrize("method, expected_label, abbrev", [("foreign", "Foreign Flow", "F"), ("broker", "Whale Flow", "W")])
+def test_each_method_labels_its_own_payload(method, expected_label, abbrev):
+	flow = _StubFlow()
+	flow.analysis_method = type("M", (), {"value": method})()
+	if method == "foreign":
+		flow.selected_broker = None
+
+	payload = web_api.build_payload(flow)
+
+	assert payload.summary.method == method
+	assert payload.annotations.method_label == expected_label
+	assert payload.annotations.abbrev == abbrev
+
+
+def test_the_worker_forwards_exactly_the_parameters_this_route_accepts():
+	# The worker allow-lists query parameters; anything it forwards has to
+	# exist here or the origin would 422 on a valid-looking request.
+	accepted = {entry["name"] for entry in PATHS["/web-api/v1/chart/{code}"]["get"]["parameters"]}
+	assert {"method", "startdate", "enddate", "clustering_method"} <= accepted
+
+
+# ==========
+# Instrument catalogue and screener metadata
+# ==========
+def test_the_catalogue_and_screener_routes_are_registered_behind_the_same_key():
+	def scheme_names(path):
+		return {name for op in PATHS[path].values() for requirement in op.get("security", []) for name in requirement}
+
+	for path in ("/web-api/v1/instruments", "/web-api/v1/screeners"):
+		assert path in PATHS
+		assert scheme_names(path) == scheme_names("/whaleanalysis/chart")
+
+
+def test_instrument_list_resolves_display_names_through_the_chart_resolver():
+	listing = wc.build_instrument_list("stock", ["BBRI", "ANTM", "composite"])
+
+	assert listing.category == "stock"
+	assert listing.count == 3
+	# Sorted by code, so the dropdown order does not depend on the query plan.
+	assert [item.code for item in listing.instruments] == ["antm", "bbri", "composite"]
+	composite = listing.instruments[-1]
+	assert composite.display_name == "IHSG / COMPOSITE"
+	assert composite.kind == "index"
+	assert listing.instruments[0].display_name == "ANTM"
+
+
+def test_instrument_list_de_duplicates_through_the_alias_table():
+	listing = wc.build_instrument_list("index", ["IHSG", "composite", "ihsg", "bbri"])
+	assert [item.code for item in listing.instruments] == ["bbri", "composite"]
+	assert listing.count == 2
+
+
+def test_an_empty_instrument_list_is_empty_not_an_error():
+	listing = wc.build_instrument_list("broker", [])
+	assert listing.count == 0
+	assert listing.instruments == []
+	assert listing.schema_version == wc.SCHEMA_VERSION
+
+
+def test_screener_catalog_covers_every_backend_criterion():
+	catalog = wc.build_screener_catalog(entry.value for entry in dp.ScreenerList)
+
+	assert {entry.slug for entry in catalog.screeners} == {entry.value for entry in dp.ScreenerList}
+	for entry in catalog.screeners:
+		assert entry.label and entry.group
+		assert entry.methods == ["foreign", "broker"]
+		# Honest by construction: metadata now, results later.
+		assert entry.web_results_available is False
+		assert entry.results_endpoint.startswith("/whaleanalysis/screener/")
+
+
+def test_screener_catalog_is_json_safe():
+	raw = wc.build_screener_catalog(["vwap_rally"]).model_dump(mode="json")
+	assert json.dumps(raw)
+	assert raw["screeners"][0]["label"] == "Rally"
+	assert raw["screeners"][0]["group"] == "VWAP"
