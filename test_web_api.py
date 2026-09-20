@@ -252,9 +252,11 @@ def test_screener_catalog_covers_every_backend_criterion():
 	for entry in catalog.screeners:
 		assert entry.label and entry.group
 		assert entry.methods == ["foreign", "broker"]
-		# Honest by construction: metadata now, results later.
-		assert entry.web_results_available is False
-		assert entry.results_endpoint.startswith("/whaleanalysis/screener/")
+		# Every criterion is routable on the browser-facing path now.
+		assert entry.web_results_available is True
+		assert entry.results_endpoint == f"/web-api/v1/screener/{entry.slug}?method={{method}}"
+		# The legacy route is still named, and still unchanged for Telegram.
+		assert entry.legacy_endpoint.startswith("/whaleanalysis/screener/")
 
 
 def test_screener_catalog_is_json_safe():

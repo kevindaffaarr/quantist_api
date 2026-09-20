@@ -20,6 +20,8 @@ import dependencies as dp
 import web_contract as wc
 from dependencies import Tags
 from lib import timeit
+from quantist_library import brokerflow as bf
+from quantist_library import foreignflow as ff
 from quantist_library import whaleflow as wf
 from routers.param import get_list_code
 
@@ -127,10 +129,76 @@ async def get_web_screeners() -> wc.ScreenerCatalog:
 	"""
 	Screener metadata, from the backend's own ScreenerList values.
 
-	Metadata only, and it says so: every entry carries
-	`web_results_available: false` and names the legacy endpoint that answers
-	it today. Normalizing screener *results* into a typed web contract is the
-	next step — see docs/eod-cache-contract.md. Until then a client can render
-	the criteria honestly without implying it has the results.
+	Each entry names its browser-facing results route and the legacy route
+	Telegram still uses, and says whether the typed results can be fetched.
+	The criteria come from ScreenerList, so this list cannot drift from what
+	the backend actually supports.
 	"""
 	return wc.build_screener_catalog(slug.value for slug in dp.ScreenerList)
+
+
+# ==========
+# Screener results
+# ==========
+def _screener_object(slug: str, method: dp.AnalysisMethod, n_stockcodes: int, enddate: datetime.date):
+	"""
+	The screener class for one slug and method.
+
+	Dispatch lives here rather than in the contract module: choosing a class is
+	an API concern, and web_contract stays free of quantist_library imports so
+	it can be tested without a database.
+	"""
+	family = wc.SCREENER_FAMILY[slug]
+	library = ff if method == dp.AnalysisMethod.foreign else bf
+	criterion = dp.ScreenerList(slug)
+
+	# Each screener class narrows its criterion to the Literal subset it
+	# handles. SCREENER_FAMILY is what guarantees the slug is in that subset,
+	# and test_web_screener.py pins it against the enum, but the type checker
+	# cannot follow the dict lookup — hence the ignores.
+	if family == "money_flow":
+		return library.ScreenerMoneyFlow(accum_or_distri=criterion, n_stockcodes=n_stockcodes, enddate=enddate)  # type: ignore[arg-type]
+	if family == "vwap":
+		return library.ScreenerVWAP(screener_vwap_criteria=criterion, n_stockcodes=n_stockcodes, enddate=enddate)  # type: ignore[arg-type]
+	return library.ScreenerVProfile(screener_vprofile_criteria=criterion, n_stockcodes=n_stockcodes, enddate=enddate)  # type: ignore[arg-type]
+
+
+@router.get("/screener/{slug}", status_code=status.HTTP_200_OK, response_model=wc.ScreenerResults, tags=[Tags.web.name])
+@timeit
+async def get_web_screener_results(
+	slug: dp.ScreenerList,
+	method: dp.AnalysisMethod = dp.AnalysisMethod.broker,
+	n_stockcodes: int = 10,
+	enddate: datetime.date = datetime.date.today(),
+	) -> wc.ScreenerResults:
+	"""
+	Ranked results for one screener criterion, in one shape for every criterion.
+
+	Additive: /whaleanalysis/screener/* keeps its DataFrame-dump response for
+	Telegram and existing callers. This route normalizes the same objects into
+	the semantic contract the browser reads, with the columns a criterion does
+	not share carried through as extras rather than dropped.
+	"""
+	try:
+		screener = _screener_object(slug.value, method, n_stockcodes, enddate)
+		screener = await screener.screen()
+		frame = screener.top_stockcodes
+
+	except KeyError as err:
+		raise HTTPException(status.HTTP_404_NOT_FOUND, detail=err.args[0]) from err
+	except ValueError as err:
+		raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=err.args[0]) from err
+	except Exception as err:
+		raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err.args[0]) from err
+
+	startdate = screener.startdate if isinstance(screener.startdate, datetime.date) else None
+	return wc.build_screener_results(
+		slug=slug.value,
+		method=method.value,
+		frame=frame,
+		metadata={
+			"startdate": startdate,
+			"enddate": screener.enddate,
+			"bar_range": getattr(screener, "bar_range", None) or getattr(screener, "radar_period", None),
+		},
+	)

@@ -204,23 +204,60 @@ class InstrumentList(BaseModel):
 
 class ScreenerDefinition(BaseModel):
 	"""
-	What a screener is, not what it currently returns.
+	What a screener is, and where its results come from.
 
-	`results_endpoint` names the legacy route that produces the list today;
-	`web_results_available` is False until a typed web-api equivalent exists,
-	so a client can show the criterion without implying it has the results.
+	`results_endpoint` is the browser-facing web route; `legacy_endpoint` is
+	the DataFrame-dump route Telegram still uses. `web_results_available` says
+	whether the typed route can actually answer, so a client never implies it
+	has results it cannot fetch.
 	"""
 	slug: str
 	label: str
 	group: str
 	methods: list[AnalysisMethod]
 	results_endpoint: str
-	web_results_available: bool = False
+	legacy_endpoint: str = ""
+	web_results_available: bool = True
 
 
 class ScreenerCatalog(BaseModel):
 	schema_version: str = SCHEMA_VERSION
 	screeners: list[ScreenerDefinition] = []
+
+
+class ScreenerRow(BaseModel):
+	"""
+	One ranked stock.
+
+	The columns the legacy screeners emit differ per criterion, so the ones
+	every criterion shares are named fields and everything else rides in
+	`extras`. Dropping the rest would lose the volume-profile annotations that
+	are the whole point of those criteria.
+	"""
+	code: str
+	display_name: str
+	close: float | None = None
+	money_flow: float | None = None
+	proportion: float | None = None
+	price_correlation: float | None = None
+	vwap: float | None = None
+	extras: dict[str, float | str | bool | None] = {}
+
+
+class ScreenerPeriod(BaseModel):
+	start: datetime.date | None = None
+	end: datetime.date | None = None
+	bars: int | None = None
+
+
+class ScreenerResults(BaseModel):
+	schema_version: str = SCHEMA_VERSION
+	slug: str
+	method: AnalysisMethod
+	period: ScreenerPeriod
+	count: int
+	rows: list[ScreenerRow] = []
+	meta: Meta
 
 
 class WebChart(BaseModel):
@@ -253,6 +290,100 @@ _SCREENER_GROUPS: dict[str, tuple[str, str, str]] = {
 	"vprofile_support_bounce": ("Support bounce", "Volume profile", "vprofile"),
 	"vprofile_resistance_rejection": ("Resistance rejection", "Volume profile", "vprofile"),
 }
+
+
+# Which screener class answers a slug. The web route dispatches on this alone,
+# so a backend slug missing here would be a screener the web surface cannot ask
+# for — test_web_screener.py pins the two sets equal.
+SCREENER_FAMILY: dict[str, str] = {
+	"most_accumulated": "money_flow",
+	"most_distributed": "money_flow",
+	"vwap_rally": "vwap",
+	"vwap_around": "vwap",
+	"vwap_breakout": "vwap",
+	"vwap_breakdown": "vwap",
+	"vprofile_inside": "vprofile",
+	"vprofile_breakout": "vprofile",
+	"vprofile_breakdown": "vprofile",
+	"vprofile_support_bounce": "vprofile",
+	"vprofile_resistance_rejection": "vprofile",
+}
+
+# DataFrame column -> contract field. Anything else becomes an extra.
+_SCREENER_FIELDS: dict[str, str] = {
+	"close": "close",
+	"mf": "money_flow",
+	"prop": "proportion",
+	"pricecorrel": "price_correlation",
+	"corr": "price_correlation",
+	"vwap": "vwap",
+}
+
+
+def _scalar(value: Any) -> float | str | bool | None:
+	"""An extras value: a finite number, a plain string, a bool, or null."""
+	if isinstance(value, bool):
+		return value
+	if isinstance(value, str):
+		return value
+	number = _num(value)
+	if number is not None:
+		return number
+	return None
+
+
+def _screener_date(value: Any) -> datetime.date | None:
+	if value in (None, ""):
+		return None
+	try:
+		return _date(value)
+	except (ValueError, TypeError):
+		return None
+
+
+def build_screener_results(
+	slug: str,
+	method: AnalysisMethod,
+	frame: pd.DataFrame,
+	metadata: dict[str, Any] | None = None,
+	generated_at: datetime.datetime | None = None,
+	) -> ScreenerResults:
+	"""Rank frame plus screener metadata to the browser-facing contract."""
+	if slug not in SCREENER_FAMILY:
+		raise ValueError(f"Unknown screener slug: {slug!r}")
+
+	info = metadata or {}
+	rows: list[ScreenerRow] = []
+	if frame is not None and not frame.empty:
+		for code, record in frame.to_dict(orient="index").items():
+			instrument = resolve_instrument(str(code))
+			named: dict[str, float | None] = {}
+			extras: dict[str, float | str | bool | None] = {}
+			for column, value in record.items():
+				field = _SCREENER_FIELDS.get(str(column))
+				if field is not None:
+					named.setdefault(field, _num(value))
+				else:
+					extras[str(column)] = _scalar(value)
+			rows.append(ScreenerRow(
+				code=instrument.code,
+				display_name=instrument.display_name,
+				extras=extras,
+				**named,
+			))
+
+	return ScreenerResults(
+		slug=slug,
+		method=method,
+		period=ScreenerPeriod(
+			start=_screener_date(info.get("startdate")),
+			end=_screener_date(info.get("enddate")),
+			bars=_int(info.get("bar_range")),
+		),
+		count=len(rows),
+		rows=rows,
+		meta=Meta(generated_at=generated_at or datetime.datetime.now(datetime.UTC)),
+	)
 
 
 def build_instrument_list(category: str, codes: Iterable[str]) -> InstrumentList:
@@ -296,7 +427,11 @@ def build_screener_catalog(slugs: Iterable[str]) -> ScreenerCatalog:
 			label=label,
 			group=group,
 			methods=["foreign", "broker"],
-			results_endpoint=f"/whaleanalysis/screener/{{method}}/{path}" if path else "",
+			results_endpoint=f"/web-api/v1/screener/{slug}?method={{method}}",
+			legacy_endpoint=f"/whaleanalysis/screener/{{method}}/{path}" if path else "",
+			# True because /web-api/v1/screener/{slug} exists and answers; a slug
+			# the dispatch table does not know could not be routed at all.
+			web_results_available=slug in SCREENER_FAMILY,
 		))
 	return ScreenerCatalog(screeners=definitions)
 
@@ -421,9 +556,12 @@ __all__ = [
 	"SCHEMA_VERSION",
 	"Instrument",
 	"InstrumentList",
+	"ScreenerResults",
 	"ScreenerCatalog",
 	"WebChart",
+	"SCREENER_FAMILY",
 	"build_instrument_list",
+	"build_screener_results",
 	"build_screener_catalog",
 	"build_web_chart",
 	"resolve_instrument",
