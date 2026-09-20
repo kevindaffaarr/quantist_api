@@ -33,4 +33,16 @@ flow), and `vprofile_event_date` (latest close date as `YYYY-MM-DD`). These are
 JSON-safe scalars; all four are `None` when no profile zone is selected. Existing
 zone levels, role, behavior, distance, and touch count remain unchanged.
 
+### Screener ordering
+
+Money-flow accumulated results rank by total flow descending; distributed results
+rank ascending, so the strongest negative flow is first. Ties use ascending stock
+code. VWAP rally ranks by the largest positive close-to-VWAP gap. VWAP around ranks
+by the smallest absolute gap. VWAP breakout and breakdown rank by the freshest valid
+cross first, then the smallest distance from VWAP, then price follow-through. Flow
+is not used for VWAP ordering. Volume-profile rankings use prominence, then strength,
+then flow in the event direction (inside/upward descending, downward ascending),
+with ascending stock code as the final tie-break. Volume-profile annotations are
+computed for every criterion member before the requested limit is applied.
+
 Copyright (c) 2023 Quantist.io. All rights reserved. This works, including all modifications made by any third party, is the property of Quantist.io and is protected by copyright law.
