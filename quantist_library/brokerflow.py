@@ -973,7 +973,7 @@ class WhaleFlowBase():
 	# ==========
 	# THE PIPELINE
 	# ==========
-	async def _load_and_cluster(self, period_predata: int | None = None, gross_window: bool = False) -> None:
+	async def _load_and_cluster(self, period_predata: int | None = None, gross_window: bool = False, gross_tail: int | None = None) -> None:
 		"""Everything after the defaults, up to per-stock selected-broker flows."""
 		assert self.screener_min_value is not None
 		assert self.screener_min_frequency is not None
@@ -1049,13 +1049,16 @@ class WhaleFlowBase():
 		raw_data_broker_nval = adjust_plusmin_by_code(raw_data_broker_nval, self.broker_features)
 		self.selected_broker_nval = self._sum_selected_broker(raw_data_broker_nval, "broker_nval")
 
-		# Volume and gross value are only read by the vwap and money-flow
-		# screeners. Callers that rank on net value alone skip the second pull,
-		# which for the year-long vprofile window is most of the bytes.
-		if gross_window:
+		# Volume and gross value back the vwap and proportion columns. Over the
+		# year-long vprofile window that second pull is most of the bytes, but
+		# vprofile only ever reports over its radar tail — so it asks for the
+		# tail (gross_tail) rather than skipping the pull and reporting nulls.
+		if gross_window or gross_tail is not None:
+			gross_index = raw_data_broker_nval.index if gross_window or gross_tail is None \
+				else raw_data_broker_nval.groupby(level="code").tail(gross_tail).index
 			raw_data_broker_nvol, raw_data_broker_sumval = await self._get_broker_window_data(
 				filtered_stockcodes=self.filtered_stockcodes,
-				index=raw_data_broker_nval.index,
+				index=gross_index,
 				columns=raw_data_broker_nval.columns,
 				dbs=self.dbs,
 			)
@@ -1654,6 +1657,8 @@ class ScreenerBase(WhaleFlowBase, sc.WhaleScreener):
 		await self._load_and_cluster(
 			period_predata=self.period_predata,
 			gross_window=predata != "vprofile",
+			# vprofile reports over the radar tail, so that is all it fetches.
+			gross_tail=self.radar_period if predata == "vprofile" else None,
 		)
 
 		return self
@@ -1752,13 +1757,21 @@ class ScreenerMoneyFlow(ScreenerBase):
 		self.raw_data_full = self.raw_data_full[self.raw_data_full.index.get_level_values(0).isin(top_stockcodes.index)]
 		self.bar_range = int(self.raw_data_full.groupby(level='code').size().max()) # type: ignore
 		
-		# Calculate top_stockcodes Prop. Get only between startdate and enddate based on level 1 date index
-		top_stockcodes['prop'] = (self.selected_broker_sumval.loc[
-				self.selected_broker_sumval.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
-			]['broker_sumval'].groupby("code").sum())\
-			/(self.raw_data_full.loc[
-				self.raw_data_full.index.get_level_values(1).isin(pd.date_range(start=startdate, end=enddate))
-			]['value'].groupby("code").sum()*2)
+		# One window, named once. Everything below reports over exactly the bars
+		# the ranking was computed from — no wider, and never past enddate.
+		window = pd.date_range(start=startdate, end=enddate)
+		windowed_price = self.raw_data_full.loc[self.raw_data_full.index.get_level_values(1).isin(window)]
+		windowed_nval = self.selected_broker_nval.loc[self.selected_broker_nval.index.get_level_values(1).isin(window)]
+		windowed_nvol = self.selected_broker_nvol.loc[self.selected_broker_nvol.index.get_level_values(1).isin(window)]
+		windowed_sumval = self.selected_broker_sumval.loc[self.selected_broker_sumval.index.get_level_values(1).isin(window)]
+
+		# Calculate top_stockcodes Prop over that window
+		top_stockcodes['prop'] = sc.flow_proportion(windowed_sumval['broker_sumval'], windowed_price['value'])
+
+		# Close and Whale-VWAP: the web contract reports these for every family,
+		# and this one used to leave both out of the frame, which read as null.
+		top_stockcodes['close'] = windowed_price['close'].groupby(level='code').last()
+		top_stockcodes['vwap'] = sc.flow_vwap(windowed_nval['broker_nval'], windowed_nvol['broker_nvol'])
 		
 		# Calculate top_stockcodes PriceCorrel
 		if (startdate == enddate) or (self.radar_period == 1):
@@ -1880,12 +1893,29 @@ class ScreenerVWAP(ScreenerBase):
 		self.stocklist, self.top_data = await self._get_data_from_stocklist(stocklist)
 
 		# Compile data for top_stockcodes from stocklist and top_data
-		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
-		self.top_stockcodes['mf'] = self.top_data['broker_nval'].groupby(level='code').sum()
-		# Preserve the price-based VWAP ranking selected before truncation.
-		self.top_stockcodes = self.top_stockcodes.reindex(self.stocklist)
+		self.top_stockcodes = self._compile_top_stockcodes()
 		
 		return self
+
+	def _compile_top_stockcodes(self) -> pd.DataFrame:
+		"""
+		The reported frame: one row per selected code, every shared column.
+
+		Separate from screen() so it can be driven without a database — the
+		arithmetic here is what the web contract reads, and it used to omit
+		proportion and correlation entirely.
+		"""
+		top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
+		top_stockcodes['mf'] = self.top_data['broker_nval'].groupby(level='code').sum()
+		# Proportion over the same window, from data already joined onto
+		# top_data. This family reported neither this nor the correlation, so
+		# the web contract read both as null on every VWAP criterion.
+		top_stockcodes['prop'] = sc.flow_proportion(self.top_data['broker_sumval'], self.top_data['value'])
+		# The clustering already answered "does price move with this flow";
+		# recomputing it here would be a second, different answer.
+		top_stockcodes['pricecorrel'] = self.optimum_corr.reindex(top_stockcodes.index)
+		# Preserve the price-based VWAP ranking selected before truncation.
+		return pd.DataFrame(top_stockcodes.reindex(self.stocklist))
 
 	async def _vwap_prepare(self,
 		raw_data_full: pd.DataFrame,
@@ -2008,8 +2038,21 @@ class ScreenerVProfile(ScreenerBase):
 		# Get selected_broker_nval that has level 0 index (code) in self.stocklist
 		stocklist_selected_broker_nval = self.selected_broker_nval.loc[self.selected_broker_nval.index.get_level_values(0).isin(self.stocklist)]
 		
+		# The radar tail is this family's window: mf, vwap and prop all report
+		# over exactly these bars, and nothing reads past them.
+		tail_nval = stocklist_selected_broker_nval.groupby(level='code').tail(self.radar_period)
+		tail_nvol = self.selected_broker_nvol.loc[
+			self.selected_broker_nvol.index.get_level_values(0).isin(self.stocklist)
+		].groupby(level='code').tail(self.radar_period)
+		tail_sumval = self.selected_broker_sumval.loc[
+			self.selected_broker_sumval.index.get_level_values(0).isin(self.stocklist)
+		].groupby(level='code').tail(self.radar_period)
+		tail_price = self.raw_data_full.loc[
+			self.raw_data_full.index.get_level_values('code').isin(self.stocklist)
+		].groupby(level='code').tail(self.radar_period)
+
 		# Sum netval in the last self.radar_period for each code
-		mf = stocklist_selected_broker_nval.groupby(level='code').tail(self.radar_period).groupby(level='code')['broker_nval'].sum()
+		mf = tail_nval.groupby(level='code')['broker_nval'].sum()
 
 		# Annotate every candidate before ranking/truncating: the signal evidence
 		# decides the top n, rather than the raw money-flow total.
@@ -2018,6 +2061,10 @@ class ScreenerVProfile(ScreenerBase):
 		][['close']].groupby(level='code').last()
 		top_stockcodes['mf'] = mf.reindex(top_stockcodes.index)
 		top_stockcodes['corr'] = self.optimum_corr.reindex(top_stockcodes.index)
+		# VWAP and proportion over the same tail. This family reported neither,
+		# so the web contract read both as null on every profile criterion.
+		top_stockcodes['vwap'] = sc.flow_vwap(tail_nval['broker_nval'], tail_nvol['broker_nvol'])
+		top_stockcodes['prop'] = sc.flow_proportion(tail_sumval['broker_sumval'], tail_price['value'])
 		vprofile_data = self.wf_indicators.loc[
 			self.wf_indicators.index.get_level_values('code').isin(self.stocklist)
 		]

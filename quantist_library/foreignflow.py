@@ -834,18 +834,8 @@ class ScreenerMoneyFlow(ScreenerBase):
 				startdate = raw_data.index.get_level_values('date').min()
 				raw_data = raw_data.loc[(slice(None), slice(startdate, enddate)), :]
 
-		# Calculate MF, Prop, and pricecorrel
-		top_stockcodes['mf'] = (raw_data['close']*(raw_data['netvol'])).groupby("code").sum()
-		top_stockcodes['prop'] = (raw_data['close']*(raw_data['sumvol'])).groupby("code").sum()/(raw_data['value']*2).groupby("code").sum()
-		# replace nan with none
-		top_stockcodes = top_stockcodes.replace({np.nan: None})
-
-		# Order by total flow; code is the deterministic tie-break.
-		top_stockcodes = sc.rank_flow_candidates(
-			top_stockcodes,
-			n_stockcodes=len(top_stockcodes),
-			ascending=accum_or_distri == dp.ScreenerList.most_distributed,
-		)
+		# Calculate MF, Prop, close and VWAP over the window raw_data now holds
+		top_stockcodes = self._compile_window_columns(raw_data, top_stockcodes, accum_or_distri)
 		
 		# Update startdate and enddate based on raw_data
 		startdate = raw_data.index.get_level_values('date').min()
@@ -854,6 +844,34 @@ class ScreenerMoneyFlow(ScreenerBase):
 
 		assert isinstance(startdate, datetime.date)
 		return top_stockcodes, startdate, enddate, bar_range
+
+	@staticmethod
+	def _compile_window_columns(
+		raw_data: pd.DataFrame,
+		top_stockcodes: pd.DataFrame,
+		accum_or_distri: dp.ScreenerList,
+		) -> pd.DataFrame:
+		"""
+		The reported columns, over exactly the window raw_data holds.
+
+		Separate from the query above so it can be driven without a database:
+		this is the arithmetic the web contract reads, and it used to leave
+		close and VWAP out of the frame, which read as null.
+		"""
+		netval = raw_data['close']*raw_data['netvol']
+		top_stockcodes['mf'] = netval.groupby("code").sum()
+		top_stockcodes['prop'] = sc.flow_proportion(raw_data['close']*raw_data['sumvol'], raw_data['value'])
+		top_stockcodes['close'] = raw_data['close'].groupby("code").last()
+		top_stockcodes['vwap'] = sc.flow_vwap(netval, raw_data['netvol'])
+		# replace nan with none
+		top_stockcodes = top_stockcodes.replace({np.nan: None})
+
+		# Order by total flow; code is the deterministic tie-break.
+		return sc.rank_flow_candidates(
+			top_stockcodes,
+			n_stockcodes=None,
+			ascending=accum_or_distri == dp.ScreenerList.most_distributed,
+		)
 
 class ScreenerVWAP(ScreenerBase):
 	"""
@@ -954,13 +972,28 @@ class ScreenerVWAP(ScreenerBase):
 			raw_data=self.raw_data, stocklist=stocklist, n_stockcodes=self.n_stockcodes)
 
 		# Compile data for top_stockcodes from stocklist and top_data
-		self.top_stockcodes:pd.DataFrame
-		self.top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
-		self.top_stockcodes['mf'] = self.top_data['netval'].groupby(level='code').sum()
-		# Preserve the price-based VWAP ranking selected before truncation.
-		self.top_stockcodes = self.top_stockcodes.reindex(self.stocklist)
+		self.top_stockcodes:pd.DataFrame = self._compile_top_stockcodes()
 		
 		return self
+
+	def _compile_top_stockcodes(self) -> pd.DataFrame:
+		"""
+		The reported frame: one row per selected code, every shared column.
+
+		Separate from screen() so it can be driven without a database — the
+		arithmetic here is what the web contract reads, and it used to omit
+		proportion and correlation entirely.
+		"""
+		top_stockcodes = self.top_data[['close','vwap']].groupby(level='code').last()
+		top_stockcodes['mf'] = self.top_data['netval'].groupby(level='code').sum()
+		# Proportion and correlation over the same window. Foreign has no
+		# clustering, so the correlation is computed the way the foreign
+		# vprofile family computes it: price against cumulative flow.
+		top_stockcodes['prop'] = sc.flow_proportion(self.top_data['sumval'], self.top_data['value'])
+		top_stockcodes['pricecorrel'] = sc.flow_price_correlation(
+			self.top_data['close'], self.top_data['netval'])
+		# Preserve the price-based VWAP ranking selected before truncation.
+		return pd.DataFrame(top_stockcodes.reindex(self.stocklist))
 
 
 	async def _vwap_prep(self,
@@ -978,6 +1011,9 @@ class ScreenerVWAP(ScreenerBase):
 			db.StockData.close,
 			db.StockData.foreignbuy,
 			db.StockData.foreignsell,
+			# Market value backs the proportion column, which this family did
+			# not report at all until it was selected here.
+			db.StockData.value,
 		).filter(db.StockData.code.in_(filtered_stockcodes))\
 		.filter(db.StockData.code.notin_(stockcode_excludes))\
 		.filter(db.StockData.date.between(startdate,enddate))\
@@ -1005,6 +1041,7 @@ class ScreenerVWAP(ScreenerBase):
 			db.StockData.close,
 			db.StockData.foreignbuy,
 			db.StockData.foreignsell,
+			db.StockData.value,
 		).filter(db.StockData.code.in_(filtered_stockcodes))\
 		.filter(db.StockData.code.notin_(stockcode_excludes))\
 		.filter(db.StockData.date < startdate)\
@@ -1020,6 +1057,7 @@ class ScreenerVWAP(ScreenerBase):
 		raw_data['fsval'] = raw_data['close']*raw_data['foreignsell']
 		raw_data['netvol'] = raw_data['foreignbuy']-raw_data['foreignsell']
 		raw_data['netval'] = raw_data['fbval']-raw_data['fsval']
+		raw_data['sumval'] = raw_data['fbval']+raw_data['fsval']
 		raw_data['vwap'] = ((raw_data['netval'].groupby(level='code').rolling(window=period_vwap).apply(lambda x: x[x>0].sum()))\
 			/(raw_data['netvol'].groupby(level='code').rolling(window=period_vwap).apply(lambda x: x[x>0].sum()))).droplevel(0)
 
@@ -1130,6 +1168,8 @@ class ScreenerVProfile(ScreenerBase):
 			db.StockData.close,
 			db.StockData.foreignbuy,
 			db.StockData.foreignsell,
+			# Backs the proportion column, which this family did not report.
+			db.StockData.value,
 		).filter(db.StockData.code.in_(filtered_stockcodes))\
 		.filter(db.StockData.code.notin_(stockcode_excludes))\
 		.filter(db.StockData.date.between(startdate,enddate))\
@@ -1145,6 +1185,9 @@ class ScreenerVProfile(ScreenerBase):
 		raw_data['fbval'] = raw_data['close']*raw_data['foreignbuy']
 		raw_data['fsval'] = raw_data['close']*raw_data['foreignsell']
 		raw_data['netval'] = raw_data['fbval']-raw_data['fsval']
+		# Volume and gross value back the vwap and proportion columns.
+		raw_data['netvol'] = raw_data['foreignbuy']-raw_data['foreignsell']
+		raw_data['sumval'] = raw_data['fbval']+raw_data['fsval']
 
 		# Calculate Correlation between close and valflow
 		raw_data['valflow'] = raw_data.groupby('code')['netval'].cumsum()
@@ -1164,14 +1207,22 @@ class ScreenerVProfile(ScreenerBase):
 		# Get raw_data that has level 0 index (code) in self.stocklist
 		raw_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(self.stocklist)]
 
+		# The radar tail is this family's window: mf, vwap and prop all report
+		# over exactly these bars, and nothing reads past them.
+		tail = raw_data.groupby(level='code').tail(self.radar_period)
+
 		# Sum netval in the last self.radar_period for each code
-		mf = raw_data.groupby(level='code').tail(self.radar_period).groupby(level='code')['netval'].sum()
+		mf = tail.groupby(level='code')['netval'].sum()
 		
 		# Annotate every candidate before ranking/truncating: the signal evidence
 		# decides the top n, rather than the raw money-flow total.
 		top_stockcodes:pd.DataFrame = raw_data[['close']].groupby(level='code').last()
 		top_stockcodes['mf'] = mf.reindex(top_stockcodes.index)
 		top_stockcodes['corr'] = self.close_valflow_corr.reindex(top_stockcodes.index)
+		# VWAP and proportion over the same tail. This family reported neither,
+		# so the web contract read both as null on every profile criterion.
+		top_stockcodes['vwap'] = sc.flow_vwap(tail['netval'], tail['netvol'])
+		top_stockcodes['prop'] = sc.flow_proportion(tail['sumval'], tail['value'])
 		top_stockcodes = top_stockcodes.join(await sc.vprofile_annotations(raw_data, self.radar_period))
 		top_stockcodes = sc.rank_vprofile_candidates(
 			top_stockcodes,

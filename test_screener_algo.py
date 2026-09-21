@@ -90,7 +90,15 @@ def _vprofile_frame(code: str = "aaa", tail: tuple[float, ...] = ()) -> pd.DataF
 	netval = [(-1.0) ** i * (i + 1) * 1000.0 for i in range(len(close))]
 	dates = pd.bdate_range("2024-01-01", periods=len(close))
 	return pd.DataFrame(
-		{"close": np.array(close), "netval": np.array(netval)},
+		{
+			"close": np.array(close),
+			"netval": np.array(netval),
+			# The volume-profile screeners report vwap and proportion too, so
+			# the volume and gross-value sides have to be here to compute them.
+			"netvol": np.array(netval) / 10.0,
+			"sumval": np.abs(np.array(netval)) * 3.0,
+			"value": np.array([5.0e9 + i * 1.0e8 for i in range(len(close))]),
+		},
 		index=pd.MultiIndex.from_product([[code], dates], names=["code", "date"]),
 	)
 
@@ -276,6 +284,9 @@ def test_foreign_vprofile_screener_annotates_its_top_stockcodes():
 	assert set(stocklist) == {"aaa", "bbb"}
 	# The columns the API already serves stay first-class...
 	assert {"close", "mf", "corr"} <= set(top.columns)
+	# ...the two the web contract used to read as null are filled...
+	assert {"vwap", "prop"} <= set(top.columns)
+	assert top[["vwap", "prop"]].notna().all().all()
 	# ...and the annotations are additive.
 	assert _annotation_columns() <= set(top.columns)
 
@@ -287,6 +298,10 @@ def test_broker_vprofile_screener_annotates_its_top_stockcodes():
 	screener.raw_data_full = data
 	screener.wf_indicators = data
 	screener.selected_broker_nval = data[["netval"]].rename(columns={"netval": "broker_nval"})
+	# vprofile fetches the gross window for its radar tail, so these are on the
+	# object by the time the frame is compiled.
+	screener.selected_broker_nvol = data[["netvol"]].rename(columns={"netvol": "broker_nvol"})
+	screener.selected_broker_sumval = data[["sumval"]].rename(columns={"sumval": "broker_sumval"})
 	screener.stocklist = ["aaa", "bbb"]
 	screener.optimum_corr = pd.Series({"aaa": 0.4, "bbb": 0.6})
 
@@ -294,6 +309,8 @@ def test_broker_vprofile_screener_annotates_its_top_stockcodes():
 
 	assert set(stocklist) == {"aaa", "bbb"}
 	assert {"close", "mf", "corr"} <= set(top.columns)
+	assert {"vwap", "prop"} <= set(top.columns)
+	assert top[["vwap", "prop"]].notna().all().all()
 	assert _annotation_columns() <= set(top.columns)
 
 
