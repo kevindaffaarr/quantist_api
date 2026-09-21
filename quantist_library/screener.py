@@ -232,6 +232,73 @@ def rank_vprofile_candidates(
 
 
 # ==========
+# Shared indicator columns
+# ==========
+# Every screener reports the same five columns to the web contract — close,
+# money flow, proportion, price correlation and VWAP — but each family used to
+# compute only the two or three its own ranking needed and leave the rest out
+# of the frame entirely, which the contract then read as null. These are the
+# missing ones, written once so a criterion cannot disagree with the chart
+# about what "VWAP" or "proportion" means.
+#
+# All three take (code, date) indexed data already narrowed to the screener's
+# own window, and return one value per code. They never look beyond what they
+# are handed, which is what keeps them off future dates.
+#
+# The inputs are typed Any rather than pd.Series only because every caller
+# reaches them as `frame["column"]`, which pandas-stubs types Series|DataFrame;
+# annotating the truth would mean an ignore comment at every call site. They
+# are always one column of a (code, date) frame.
+def flow_vwap(net_value: Any, net_volume: Any) -> pd.Series:
+	"""
+	Flow VWAP per code: the average price the accumulating side paid.
+
+	Same definition as the chart and the VWAP screeners — the positive days of
+	net value over the positive days of net volume — with the window being
+	whatever was passed in rather than a rolling period. The two sides are
+	filtered independently because that is what the rolling version does; a
+	day that is value-positive but volume-negative contributes to the numerator
+	only, and matching it here is the point.
+
+	A code with no accumulation at all has no such price, so it is NaN rather
+	than zero: nothing was bought, which is not the same as buying at nothing.
+	"""
+	# Annotated because .sum() on a grouped Series widens to a scalar union in
+	# the stubs, and .where() is then unresolvable on it.
+	value: pd.Series = net_value.where(net_value > 0, 0.0).groupby(level="code").sum()
+	volume: pd.Series = net_volume.where(net_volume > 0, 0.0).groupby(level="code").sum()
+	return value / volume.where(volume > 0, np.nan)
+
+
+def flow_proportion(gross_value: Any, market_value: Any) -> pd.Series:
+	"""
+	Proportion per code: this flow's gross value against both sides of the market.
+
+	The ``* 2`` is the market's two sides — every lot traded is someone's buy
+	and someone's sell — so a participant transacting every lot scores 1.0, not
+	2.0. Both families already computed it this way; this is the same formula
+	in one place.
+	"""
+	gross: pd.Series = gross_value.groupby(level="code").sum()
+	total: pd.Series = market_value.groupby(level="code").sum() * 2
+	return gross / total.where(total > 0, np.nan)
+
+
+def flow_price_correlation(close: Any, net_value: Any) -> pd.Series:
+	"""
+	Per-code correlation between the price change and the cumulative flow change.
+
+	The whale families get this from clustering as ``optimum_corr``; the
+	foreign families have no clustering and compute it here. Same quantity
+	either way: does the price move with this flow.
+	"""
+	frame = pd.DataFrame({"close": close, "valflow": net_value.groupby(level="code").cumsum()})
+	correlations = frame.groupby(level="code").diff().groupby(level="code")[["close", "valflow"]]\
+		.corr(method="pearson")
+	return correlations.iloc[0::2, -1].droplevel(1)
+
+
+# ==========
 # Volume profile criteria
 # ==========
 VPROFILE_ROLES = ("support", "resistance", "undetermined")
