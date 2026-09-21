@@ -1661,7 +1661,7 @@ class ScreenerBase(WhaleFlowBase, sc.WhaleScreener):
 class ScreenerMoneyFlow(ScreenerBase):
 	def __init__(self,
 		accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
-		n_stockcodes: int = 10,
+		n_stockcodes: int | None = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		stockcode_excludes: set[str] = set(),
@@ -1706,7 +1706,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		)
 
 		self.accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = accum_or_distri
-		self.n_stockcodes: int = n_stockcodes
+		self.n_stockcodes: int | None = n_stockcodes
 
 	async def screen(self) -> ScreenerMoneyFlow:
 		# get default param radar, defined startdate,
@@ -1724,7 +1724,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 	
 	async def _get_mf_top_stockcodes(self,
 		accum_or_distri: dp.ScreenerList = dp.ScreenerList.most_accumulated,
-		n_stockcodes: int = 10,
+		n_stockcodes: int | None = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today()
 		) -> pd.DataFrame:
@@ -1789,7 +1789,7 @@ class ScreenerVWAP(ScreenerBase):
 	"""
 	def __init__(self,
 		screener_vwap_criteria: Literal[dp.ScreenerList.vwap_rally,dp.ScreenerList.vwap_around,dp.ScreenerList.vwap_breakout,dp.ScreenerList.vwap_breakdown] = dp.ScreenerList.vwap_rally,
-		n_stockcodes: int = 10,
+		n_stockcodes: int | None = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		radar_period: int | None = None,
@@ -1843,7 +1843,7 @@ class ScreenerVWAP(ScreenerBase):
 		)
 
 		self.screener_vwap_criteria: Literal[dp.ScreenerList.vwap_rally,dp.ScreenerList.vwap_around,dp.ScreenerList.vwap_breakout,dp.ScreenerList.vwap_breakdown] = screener_vwap_criteria
-		self.n_stockcodes: int = n_stockcodes
+		self.n_stockcodes: int | None = n_stockcodes
 		self.radar_period: int | None = radar_period
 		self.percentage_range: float | None = percentage_range
 		self.period_vwap: int | None = period_vwap
@@ -1933,7 +1933,7 @@ class ScreenerVWAP(ScreenerBase):
 class ScreenerVProfile(ScreenerBase):
 	def __init__(
 		self,
-		n_stockcodes: int = 10,
+		n_stockcodes: int | None = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		radar_period: int | None = None,
@@ -1983,7 +1983,7 @@ class ScreenerVProfile(ScreenerBase):
 			dbs=dbs,
 		)
 
-		self.n_stockcodes: int = n_stockcodes
+		self.n_stockcodes: int | None = n_stockcodes
 		self.radar_period: int | None = radar_period
 		# Which reading of the profile selects the stocklist; the annotations stay the same either way.
 		self.screener_vprofile_criteria = screener_vprofile_criteria
@@ -2003,7 +2003,7 @@ class ScreenerVProfile(ScreenerBase):
 		assert isinstance(self.radar_period, int)
 		return await sc.vprofile_criteria_stocklist(self.wf_indicators, self.radar_period, self.screener_vprofile_criteria)
 
-	async def _get_data_from_stocklist(self,n_stockcodes: int) -> tuple[list[str], pd.DataFrame]:
+	async def _get_data_from_stocklist(self,n_stockcodes: int | None) -> tuple[list[str], pd.DataFrame]:
 		assert isinstance(self.radar_period, int), 'radar_period must be int'
 		# Get selected_broker_nval that has level 0 index (code) in self.stocklist
 		stocklist_selected_broker_nval = self.selected_broker_nval.loc[self.selected_broker_nval.index.get_level_values(0).isin(self.stocklist)]

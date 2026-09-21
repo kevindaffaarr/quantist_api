@@ -714,7 +714,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 	"""
 	def __init__(self,
 		accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
-		n_stockcodes: int = 10,
+		n_stockcodes: int | None = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		radar_period: int | None = None,
@@ -737,7 +737,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		)
 
 		self.accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = accum_or_distri
-		self.n_stockcodes: int = n_stockcodes
+		self.n_stockcodes: int | None = n_stockcodes
 	
 	async def screen(self) -> ScreenerMoneyFlow:
 		# Get default param: self.period_mf, self.period_pricecorrel, self.screener_min_value, self.screener_min_frequency, self.screener_min_prop, self.bar_range
@@ -764,7 +764,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		filtered_stockcodes: pd.Series,
 		stockcode_excludes: set[str],
 		accum_or_distri: dp.ScreenerList = dp.ScreenerList.most_accumulated,
-		n_stockcodes: int = 10,
+		n_stockcodes: int | None = 10,
 		startdate: datetime.date | ScalarSelect | None = None,
 		radar_period: int | None = None,
 		period_pricecorrel: int | None = None,
@@ -779,6 +779,10 @@ class ScreenerMoneyFlow(ScreenerBase):
 		).filter(db.StockData.code.notin_(stockcode_excludes)
 		).filter(db.StockData.date.between(startdate,enddate)
 		).group_by(db.StockData.code)
+		# The foreign money-flow family truncates in SQL rather than in the rank
+		# helper, so "every candidate" has to be handled here too: limit(None)
+		# emits no LIMIT clause at all. Patching only screener.py would leave
+		# this one capped and nothing would say so.
 		if accum_or_distri == dp.ScreenerList.most_distributed:
 			sub_qry_1 = sub_qry_1.order_by(asc('mf'), asc(db.StockData.code)).limit(n_stockcodes).subquery()
 		else:
@@ -869,7 +873,7 @@ class ScreenerVWAP(ScreenerBase):
 			dp.ScreenerList.vwap_breakout,
 			dp.ScreenerList.vwap_breakdown
 			] = dp.ScreenerList.vwap_rally,
-		n_stockcodes: int = 10,
+		n_stockcodes: int | None = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		radar_period: int | None = None,
@@ -906,7 +910,7 @@ class ScreenerVWAP(ScreenerBase):
 			dp.ScreenerList.vwap_breakout,
 			dp.ScreenerList.vwap_breakdown
 			] = screener_vwap_criteria
-		self.n_stockcodes: int = n_stockcodes
+		self.n_stockcodes: int | None = n_stockcodes
 		self.percentage_range: float | None = percentage_range
 		self.period_vwap: int | None = period_vwap
 
@@ -1031,7 +1035,7 @@ class ScreenerVWAP(ScreenerBase):
 	async def _get_data_from_stocklist(self, 
 		raw_data: pd.DataFrame,
 		stocklist: list,
-		n_stockcodes: int
+		n_stockcodes: int | None
 		) -> tuple[list, pd.DataFrame]:
 		# Get data from stocklist
 		top_data = raw_data.loc[raw_data.index.get_level_values('code').isin(stocklist)]
@@ -1057,7 +1061,7 @@ class ScreenerVWAP(ScreenerBase):
 class ScreenerVProfile(ScreenerBase):
 	def __init__ (
 		self,
-		n_stockcodes: int = 10,
+		n_stockcodes: int | None = 10,
 		startdate: datetime.date | None = None,
 		enddate: datetime.date = datetime.date.today(),
 		radar_period: int | None = None,
@@ -1085,7 +1089,7 @@ class ScreenerVProfile(ScreenerBase):
 			dbs = dbs,
 		)
 
-		self.n_stockcodes: int = n_stockcodes
+		self.n_stockcodes: int | None = n_stockcodes
 		# Which reading of the profile selects the stocklist; the annotations stay the same either way.
 		self.screener_vprofile_criteria = screener_vprofile_criteria
 	
@@ -1155,7 +1159,7 @@ class ScreenerVProfile(ScreenerBase):
 		assert isinstance(self.radar_period, int)
 		return await sc.vprofile_criteria_stocklist(raw_data, self.radar_period, self.screener_vprofile_criteria)
 
-	async def _get_data_from_stocklist(self,n_stockcodes: int) -> tuple[list[str], pd.DataFrame]:
+	async def _get_data_from_stocklist(self,n_stockcodes: int | None) -> tuple[list[str], pd.DataFrame]:
 		assert isinstance(self.radar_period, int), 'radar_period must be int'
 		# Get raw_data that has level 0 index (code) in self.stocklist
 		raw_data = self.raw_data.loc[self.raw_data.index.get_level_values('code').isin(self.stocklist)]

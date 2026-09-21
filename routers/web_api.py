@@ -113,13 +113,16 @@ async def get_web_screeners() -> wc.ScreenerCatalog:
 # ==========
 # Screener results
 # ==========
-def _screener_object(slug: str, method: dp.AnalysisMethod, n_stockcodes: int, enddate: datetime.date):
+def _screener_object(slug: str, method: dp.AnalysisMethod, n_stockcodes: int | None, enddate: datetime.date):
 	"""
 	The screener class for one slug and method.
 
 	Dispatch lives here rather than in the contract module: choosing a class is
 	an API concern, and web_contract stays free of quantist_library imports so
 	it can be tested without a database.
+
+	`n_stockcodes=None` asks for every candidate. The web route is the only
+	caller that passes it; /whaleanalysis keeps its top-ten default.
 	"""
 	family = wc.SCREENER_FAMILY[slug]
 	library = ff if method == dp.AnalysisMethod.foreign else bf
@@ -141,19 +144,25 @@ def _screener_object(slug: str, method: dp.AnalysisMethod, n_stockcodes: int, en
 async def get_web_screener_results(
 	slug: dp.ScreenerList,
 	method: dp.AnalysisMethod = dp.AnalysisMethod.broker,
-	n_stockcodes: int = 10,
 	enddate: datetime.date = datetime.date.today(),
 	) -> wc.ScreenerResults:
 	"""
-	Ranked results for one screener criterion, in one shape for every criterion.
+	Every stock matching one screener criterion, in one shape for every criterion.
 
-	Additive: /whaleanalysis/screener/* keeps its DataFrame-dump response for
-	Telegram and existing callers. This route normalizes the same objects into
-	the semantic contract the browser reads, with the columns a criterion does
-	not share carried through as extras rather than dropped.
+	Deliberately uncapped, and there is no parameter to cap it: the browser
+	screens the whole market and the EOD job caches the whole answer, so a
+	top-N here would mean the cache silently held a tenth of the result. The
+	library's `n_stockcodes=None` mode is what makes that an explicit choice
+	rather than a large number pretending to be all.
+
+	Additive: /whaleanalysis/screener/* keeps its DataFrame-dump response and
+	its top-ten default for Telegram and existing callers. This route
+	normalizes the same objects into the semantic contract the browser reads,
+	with the columns a criterion does not share carried through as extras
+	rather than dropped.
 	"""
 	try:
-		screener = _screener_object(slug.value, method, n_stockcodes, enddate)
+		screener = _screener_object(slug.value, method, None, enddate)
 		screener = await screener.screen()
 		frame = screener.top_stockcodes
 
