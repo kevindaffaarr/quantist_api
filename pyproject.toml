@@ -29,5 +29,5 @@ dev = [
     "ruff==0.16.8",
 ]
 server = [
-    "psycopg[binary]==3.3.5",
+    "psycopg[binary]==3.3.6",
 ]
