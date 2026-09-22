@@ -4,7 +4,7 @@ import json
 import pandas as pd
 
 from quantist_library.screener import flow_price_correlation
-from research.generate_screener_observations import forward_result, render_html, summarize
+from research.generate_screener_observations import HORIZONS, forward_result, render_html, summarize
 
 
 def test_forward_result_ignores_prices_on_or_before_observation():
@@ -45,8 +45,8 @@ def test_zero_next_open_is_unavailable_not_an_exception():
 
 def test_summary_uses_only_valid_numeric_returns():
     rows = [
-        {"horizons": {str(horizon): {"forward_return": 0.1 if horizon == 1 else None} for horizon in (1, 3, 5, 10, 20)}},
-        {"horizons": {str(horizon): {"forward_return": -0.1 if horizon == 1 else None} for horizon in (1, 3, 5, 10, 20)}},
+        {"horizons": {str(horizon): {"forward_return": 0.1 if horizon == 1 else None} for horizon in HORIZONS}},
+        {"horizons": {str(horizon): {"forward_return": -0.1 if horizon == 1 else None} for horizon in HORIZONS}},
     ]
     summary = summarize(rows)["1"]
     assert summary["observations"] == 2
@@ -54,6 +54,15 @@ def test_summary_uses_only_valid_numeric_returns():
     assert summary["positive_count"] == 1
     assert summary["positive_rate"] == 0.5
     assert summary["average"] == 0.0
+    assert summary["median"] == 0.0
+
+
+def test_summary_includes_50_and_100_session_horizons():
+    rows = [{"horizons": {str(horizon): {"forward_return": 0.05} for horizon in HORIZONS}}]
+    summary = summarize(rows)
+    assert tuple(int(horizon) for horizon in summary) == (1, 3, 5, 10, 20, 50, 100)
+    assert summary["50"]["median"] == 0.05
+    assert summary["100"]["positive_rate"] == 1.0
 
 
 def test_single_code_flow_correlation_has_a_flat_index():
@@ -72,7 +81,7 @@ def test_static_html_contains_indonesian_disclaimer_and_no_trade_language():
         "disclaimer": "Bukan sinyal beli/jual atau rekomendasi investasi.",
         "status": "unavailable",
         "reason": "Data historis belum tersedia.",
-        "horizons": {str(horizon): {"average": None, "valid_results": 0, "positive_rate": None} for horizon in (1, 3, 5, 10, 20)},
+        "horizons": {str(horizon): {"average": None, "valid_results": 0, "positive_rate": None} for horizon in HORIZONS},
         "observations": [],
         "errors": [],
     }
@@ -81,5 +90,9 @@ def test_static_html_contains_indonesian_disclaimer_and_no_trade_language():
     assert payload["disclaimer"] in html
     assert "Data historis belum tersedia." in html
     assert "BUY" not in html and "SELL" not in html
+    assert "Rentang tanggal" in html
+    assert "Rentang nilai saham" in html
+    assert "Pemilih saham" in html
+    assert "Rata-rata" in html and "Median" in html and "Hasil positif" in html
     json.dumps(payload)
 
