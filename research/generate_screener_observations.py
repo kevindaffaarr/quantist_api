@@ -275,7 +275,7 @@ load();
 
 def write_artifacts(payload: dict[str, Any], output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "screener-observations.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "screener-observations.json").write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     fields = ["observation_date", "slug", "method", "code", "display_name", "rank", "reference_close", "next_session_date", "next_session_open"]
     fields += [f"horizon_{horizon}_date" for horizon in HORIZONS] + [f"horizon_{horizon}_close" for horizon in HORIZONS] + [f"horizon_{horizon}_return" for horizon in HORIZONS]
     with (output_dir / "screener-observations.csv").open("w", newline="", encoding="utf-8") as handle:
