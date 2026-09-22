@@ -93,6 +93,7 @@ def test_static_html_contains_indonesian_disclaimer_and_no_trade_language():
     assert "Rentang tanggal" in html
     assert "Rentang nilai saham" in html
     assert "Pemilih saham" in html
+    assert "stock-pills" in html and "stock-options" in html and "remove-stock" in html
     assert "Rata-rata" in html and "Median" in html and "Hasil positif" in html
     json.dumps(payload)
 
