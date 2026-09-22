@@ -208,18 +208,18 @@ def render_html(payload: dict[str, Any]) -> str:
     return f"""<!doctype html>
 <html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Analisis Observasi Screener · Quantist</title>
 <style>
-:root{{--page:#0b0c10;--panel:#0e0f14;--raised:#14161d;--border:#232734;--ink:#e6e9f2;--muted:#98a0b4;--purple:#a46bf2;--green:#62d39a}}*{{box-sizing:border-box}}body{{margin:0;background:var(--page);color:var(--ink);font:14px/1.55 Inter,system-ui,sans-serif}}main{{max-width:1240px;margin:auto;padding:44px 28px 72px}}header{{display:flex;justify-content:space-between;gap:32px;border-bottom:1px solid var(--border);padding-bottom:28px}}h1{{font-size:32px;line-height:1.1;margin:6px 0 12px}}h2{{font-size:18px;margin:0 0 8px}}p{{color:var(--muted);margin:6px 0}}.kicker,small{{color:var(--purple);font-size:11px;letter-spacing:.1em;text-transform:uppercase}}.disclaimer{{color:var(--ink);font-weight:600}}.source{{text-align:right;font-size:12px}}code,pre,td,th,strong,input,select{{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,monospace}}section{{margin-top:30px}}.filters{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:18px;background:var(--raised);border:1px solid var(--border)}}label{{display:grid;gap:6px;color:var(--muted);font-size:12px}}input,select{{width:100%;min-height:38px;padding:8px 10px;background:var(--panel);color:var(--ink);border:1px solid var(--border);border-radius:6px}}.filter-pair{{display:grid;grid-template-columns:1fr 1fr;gap:8px}}.summary-head{{display:flex;align-items:end;justify-content:space-between;gap:16px}}.summary-head p{{text-align:right}}.scroll{{overflow:auto;border:1px solid var(--border)}}table{{width:100%;border-collapse:collapse;background:var(--panel)}}th,td{{text-align:left;border-bottom:1px solid var(--border);padding:11px 12px;white-space:nowrap}}th{{color:var(--muted);font-size:11px;text-transform:uppercase}}td.number{{text-align:right}}td.positive{{color:var(--green)}}.state{{border:1px solid var(--border);background:var(--raised);padding:24px}}details{{margin-top:24px;color:var(--muted)}}.note{{font-size:12px}}@media(max-width:780px){{main{{padding:28px 16px}}header{{display:block}}.source{{text-align:left;margin-top:18px}}.filters{{grid-template-columns:1fr 1fr}}}}@media(max-width:480px){{.filters{{grid-template-columns:1fr}}.summary-head{{display:block}}.summary-head p{{text-align:left}}}}
+:root{{--page:#0b0c10;--panel:#0e0f14;--raised:#14161d;--border:#232734;--ink:#e6e9f2;--muted:#98a0b4;--purple:#a46bf2;--green:#62d39a}}*{{box-sizing:border-box}}body{{margin:0;background:var(--page);color:var(--ink);font:14px/1.55 Inter,system-ui,sans-serif}}main{{max-width:1240px;margin:auto;padding:44px 28px 72px}}header{{display:flex;justify-content:space-between;gap:32px;border-bottom:1px solid var(--border);padding-bottom:28px}}h1{{font-size:32px;line-height:1.1;margin:6px 0 12px}}h2{{font-size:18px;margin:0 0 8px}}p{{color:var(--muted);margin:6px 0}}.kicker,small{{color:var(--purple);font-size:11px;letter-spacing:.1em;text-transform:uppercase}}.disclaimer{{color:var(--ink);font-weight:600}}.source{{text-align:right;font-size:12px}}code,pre,td,th,strong,input,select{{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,monospace}}section{{margin-top:30px}}.filters{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:18px;background:var(--raised);border:1px solid var(--border)}}label{{display:grid;gap:6px;color:var(--muted);font-size:12px}}input,select{{width:100%;min-height:38px;padding:8px 10px;background:var(--panel);color:var(--ink);border:1px solid var(--border);border-radius:6px}}.filter-pair{{display:grid;grid-template-columns:1fr 1fr;gap:8px}}.stock-control{{position:relative}}.pills{{display:flex;flex-wrap:wrap;gap:6px;min-height:38px;padding:6px;background:var(--panel);border:1px solid var(--border);border-radius:6px}}.pill{{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:999px;background:#302344;color:var(--ink)}}.pill button{{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:0}}.pill-empty{{color:var(--muted);padding:3px}}.stock-control>button{{margin-top:6px;min-height:32px;padding:5px 9px;background:var(--panel);color:var(--ink);border:1px solid var(--border);border-radius:6px;cursor:pointer}}.stock-options{{position:absolute;z-index:2;left:0;right:0;max-height:240px;overflow:auto;margin-top:4px;padding:8px;background:var(--panel);border:1px solid var(--border);border-radius:6px}}.stock-option{{display:flex;gap:8px;align-items:center;padding:6px;color:var(--ink)}}.stock-option input{{width:auto;min-height:auto}}.summary-head{{display:flex;align-items:end;justify-content:space-between;gap:16px}}.summary-head p{{text-align:right}}.scroll{{overflow:auto;border:1px solid var(--border)}}table{{width:100%;border-collapse:collapse;background:var(--panel)}}th,td{{text-align:left;border-bottom:1px solid var(--border);padding:11px 12px;white-space:nowrap}}th{{color:var(--muted);font-size:11px;text-transform:uppercase}}td.number{{text-align:right}}td.positive{{color:var(--green)}}.state{{border:1px solid var(--border);background:var(--raised);padding:24px}}details{{margin-top:24px;color:var(--muted)}}.note{{font-size:12px}}@media(max-width:780px){{main{{padding:28px 16px}}header{{display:block}}.source{{text-align:left;margin-top:18px}}.filters{{grid-template-columns:1fr 1fr}}}}@media(max-width:480px){{.filters{{grid-template-columns:1fr}}.summary-head{{display:block}}.summary-head p{{text-align:left}}}}
 </style></head><body><main><header><div><div class="kicker">Riset kuantitatif · hasil statis</div><h1>Analisis Observasi Screener</h1><p class="disclaimer">{html.escape(payload['disclaimer'])}</p><p>Screener adalah penyaring kandidat. Halaman ini mengukur perubahan setelah observasi, bukan keputusan transaksi.</p></div><div class="source">Dataset<br><strong>{html.escape(str(query['slug']))} · {html.escape(str(query['method']))}</strong><br>{html.escape(query['startdate'])} – {html.escape(query['enddate'])}</div></header>
-<section><h2>Filter rekap</h2><p>Filter hanya menghitung ulang observasi yang sudah tersimpan di browser. Tidak ada backtest baru saat filter diubah.</p><div class="filters"><label>Rentang tanggal<div class="filter-pair"><input id="date-from" type="date" aria-label="Tanggal mulai"><input id="date-to" type="date" aria-label="Tanggal akhir"></div></label><label>Rentang nilai saham<div class="filter-pair"><input id="value-min" type="number" step="any" placeholder="Minimum" aria-label="Nilai saham minimum"><input id="value-max" type="number" step="any" placeholder="Maksimum" aria-label="Nilai saham maksimum"></div></label><label>Pemilih saham<select id="stock-picker" aria-label="Pemilih saham"><option value="">Semua saham</option></select></label><label>Status data<div id="load-status" class="state">Memuat data tersimpan…</div></label></div></section>
+<section><h2>Filter rekap</h2><p>Filter hanya menghitung ulang observasi yang sudah tersimpan di browser. Tidak ada backtest baru saat filter diubah.</p><div class="filters"><label>Rentang tanggal<div class="filter-pair"><input id="date-from" type="date" aria-label="Tanggal mulai"><input id="date-to" type="date" aria-label="Tanggal akhir"></div></label><label>Rentang nilai saham<div class="filter-pair"><input id="value-min" type="number" step="any" placeholder="Minimum" aria-label="Nilai saham minimum"><input id="value-max" type="number" step="any" placeholder="Maksimum" aria-label="Nilai saham maksimum"></div></label><label>Pemilih saham<div class="stock-control"><div id="stock-pills" class="pills" aria-live="polite"><span class="pill-empty">Semua saham</span></div><button id="stock-picker-button" type="button" aria-expanded="false">Pilih saham</button><div id="stock-options" class="stock-options" hidden></div></div></label><label>Status data<div id="load-status" class="state">Memuat data tersimpan…</div></label></div></section>
 <section><div class="summary-head"><div><h2>Agregat hasil</h2><p>Mean dan median adalah perubahan relatif dari pembukaan sesi berikutnya ke penutupan pada horizon terkait. Hasil positif = persentase observasi dengan perubahan di atas nol.</p></div><p id="row-count">—</p></div><div id="summary" class="scroll"><div class="state">{initial_reason}</div></div></section>{error_note}</main>
 <script>
 const HORIZONS = [1, 3, 5, 10, 20, 50, 100];
 const INITIAL_SUMMARY = {initial_summary};
-const state = {{ payload: null }};
+const state = {{ payload: null, selectedStocks: new Set() }};
 const $ = (id) => document.getElementById(id);
 const percent = (value) => value == null ? '—' : `${{(value * 100).toFixed(2)}}%`;
 const dateValue = (id) => $(id).value;
-const finite = (value) => Number.isFinite(Number(value)) ? Number(value) : null;
+const finite = (value) => value === '' || value == null ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
 function median(values) {{
   if (!values.length) return null;
   const ordered = [...values].sort((a, b) => a - b);
@@ -241,10 +241,11 @@ function aggregate(rows) {{
 }}
 function filteredRows() {{
   const from = dateValue('date-from'); const to = dateValue('date-to');
-  const min = finite($('value-min').value); const max = finite($('value-max').value); const stock = $('stock-picker').value;
+  const min = finite($('value-min').value); const max = finite($('value-max').value);
   return state.payload.observations.filter((row) => {{
     const value = finite(row.reference_close);
-    return (!from || row.observation_date >= from) && (!to || row.observation_date <= to) && (min === null || (value !== null && value >= min)) && (max === null || (value !== null && value <= max)) && (!stock || row.code === stock);
+    const stockMatch = state.selectedStocks.size === 0 || state.selectedStocks.has(row.code);
+    return (!from || row.observation_date >= from) && (!to || row.observation_date <= to) && (min === null || (value !== null && value >= min)) && (max === null || (value !== null && value <= max)) && stockMatch;
   }});
 }}
 function render() {{
@@ -255,9 +256,28 @@ function render() {{
   if (!aggregates.length) {{ $('summary').innerHTML = '<div class="state">Tidak ada observasi yang cocok dengan filter.</div>'; return; }}
   $('summary').innerHTML = `<table><thead><tr><th>Screener</th><th>Metode</th><th>Horizon</th><th>Observasi</th><th>Hasil valid</th><th>Rata-rata</th><th>Median</th><th>Hasil positif</th></tr></thead><tbody>${{aggregates.map((item) => `<tr><td>${{item.slug}}</td><td>${{item.method}}</td><td>${{item.horizon}} sesi</td><td class="number">${{item.observations.toLocaleString('id-ID')}}</td><td class="number">${{item.valid_results.toLocaleString('id-ID')}}</td><td class="number">${{percent(item.mean)}}</td><td class="number">${{percent(item.median)}}</td><td class="number positive">${{percent(item.positive_rate)}}</td></tr>`).join('')}}</tbody></table>`;
 }}
+function renderStockPills() {{
+  const labels = new Map(state.payload.observations.map((row) => [row.code, row.display_name || row.code.toUpperCase()]));
+  $('stock-pills').innerHTML = state.selectedStocks.size === 0 ? '<span class="pill-empty">Semua saham</span>' : [...state.selectedStocks].map((code) => `<span class="pill">${{labels.get(code) || code.toUpperCase()}}<button class="remove-stock" type="button" data-code="${{code}}" aria-label="Hapus ${{code}}">×</button></span>`).join('');
+}}
 function populateStocks() {{
   const stocks = [...new Map(state.payload.observations.map((row) => [row.code, row.display_name || row.code.toUpperCase()])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  $('stock-picker').innerHTML = '<option value="">Semua saham</option>' + stocks.map(([code, name]) => `<option value="${{code}}">${{name}}</option>`).join('');
+  $('stock-options').innerHTML = stocks.map(([code, name]) => `<label class="stock-option"><input type="checkbox" value="${{code}}"><span>${{name}}</span></label>`).join('');
+  $('stock-options').addEventListener('change', (event) => {{
+    if (event.target.matches('input[type="checkbox"]')) {{
+      event.target.checked ? state.selectedStocks.add(event.target.value) : state.selectedStocks.delete(event.target.value);
+      renderStockPills(); render();
+    }}
+  }});
+  $('stock-pills').addEventListener('click', (event) => {{
+    const button = event.target.closest('.remove-stock');
+    if (!button) return;
+    state.selectedStocks.delete(button.dataset.code);
+    const checkbox = $('stock-options').querySelector(`input[value="${{button.dataset.code}}"]`);
+    if (checkbox) checkbox.checked = false;
+    renderStockPills(); render();
+  }});
+  renderStockPills();
 }}
 async function load() {{
   try {{
@@ -268,7 +288,12 @@ async function load() {{
     populateStocks(); render();
   }} catch (error) {{ $('load-status').textContent = `Data tidak dapat dimuat: ${{error.message}}`; $('summary').innerHTML = '<div class="state">Data historis belum tersedia.</div>'; }}
 }}
-['date-from', 'date-to', 'value-min', 'value-max', 'stock-picker'].forEach((id) => $(id).addEventListener('input', render));
+['date-from', 'date-to', 'value-min', 'value-max'].forEach((id) => $(id).addEventListener('input', render));
+$('stock-picker-button').addEventListener('click', () => {{
+  const options = $('stock-options');
+  options.hidden = !options.hidden;
+  $('stock-picker-button').setAttribute('aria-expanded', String(!options.hidden));
+}});
 load();
 </script></body></html>"""
 
