@@ -293,9 +293,13 @@ def flow_price_correlation(close: Any, net_value: Any) -> pd.Series:
 	either way: does the price move with this flow.
 	"""
 	frame = pd.DataFrame({"close": close, "valflow": net_value.groupby(level="code").cumsum()})
-	correlations = frame.groupby(level="code").diff().groupby(level="code")[["close", "valflow"]]\
-		.corr(method="pearson")
-	return correlations.iloc[0::2, -1].droplevel(1)
+	correlations: dict[Any, float] = {}
+	for code, group in frame.groupby(level="code"):
+		differenced = group.droplevel("code").diff()
+		correlation = differenced["close"].corr(differenced["valflow"], method="pearson")
+		if pd.notna(correlation):
+			correlations[code] = float(correlation)
+	return pd.Series(correlations, dtype=float)
 
 
 # ==========
