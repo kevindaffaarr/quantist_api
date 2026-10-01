@@ -12,6 +12,7 @@ statically. What must not drift:
 """
 import asyncio
 import datetime
+import inspect
 import json
 from typing import Any
 
@@ -23,6 +24,7 @@ import dependencies as dp
 import main
 import web_contract as wc
 from routers import web_api
+from routers import whaleanalysis as legacy_routes
 
 PATHS = main.app.openapi()["paths"]
 
@@ -370,3 +372,25 @@ def test_the_serialized_body_carries_the_deep_rows_and_their_ranks(monkeypatch):
 	assert raw["rows"][119] == {**raw["rows"][119], "rank": 120, "code": "s0119"}
 	assert raw["rows"][-1]["rank"] == ROWS
 	assert [entry["rank"] for entry in raw["rows"]] == sorted(entry["rank"] for entry in raw["rows"])
+
+
+def test_no_legacy_route_freezes_enddate_at_import():
+	# `enddate: datetime.date = datetime.date.today()` is evaluated once, when
+	# the module is imported, so a process that stays up keeps answering for
+	# the day it started — a warm at 10:30 the next morning would serve the
+	# previous day's window. Every handler in the legacy router takes the
+	# default as None and resolves it per request, the way the web routes do.
+	checked = 0
+	for route in legacy_routes.router.routes:
+		endpoint = getattr(route, "endpoint", None)
+		if endpoint is None:
+			continue
+		parameters = inspect.signature(inspect.unwrap(endpoint)).parameters
+		if "enddate" not in parameters:
+			continue
+		checked += 1
+		default = parameters["enddate"].default
+		path = getattr(route, "path", "?")
+		assert default is None, f"{path} froze its enddate at import: {default!r}"
+
+	assert checked >= 12, f"only {checked} legacy routes carry an enddate"
