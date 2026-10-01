@@ -110,3 +110,21 @@ def test_vprofile_event_ranking_uses_directional_flow_tiebreak(criteria, expecte
     )
 
     assert rank_vprofile_candidates(candidates, criteria, 2).index.tolist() == expected
+
+
+def test_vprofile_ranking_of_no_candidates_is_an_empty_answer_not_a_keyerror():
+    # What a criterion with no matches hands to the ranking: the columns the
+    # flow built, and none of the annotation columns, because there was no code
+    # to annotate. Reading ``vprofile_zone_prominence`` off that frame raised
+    # KeyError, which the API reports as 404/500 and the EOD warm counted as a
+    # failed key — so "nothing matched today" broke a run instead of warming an
+    # empty answer.
+    candidates = pd.DataFrame(
+        {"close": [], "mf": [], "corr": []},
+        index=pd.Index([], name="code"),
+    )
+
+    ranked = rank_vprofile_candidates(candidates, "vprofile_breakout", None)
+
+    assert ranked.empty
+    assert ranked.index.name == "code"
