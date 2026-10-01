@@ -24,6 +24,20 @@ def date_only(value: datetime.date | datetime.datetime | pd.Timestamp | None) ->
 	raise TypeError(f"Expected a date-like value, got {type(value).__name__}")
 
 
+def bar_range_of(frame: pd.DataFrame) -> int:
+	"""Bars in the window for the busiest code; 0 when the window holds no rows.
+
+	``frame.groupby(level="code").size().max()`` is NaN on an empty frame and
+	``int(NaN)`` raises ``ValueError``, so an empty universe — no broker passing
+	the criterion, no rows inside the window — became a 500 three call levels
+	below the request instead of an empty screen. A window with no rows has no
+	bars, and the empty frame is screened and reported as empty either way.
+	"""
+	if frame.empty:
+		return 0
+	return int(frame.groupby(level="code").size().max())
+
+
 class Bin():
 	def __init__(self, data:pd.DataFrame) -> None:
 		self.data:pd.DataFrame = data
