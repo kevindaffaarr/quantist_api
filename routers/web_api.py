@@ -166,8 +166,8 @@ async def get_web_screener_results(
 		screener = await screener.screen()
 		frame = screener.top_stockcodes
 
-	except KeyError as err:
-		raise HTTPException(status.HTTP_404_NOT_FOUND, detail=err.args[0]) from err
+	# No KeyError → 404 here: the slug is enum-validated, so a KeyError is an
+	# internal bug and must read as one (500, which the EOD warm retries).
 	except ValueError as err:
 		raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=err.args[0]) from err
 	except Exception as err:

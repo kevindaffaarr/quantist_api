@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
+from fastapi import HTTPException
 
 import dependencies as dp
 import main
@@ -325,6 +326,21 @@ def _call_route(monkeypatch, frame: pd.DataFrame, seen: dict[str, Any]):
 
 	monkeypatch.setattr(web_api, "_screener_object", fake_screener_object)
 	return asyncio.run(web_api.get_web_screener_results(dp.ScreenerList.vwap_rally, dp.AnalysisMethod.broker))
+
+
+def test_an_internal_keyerror_is_a_500_not_a_404(monkeypatch):
+	# 2026-10-01: a missing pandas column answered 404 "vprofile_zone_prominence",
+	# which looked like a missing route and was not retried by the EOD warm.
+	class _Broken(_StubScreener):
+		async def screen(self):
+			raise KeyError("vprofile_zone_prominence")
+
+	monkeypatch.setattr(web_api, "_screener_object", lambda *args: _Broken(_wide_screener_frame(1)))
+
+	with pytest.raises(HTTPException) as raised:
+		asyncio.run(web_api.get_web_screener_results(dp.ScreenerList.vprofile_breakout, dp.AnalysisMethod.foreign))
+
+	assert raised.value.status_code == 500
 
 
 def test_every_row_of_a_nine_hundred_row_screener_reaches_the_web_response(monkeypatch):
