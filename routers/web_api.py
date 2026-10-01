@@ -45,10 +45,14 @@ async def get_web_chart(
 	code: str = wc.DEFAULT_INSTRUMENT,
 	method: dp.AnalysisMethod = dp.AnalysisMethod.broker,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	clustering_method: dp.ClusteringMethod = dp.ClusteringMethod.correlation,
 	) -> wc.WebChart:
 	"""Semantic chart payload for one instrument. COMPOSITE and IHSG are the same instrument."""
+	# Resolved per request: a default in the signature is evaluated once, at
+	# import, and a process alive past midnight would keep answering for the
+	# day it started.
+	enddate = enddate or datetime.date.today()
 	instrument = wc.resolve_instrument(code)
 
 	try:
@@ -144,7 +148,7 @@ def _screener_object(slug: str, method: dp.AnalysisMethod, n_stockcodes: int | N
 async def get_web_screener_results(
 	slug: dp.ScreenerList,
 	method: dp.AnalysisMethod = dp.AnalysisMethod.broker,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	) -> wc.ScreenerResults:
 	"""
 	Every stock matching one screener criterion, in one shape for every criterion.
@@ -161,6 +165,7 @@ async def get_web_screener_results(
 	with the columns a criterion does not share carried through as extras
 	rather than dropped.
 	"""
+	enddate = enddate or datetime.date.today()  # per request; see get_web_chart
 	try:
 		screener = _screener_object(slug.value, method, None, enddate)
 		screener = await screener.screen()
