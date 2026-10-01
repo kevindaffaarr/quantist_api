@@ -297,15 +297,14 @@ def flow_price_correlation(close: Any, net_value: Any) -> pd.Series:
 
 	The whale families get this from clustering as ``optimum_corr``; the
 	foreign families have no clustering and compute it here. Same quantity
-	either way: does the price move with this flow.
+	either way: does the price move with this flow. A code with no defined
+	correlation (a flat price) stays in the answer as NaN.
 	"""
 	frame = pd.DataFrame({"close": close, "valflow": net_value.groupby(level="code").cumsum()})
 	correlations: dict[Any, float] = {}
 	for code, group in frame.groupby(level="code"):
 		differenced = group.droplevel("code").diff()
-		correlation = differenced["close"].corr(differenced["valflow"], method="pearson")
-		if pd.notna(correlation):
-			correlations[code] = float(correlation)
+		correlations[code] = float(differenced["close"].corr(differenced["valflow"], method="pearson"))
 	return pd.Series(correlations, dtype=float)
 
 
