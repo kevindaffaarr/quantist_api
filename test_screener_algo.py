@@ -555,3 +555,22 @@ def test_pivot_broker_values_zero_fills_absent_brokers():
 	full = bf.pivot_broker_values(_long_broker_rows(), "nval")
 	assert list(full.columns) == ["ax", "bx", "cx"]
 	assert full.loc[("bbb", pd.Timestamp("2024-01-02")), "cx"] == 0.0
+
+
+def test_vprofile_annotations_of_no_codes_still_carry_every_annotation_column():
+	"""The empty answer keeps the populated answer's shape, so the ranking can read it."""
+	empty = pd.DataFrame(
+		{"close": []},
+		index=pd.MultiIndex.from_tuples([], names=["code", "date"]),
+	)
+
+	annotations = asyncio.run(sc.vprofile_annotations(empty, 20))
+
+	assert annotations.empty
+	assert "vprofile_zone_prominence" in annotations.columns
+
+	# The join and rank both families do, on a day the criterion matched nothing.
+	top = pd.DataFrame({"close": [], "mf": [], "corr": []}, index=pd.Index([], name="code"))
+	ranked = sc.rank_vprofile_candidates(top.join(annotations), "vprofile_breakout", None)
+
+	assert ranked.empty

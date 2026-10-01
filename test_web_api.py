@@ -13,11 +13,13 @@ statically. What must not drift:
 import asyncio
 import datetime
 import json
+import types
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import pytest
+from fastapi import HTTPException
 
 import dependencies as dp
 import main
@@ -325,6 +327,43 @@ def _call_route(monkeypatch, frame: pd.DataFrame, seen: dict[str, Any]):
 
 	monkeypatch.setattr(web_api, "_screener_object", fake_screener_object)
 	return asyncio.run(web_api.get_web_screener_results(dp.ScreenerList.vwap_rally, dp.AnalysisMethod.broker))
+
+
+def test_an_internal_keyerror_is_a_500_not_a_404(monkeypatch):
+	# 2026-10-01: a missing pandas column answered 404 "vprofile_zone_prominence",
+	# which looked like a missing route and was not retried by the EOD warm.
+	class _Broken(_StubScreener):
+		async def screen(self):
+			raise KeyError("vprofile_zone_prominence")
+
+	monkeypatch.setattr(web_api, "_screener_object", lambda *args: _Broken(_wide_screener_frame(1)))
+
+	with pytest.raises(HTTPException) as raised:
+		asyncio.run(web_api.get_web_screener_results(dp.ScreenerList.vprofile_breakout, dp.AnalysisMethod.foreign))
+
+	assert raised.value.status_code == 500
+
+
+def test_a_missing_enddate_is_today_when_asked_not_when_imported(monkeypatch):
+	# The EOD warm sends no enddate; a process alive past midnight must not keep
+	# answering for the day it was imported.
+	class _NextDay(datetime.date):
+		@classmethod
+		def today(cls):
+			return datetime.date(2099, 1, 2)
+
+	seen: dict[str, Any] = {}
+
+	def fake_screener_object(slug, method, n_stockcodes, enddate):
+		seen["enddate"] = enddate
+		return _StubScreener(_wide_screener_frame(1))
+
+	monkeypatch.setattr(web_api, "_screener_object", fake_screener_object)
+	monkeypatch.setattr(web_api, "datetime", types.SimpleNamespace(date=_NextDay))
+
+	asyncio.run(web_api.get_web_screener_results(dp.ScreenerList.vwap_rally, dp.AnalysisMethod.broker))
+
+	assert seen["enddate"] == datetime.date(2099, 1, 2)
 
 
 def test_every_row_of_a_nine_hundred_row_screener_reaches_the_web_response(monkeypatch):
