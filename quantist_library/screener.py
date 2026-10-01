@@ -224,6 +224,13 @@ def rank_vprofile_candidates(
 		mf_ascending = True
 	else:
 		raise ValueError(f"Invalid screener_vprofile_criteria: {criteria}")
+	if len(candidates) == 0:
+		# Nothing matched, so there is no order to put them in — and an empty
+		# candidate frame may not carry the annotation columns at all, which
+		# used to surface as a KeyError the API reported as 404/500. An empty
+		# answer stays an empty answer. len(), not .empty: .empty is also true
+		# for rows without columns, which must not skip the truncation.
+		return candidates
 	return _stable_sort_frame(
 		candidates,
 		["vprofile_zone_prominence", "vprofile_zone_strength", "mf"],
@@ -331,6 +338,32 @@ def _vprofile_ratio(value: float, denominator: float) -> float | None:
 	return float(min(1.0, max(0.0, value / denominator)))
 
 
+def _empty_vprofile_reading() -> dict[str, Any]:
+	"""
+	The annotation a code carries before its own profile says otherwise.
+
+	Named and shared so the *no candidates* case can be shaped like the
+	populated one: every key vprofile_reading can ever set, with the value that
+	means "nothing observed". A criterion matching nothing is an ordinary
+	answer, and the frame it produces still has to be readable by the ranking
+	and by the web contract.
+	"""
+	return {
+		"vprofile_in_zone": False,
+		"vprofile_zone_role": "undetermined",
+		"vprofile_zone_behavior": "undetermined",
+		"vprofile_zone_low": None,
+		"vprofile_zone_high": None,
+		"vprofile_zone_mid": None,
+		"vprofile_distance_to_mid_pct": None,
+		"vprofile_touch_count": 0,
+		"vprofile_zone_strength": None,
+		"vprofile_zone_prominence": None,
+		"vprofile_zone_flow_share": None,
+		"vprofile_event_date": None,
+	}
+
+
 def vprofile_reading(
 	closes: pd.Series,
 	zones: pd.IntervalIndex,
@@ -376,20 +409,7 @@ def vprofile_reading(
 	A missing (NaN) last close says nothing about now: role, behavior and the
 	distance stay empty, while membership still answers for the window.
 	"""
-	reading: dict[str, Any] = {
-		"vprofile_in_zone": False,
-		"vprofile_zone_role": "undetermined",
-		"vprofile_zone_behavior": "undetermined",
-		"vprofile_zone_low": None,
-		"vprofile_zone_high": None,
-		"vprofile_zone_mid": None,
-		"vprofile_distance_to_mid_pct": None,
-		"vprofile_touch_count": 0,
-		"vprofile_zone_strength": None,
-		"vprofile_zone_prominence": None,
-		"vprofile_zone_flow_share": None,
-		"vprofile_event_date": None,
-	}
+	reading: dict[str, Any] = _empty_vprofile_reading()
 	values = closes.to_numpy(dtype="float64")
 	if len(zones) == 0 or len(values) == 0:
 		return reading
@@ -489,11 +509,22 @@ async def vprofile_annotate(data: pd.DataFrame, checking_period: int) -> tuple[s
 
 
 async def vprofile_annotations(data: pd.DataFrame, checking_period: int) -> pd.DataFrame:
-	"""Per-code zone annotations, indexed by code, ready to join onto top_stockcodes."""
+	"""Per-code zone annotations, indexed by code, ready to join onto top_stockcodes.
+
+	Every annotation column comes back even when nothing matched. A criterion
+	that selects no codes is an answer — the browser and the Telegram tables
+	are allowed to be empty — and ``from_dict`` on an empty result yields a
+	frame with *no columns at all*, so the join onto the candidate frame added
+	nothing and the ranking read ``vprofile_zone_prominence`` off it as a
+	KeyError. The API answers a KeyError with 404/500, which made "nothing
+	matched today" indistinguishable from "this endpoint is broken".
+	"""
 	results = await asyncio.gather(*[
 		vprofile_annotate(group, checking_period)
 		for _, group in data.groupby(level="code", group_keys=False)
 	])
+	if not results:
+		return pd.DataFrame(columns=list(_empty_vprofile_reading()), index=pd.Index([], name="code"))
 	return pd.DataFrame.from_dict(dict(results), orient="index").rename_axis("code")
 
 

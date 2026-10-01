@@ -359,6 +359,31 @@ def test_the_volume_profile_extras_still_ride_along():
 	assert any(name.startswith("vprofile_") for name in extras)
 
 
+@pytest.mark.parametrize("method, frame_of, make", [
+	("broker", _broker_vprofile_frame, _broker_vprofile_object),
+	("foreign", _foreign_vprofile_frame, _foreign_vprofile_object),
+])
+@pytest.mark.parametrize("criterion", [
+	"vprofile_inside", "vprofile_breakout", "vprofile_breakdown",
+	"vprofile_support_bounce", "vprofile_resistance_rejection",
+])
+def test_a_criterion_that_selects_nothing_is_an_empty_answer(method, frame_of, make, criterion):
+	# The 2026-10-01 incident: zero selected codes reached the annotation and
+	# ranking with no annotation columns, raised KeyError, and the web route
+	# answered 404. Nothing matching is an ordinary day.
+	instance = make()
+	instance.stocklist = []
+	instance.screener_vprofile_criteria = dp.ScreenerList(criterion)
+
+	frame = frame_of(instance=instance)
+	results = wc.build_screener_results(slug=criterion, method=method, frame=frame, metadata={"enddate": ENDDATE})
+
+	assert results.count == 0
+	assert results.rows == []
+	# Same shape as a populated answer, so nothing downstream reads a missing column.
+	assert list(frame.columns) == list(frame_of().columns)
+
+
 # ==========
 # The window is the window
 # ==========
