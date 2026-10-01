@@ -49,7 +49,7 @@ async def get_foreign_chart(
 	media_type:dp.ListMediaType = dp.ListMediaType.json,
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	period_mf: int | None = None,
 	period_prop: int | None = None,
 	period_pricecorrel: int | None = None,
@@ -62,6 +62,7 @@ async def get_foreign_chart(
 	pow_medium_pricecorrel: int | None = None,
 	pow_medium_mapricecorrel: int | None = None,
 ):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	if media_type not in [dp.ListMediaType.png,
 		dp.ListMediaType.jpeg,
 		dp.ListMediaType.jpg,
@@ -135,7 +136,7 @@ async def get_broker_chart(
 	api_type: dp.ListBrokerApiType = dp.ListBrokerApiType.brokerflow,
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	clustering_method: dp.ClusteringMethod = dp.ClusteringMethod.correlation,
 	n_selected_cluster:int | None = None,
 	period_mf: int | None = None,
@@ -157,6 +158,7 @@ async def get_broker_chart(
 	splitted_max_n_cluster: int | None = None,
 	stepup_n_cluster_threshold: int | None = None,
 ):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	if media_type not in [dp.ListMediaType.png,
 		dp.ListMediaType.jpeg,
 		dp.ListMediaType.jpg,
@@ -269,7 +271,7 @@ async def get_broker_chart(
 async def get_foreign_radar(
 	media_type:dp.ListMediaType = dp.ListMediaType.json,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	radar_period: int | None = None,
 	y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
 	stockcode_excludes: set[str] = Query(default=set()),
@@ -280,6 +282,7 @@ async def get_foreign_radar(
 	period_mf: int | None = None,
 	period_pricecorrel: int | None = None,
 ):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	if media_type not in [dp.ListMediaType.png,
 		dp.ListMediaType.jpeg,
 		dp.ListMediaType.jpg,
@@ -345,7 +348,7 @@ async def get_foreign_radar(
 async def get_broker_radar(
 	media_type:dp.ListMediaType = dp.ListMediaType.json,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	y_axis_type: dp.ListRadarType = dp.ListRadarType.correlation,
 	stockcode_excludes: set[str] = Query(default=set()),
 	include_composite: bool = False,
@@ -365,6 +368,7 @@ async def get_broker_radar(
 	stepup_n_cluster_threshold: int | None = None,
 	filter_opt_corr: int | None = None,
 ):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	if media_type not in [dp.ListMediaType.png,
 		dp.ListMediaType.jpeg,
 		dp.ListMediaType.jpg,
@@ -443,7 +447,7 @@ async def get_broker_radar(
 async def get_foreign_data(
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	period_mf: int | None = None,
 	period_prop: int | None = None,
 	period_pricecorrel: int | None = None,
@@ -456,6 +460,7 @@ async def get_foreign_data(
 	pow_medium_pricecorrel: int | None = None,
 	pow_medium_mapricecorrel: int | None = None,
 ):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	try:
 		stock_ff_full = ff.StockFFFull(
 			stockcode=stockcode,
@@ -492,7 +497,7 @@ async def get_broker_data(
 	api_type: dp.ListBrokerApiType = dp.ListBrokerApiType.brokerflow,
 	stockcode: str | None = None,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	clustering_method: dp.ClusteringMethod = dp.ClusteringMethod.correlation,
 	n_selected_cluster:int | None = None,
 	period_mf: int | None = None,
@@ -514,6 +519,7 @@ async def get_broker_data(
 	splitted_max_n_cluster: int | None = None,
 	stepup_n_cluster_threshold: int | None = None,
 ):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	try:
 		stock_bf_full = bf.StockBFFull(
 			stockcode=stockcode,
@@ -577,13 +583,14 @@ async def get_screener_foreign_moneyflow(
 	accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	radar_period: int | None = None,
 	stockcode_excludes: set[str] = Query(default=set()),
 	screener_min_value: int | None = None,
 	screener_min_frequency: int | None = None,
 	screener_min_prop:int | None = None,
 	):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	try:
 		screener_moneyflow_object = ff.ScreenerMoneyFlow(
 			accum_or_distri=accum_or_distri,
@@ -630,7 +637,7 @@ async def get_screener_broker_moneyflow(
 	accum_or_distri: Literal[dp.ScreenerList.most_accumulated,dp.ScreenerList.most_distributed] = dp.ScreenerList.most_accumulated,
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	radar_period: int | None = None,
 	stockcode_excludes: set[str] = Query(default=set()),
 	screener_min_value: int | None = None,
@@ -648,6 +655,7 @@ async def get_screener_broker_moneyflow(
 	stepup_n_cluster_threshold: int | None = None,
 	filter_opt_corr: int | None = None,
 	):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	try:
 		screener_moneyflow_object = bf.ScreenerMoneyFlow(
 			accum_or_distri = accum_or_distri,
@@ -709,7 +717,7 @@ async def get_screener_foreign_vwap(
 		] = dp.ScreenerList.vwap_rally,
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	radar_period: int | None = None,
 	stockcode_excludes: set[str] = Query(default=set()),
 	percentage_range: float | None = 0.05,
@@ -718,6 +726,7 @@ async def get_screener_foreign_vwap(
 	screener_min_prop:int | None = None,
 	period_vwap: int | None = None,
 	):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	try:
 		screener_vwap_object = ff.ScreenerVWAP(
 			screener_vwap_criteria = screener_vwap_criteria,
@@ -766,7 +775,7 @@ async def get_screener_broker_vwap(
 	screener_vwap_criteria: Literal[dp.ScreenerList.vwap_rally,dp.ScreenerList.vwap_around,dp.ScreenerList.vwap_breakout,dp.ScreenerList.vwap_breakdown] = dp.ScreenerList.vwap_rally,
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	radar_period: int | None = None,
 	percentage_range: float | None = 0.05,
 	period_vwap: int | None = None,
@@ -786,6 +795,7 @@ async def get_screener_broker_vwap(
 	stepup_n_cluster_threshold: int | None = None,
 	filter_opt_corr: int | None = None,
 	):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	try:
 		screener_vwap_object = bf.ScreenerVWAP(
 			screener_vwap_criteria = screener_vwap_criteria,
@@ -844,13 +854,14 @@ async def get_screener_foreign_vprofile(
 	screener_vprofile_criteria: Literal[dp.ScreenerList.vprofile_inside,dp.ScreenerList.vprofile_breakout,dp.ScreenerList.vprofile_breakdown,dp.ScreenerList.vprofile_support_bounce,dp.ScreenerList.vprofile_resistance_rejection] = dp.ScreenerList.vprofile_inside,
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	radar_period: int | None = None,
 	stockcode_excludes: set[str] = Query(default=set()),
 	screener_min_value: int | None = None,
 	screener_min_frequency: int | None = None,
 	screener_min_prop:int | None = None
 	):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	try:
 		screener_vprofile_object = ff.ScreenerVProfile(
 			screener_vprofile_criteria = screener_vprofile_criteria,
@@ -897,7 +908,7 @@ async def get_screener_broker_vprofile(
 	screener_vprofile_criteria: Literal[dp.ScreenerList.vprofile_inside,dp.ScreenerList.vprofile_breakout,dp.ScreenerList.vprofile_breakdown,dp.ScreenerList.vprofile_support_bounce,dp.ScreenerList.vprofile_resistance_rejection] = dp.ScreenerList.vprofile_inside,
 	n_stockcodes: int = 10,
 	startdate: datetime.date | None = None,
-	enddate: datetime.date = datetime.date.today(),
+	enddate: datetime.date | None = None,
 	radar_period: int | None = None,
 	stockcode_excludes: set[str] = Query(default=set()),
 	screener_min_value: int | None = None,
@@ -915,6 +926,7 @@ async def get_screener_broker_vprofile(
 	stepup_n_cluster_threshold: int | None = None,
 	filter_opt_corr: int | None = None
 	):
+	enddate = enddate or datetime.date.today()  # resolved per request, not at import
 	try:
 		screener_vprofile_object = bf.ScreenerVProfile(
 			screener_vprofile_criteria = screener_vprofile_criteria,
