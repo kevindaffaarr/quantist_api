@@ -19,7 +19,7 @@ import database as db
 import dependencies as dp
 from quantist_library import genchart
 from . import screener as sc
-from .helper import Bin, date_only, pl_to_pandas
+from .helper import Bin, bar_range_of, date_only, pl_to_pandas
 
 import polars as pl
 
@@ -1755,7 +1755,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		self.selected_broker_nval = self.selected_broker_nval[self.selected_broker_nval.index.get_level_values(0).isin(top_stockcodes.index)]
 		self.selected_broker_sumval = self.selected_broker_sumval[self.selected_broker_sumval.index.get_level_values(0).isin(top_stockcodes.index)]
 		self.raw_data_full = self.raw_data_full[self.raw_data_full.index.get_level_values(0).isin(top_stockcodes.index)]
-		self.bar_range = int(self.raw_data_full.groupby(level='code').size().max()) # type: ignore
+		self.bar_range = bar_range_of(self.raw_data_full)
 		
 		# One window, named once. Everything below reports over exactly the bars
 		# the ranking was computed from — no wider, and never past enddate.
@@ -1933,7 +1933,7 @@ class ScreenerVWAP(ScreenerBase):
 			(raw_data_full.index.get_level_values('date') >= pd.Timestamp(startdate)) & \
 			(raw_data_full.index.get_level_values('date') <= pd.Timestamp(enddate))]
 
-		bar_range = int(raw_data_full.groupby(level='code').size().max()) # type: ignore
+		bar_range = bar_range_of(raw_data_full)
 
 		return raw_data_full, bar_range
 	

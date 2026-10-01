@@ -13,7 +13,7 @@ import database as db
 import dependencies as dp
 from quantist_library import genchart
 from . import screener as sc
-from .helper import Bin
+from .helper import Bin, bar_range_of
 
 
 class StockFFFull():
@@ -840,7 +840,7 @@ class ScreenerMoneyFlow(ScreenerBase):
 		# Update startdate and enddate based on raw_data
 		startdate = raw_data.index.get_level_values('date').min()
 		enddate = raw_data.index.get_level_values('date').max()
-		bar_range = int(raw_data.groupby(level='code').size().max()) # type: ignore
+		bar_range = bar_range_of(raw_data)
 
 		assert isinstance(startdate, datetime.date)
 		return top_stockcodes, startdate, enddate, bar_range
@@ -1066,7 +1066,7 @@ class ScreenerVWAP(ScreenerBase):
 			(raw_data.index.get_level_values('date') >= pd.Timestamp(startdate)) & \
 			(raw_data.index.get_level_values('date') <= pd.Timestamp(enddate))]
 
-		bar_range = int(raw_data.groupby(level='code').size().max()) # type: ignore
+		bar_range = bar_range_of(raw_data)
 
 		return startdate, enddate, bar_range, raw_data
 
@@ -1194,7 +1194,7 @@ class ScreenerVProfile(ScreenerBase):
 		close_valflow_corr:pd.Series = raw_data.groupby(level='code').diff().groupby(level='code')[["close","valflow"]]\
 			.corr(method='pearson').iloc[0::2,-1].droplevel(1) # type: ignore
 		
-		bar_range = int(raw_data.groupby(level='code').size().max()) # type: ignore
+		bar_range = bar_range_of(raw_data)
 
 		return startdate, enddate, bar_range, raw_data, close_valflow_corr
 	
